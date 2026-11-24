@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight, LoaderCircle } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import { updateState } from "../../lib/updateState";
 import type { RuntimeEditableSettings } from "../../api/types";
@@ -886,18 +887,18 @@ export function RuntimeSettingsPanel({
             <div className="runtime-rail-group" key={group.key}>
               <span className="runtime-rail-label">{t(group.label)}</span>
               {group.sections.map((section) => (
-                <button
+                <HeroButton
                   key={section.key}
                   type="button"
                   className={`runtime-rail-item${section.key === activeSectionKey ? " is-active" : ""}`}
                   aria-current={section.key === activeSectionKey ? "true" : undefined}
-                  onClick={() => selectSection(section.key)}
+                  onPress={() => selectSection(section.key)}
                 >
                   <span className="runtime-rail-text">{t(section.label)}</span>
                   {sectionChanged(section) ? (
                     <span className="runtime-nav-dot" aria-hidden="true" />
                   ) : null}
-                </button>
+                </HeroButton>
               ))}
             </div>
           ))}
@@ -2179,11 +2180,11 @@ export function RuntimeSettingsPanel({
                   runtime parameter, so it lives inside the section that owns
                   the process's own settings and starts folded. */}
               <div className={`runtime-subblock${deploymentOpen ? " is-open" : ""}`}>
-                <button
+                <HeroButton
                   type="button"
                   className="runtime-subblock-toggle"
                   aria-expanded={deploymentOpen}
-                  onClick={() => setDeploymentOpen((open) => !open)}
+                  onPress={() => setDeploymentOpen((open) => !open)}
                 >
                   <ChevronRight size={14} className="runtime-subblock-chevron" aria-hidden="true" />
                   <span className="runtime-subblock-title">
@@ -2192,7 +2193,7 @@ export function RuntimeSettingsPanel({
                   <span className="runtime-subblock-count">
                     {t("ops.runtime.deploymentEnvSummary", { count: envParamCount })}
                   </span>
-                </button>
+                </HeroButton>
                 {deploymentOpen ? (
                   <div className="runtime-subblock-body">
                     <p className="muted panel-lede">{t("ops.runtime.deploymentLede")}</p>

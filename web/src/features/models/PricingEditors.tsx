@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { InfoTip, Button } from "../../components/ui";
 import { useI18n } from "../../i18n";
 import type { PriceTier, PriceWindow } from "../../api/types";
@@ -239,16 +240,17 @@ export function PriceTiersEditor({
               onChange={(event) => patch(index, { per_request: pricingNumber(event.target.value) })}
             />
           </label>
-          <button
+          <HeroButton
+            variant="ghost"
             type="button"
             className="button button-quiet pricing-remove"
             aria-label={t("pricing.removeTier")}
-            title={t("pricing.removeTier")}
-            disabled={disabled}
-            onClick={() => onChange(value.filter((_, i) => i !== index))}
+            {...({ title: t("pricing.removeTier") } as { title: string })}
+            isDisabled={disabled}
+            onPress={() => onChange(value.filter((_, i) => i !== index))}
           >
             <Trash2 size={14} />
-          </button>
+          </HeroButton>
         </div>
       ))}
       <Button
@@ -331,30 +333,32 @@ export function PriceWindowsEditor({
                 }
               />
             </label>
-            <button
+            <HeroButton
+              variant="ghost"
               type="button"
               className="button button-quiet pricing-remove"
               aria-label={t("pricing.removeWindow")}
-              title={t("pricing.removeWindow")}
-              disabled={disabled}
-              onClick={() => onChange(value.filter((_, i) => i !== index))}
+              {...({ title: t("pricing.removeWindow") } as { title: string })}
+              isDisabled={disabled}
+              onPress={() => onChange(value.filter((_, i) => i !== index))}
             >
               <Trash2 size={14} />
-            </button>
+            </HeroButton>
           </div>
           <div className="pricing-days">
             <span>{t("pricing.windowDays")}</span>
             {WEEKDAYS.map(({ day, key }) => (
-              <button
+              <HeroButton
+                variant="ghost"
                 type="button"
                 key={day}
                 className="pricing-day"
                 aria-pressed={window.days.includes(day)}
-                disabled={disabled}
-                onClick={() => toggleDay(index, day)}
+                isDisabled={disabled}
+                onPress={() => toggleDay(index, day)}
               >
                 {t(key)}
-              </button>
+              </HeroButton>
             ))}
             <small className="pricing-days-note">
               {window.days.length === 0 ? t("pricing.everyDay") : ""}

@@ -1,4 +1,5 @@
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../../i18n";
 import { Field, InfoTip } from "../../components/ui";
@@ -132,17 +133,18 @@ export function EndpointMapEditor({
       <div className="map-editor-bar">
         <div className="map-editor-modes" role="tablist" aria-label={t("channels.endpointMap")}>
           {(["visual", "json"] as const).map((candidate) => (
-            <button
+            <HeroButton
               key={candidate}
               type="button"
-              role="tab"
+              variant="ghost"
+              {...{ role: "tab" }}
               aria-selected={mode === candidate}
               className={`map-editor-mode${mode === candidate ? " is-active" : ""}`}
-              onClick={() => setMode(candidate)}
-              disabled={disabled}
+              onPress={() => setMode(candidate)}
+              isDisabled={disabled}
             >
               {t(candidate === "visual" ? "channels.mapModeVisual" : "channels.mapModeJson")}
-            </button>
+            </HeroButton>
           ))}
         </div>
         <div className="map-editor-badges">
@@ -177,23 +179,29 @@ export function EndpointMapEditor({
           ) : null}
         </div>
         <div className="map-editor-preset">
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className={`advanced-toggle${presetOpen ? " is-open" : ""}`}
             aria-expanded={presetOpen}
-            onClick={() => setPresetOpen((open) => !open)}
-            disabled={disabled}
+            onPress={() => setPresetOpen((open) => !open)}
+            isDisabled={disabled}
           >
             <ChevronDown size={13} />
             {t("channels.mapPreset")}
-          </button>
+          </HeroButton>
           {presetOpen ? (
             <ul className="map-preset-list">
               {ENDPOINT_MAP_PRESETS.map((preset) => (
                 <li key={preset.id}>
-                  <button type="button" onClick={() => applyPreset(preset.id)} disabled={disabled}>
+                  <HeroButton
+                    type="button"
+                    variant="ghost"
+                    onPress={() => applyPreset(preset.id)}
+                    isDisabled={disabled}
+                  >
                     {t(PRESET_KEYS[preset.id] ?? preset.id)}
-                  </button>
+                  </HeroButton>
                 </li>
               ))}
             </ul>
@@ -246,15 +254,16 @@ export function EndpointMapEditor({
             <div className="map-section-head">
               <h4>{t("channels.pathMapSection")}</h4>
               <InfoTip label={t("channels.pathMapHint")} />
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
                 className="map-row-add"
-                onClick={() => updatePathMap([...model.pathMap, { from: "", to: "" }])}
-                disabled={disabled}
+                onPress={() => updatePathMap([...model.pathMap, { from: "", to: "" }])}
+                isDisabled={disabled}
               >
                 <Plus size={12} />
                 {t("channels.mapRowAdd")}
-              </button>
+              </HeroButton>
             </div>
             {model.pathMapError ? (
               <p className="map-row-error">
@@ -302,15 +311,17 @@ export function EndpointMapEditor({
                       }
                       disabled={disabled}
                     />
-                    <button
+                    <HeroButton
                       type="button"
+                      variant="ghost"
+                      isIconOnly
                       className="map-row-remove"
                       aria-label={t("channels.mapRowRemove")}
-                      onClick={() => updatePathMap(model.pathMap.filter((_, i) => i !== index))}
-                      disabled={disabled}
+                      onPress={() => updatePathMap(model.pathMap.filter((_, i) => i !== index))}
+                      isDisabled={disabled}
                     >
                       <Trash2 size={13} />
-                    </button>
+                    </HeroButton>
                     {issueFor(pathIssues, index) ? (
                       <p className="map-row-error">{issueFor(pathIssues, index)}</p>
                     ) : null}
@@ -381,15 +392,16 @@ function FieldMapSection({
       <div className="map-section-head">
         <h4>{t(titleKey)}</h4>
         <InfoTip label={t(hintKey)} />
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="map-row-add"
-          onClick={() => onChange([...rows, emptyFieldRow()])}
-          disabled={disabled}
+          onPress={() => onChange([...rows, emptyFieldRow()])}
+          isDisabled={disabled}
         >
           <Plus size={12} />
           {t("channels.mapRowAdd")}
-        </button>
+        </HeroButton>
       </div>
       {error ? (
         <p className="map-row-error">{t("channels.mapJsonInvalid", { message: error })}</p>
@@ -506,15 +518,17 @@ function FieldMapSection({
                 </>
               )}
 
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
+                isIconOnly
                 className="map-row-remove"
                 aria-label={t("channels.mapRowRemove")}
-                onClick={() => onChange(rows.filter((_, i) => i !== index))}
-                disabled={disabled}
+                onPress={() => onChange(rows.filter((_, i) => i !== index))}
+                isDisabled={disabled}
               >
                 <Trash2 size={13} />
-              </button>
+              </HeroButton>
               {issueFor(index) ? <p className="map-row-error">{issueFor(index)}</p> : null}
             </li>
           ))}

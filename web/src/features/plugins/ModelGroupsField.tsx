@@ -1,4 +1,5 @@
 import { Plus, Sparkles, Trash2, X } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useI18n } from "../../i18n";
 import { Button } from "../../components/ui";
 
@@ -164,30 +165,34 @@ export function ModelGroupsField({
                 value={group.hint}
                 onChange={(event) => replace(index, { hint: event.target.value })}
               />
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
+                isIconOnly
                 className="model-group-remove"
                 aria-label={t("plugins.modelGroups.remove")}
-                onClick={() => update(groups.filter((_, i) => i !== index))}
+                onPress={() => update(groups.filter((_, i) => i !== index))}
               >
                 <Trash2 size={14} />
-              </button>
+              </HeroButton>
             </div>
             <div className="model-group-models">
               {group.models.map((model) => (
                 <span className="model-chip" key={model}>
                   <span className="mono">{model}</span>
-                  <button
+                  <HeroButton
                     type="button"
+                    variant="ghost"
+                    isIconOnly
                     aria-label={t("plugins.modelGroups.removeModel", { model })}
-                    onClick={() =>
+                    onPress={() =>
                       replace(index, {
                         models: group.models.filter((entry) => entry !== model),
                       })
                     }
                   >
                     <X size={12} />
-                  </button>
+                  </HeroButton>
                 </span>
               ))}
               <select

@@ -93,10 +93,8 @@ function mount(fail = false) {
   const element = (
     <SettingsPage
       account={account}
-      appearance="modern"
       scheme="light"
       density="comfortable"
-      onAppearance={vi.fn()}
       onScheme={vi.fn()}
       onDensity={vi.fn()}
       t={teamText("en")}

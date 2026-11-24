@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { Button as HeroButton } from "@heroui/react";
 import {
   AlertTriangle,
   Activity,
@@ -11,7 +12,6 @@ import {
   Coins,
   Copy,
   Database,
-  Play,
   ScrollText,
   Timer,
   TrendingUp,
@@ -36,7 +36,6 @@ import { Button, Page, Panel } from "../components/ui";
 import { formatCost, formatLatency, formatTokens, relativeTime } from "../lib/format";
 import { channelHealthState } from "./channelHealth";
 import { DashboardAura } from "../components/DashboardAura";
-import { GatewayPreview } from "../components/GatewayTransition";
 import { MemberHome } from "../member/MemberHome";
 import { SiteNewsPanel } from "./SiteNewsPanel";
 
@@ -309,7 +308,6 @@ export function DashboardView({
   /** A host that knows who is reading may replace the page's own heading. */
   title?: string;
 }) {
-  const [replayEntrance, setReplayEntrance] = useState(false);
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const range = useUrlTimeRange(params, setParams);
@@ -457,19 +455,8 @@ export function DashboardView({
       // A host without the channel matrix gets a description that does not
       // promise it: the panel is not its to show (see DashboardCapabilities).
       description={caps.channels ? t("dashboard.description") : t("dashboard.descriptionMember")}
-      actions={
-        // Replaying the brand entrance is the operator's flourish; a member's own
-        // home is a place to check a balance and leave, not to watch an animated
-        // gateway. Staff keep it.
-        caps.memberHome ? undefined : (
-          <Button variant="quiet" icon={<Play size={14} />} onClick={() => setReplayEntrance(true)}>
-            {t("motion.replay")}
-          </Button>
-        )
-      }
     >
       <DashboardAura />
-      {replayEntrance ? <GatewayPreview onClose={() => setReplayEntrance(false)} /> : null}
       <div className="cockpit-stack">
         {/* The member's own band answers "where do I connect, what is left, what
             next" in one place; the endpoint strip below it is the operator's
@@ -553,14 +540,16 @@ export function DashboardView({
           <div className="panel-header cockpit-chart-header">
             <div className="cockpit-chart-title">
               {zoom ? (
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
+                  isIconOnly
                   className="chart-back-button"
-                  onClick={() => setZoom(null)}
+                  onPress={() => setZoom(null)}
                   aria-label={t("dashboard.chartBack")}
                 >
                   <ArrowLeft size={14} />
-                </button>
+                </HeroButton>
               ) : (
                 <Activity size={15} />
               )}

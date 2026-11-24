@@ -42,4 +42,17 @@ describe("overlay stack", () => {
     lower.remove();
     upper.remove();
   });
+
+  it("does not overwrite a scroll lock restored by another overlay", () => {
+    document.body.style.overflow = "auto";
+    const unregister = registerOverlay(vi.fn());
+    expect(document.body.style.overflow).toBe("hidden");
+
+    // React Aria may release its own lock before the shared stack unregisters.
+    document.body.style.overflow = "auto";
+    unregister();
+
+    expect(document.body.style.overflow).toBe("auto");
+    document.body.style.overflow = "";
+  });
 });

@@ -32,10 +32,8 @@
   --accent-glow: rgba(229, 93, 73, .12);
   --on-primary: #ffffff;
   --on-accent: #ffffff;
-  /* Text-safe brand colours. The brand hues themselves are fills: in the classic
-     appearance the powder blue is #7cc4f0, which is 1.9:1 as text on white. These
-     two are the same brand, dark enough to read (light) or light enough to read on
-     a dark surface (below). */
+  /* Text-safe brand colours keep labels readable against both light and dark
+     surfaces while preserving the selected palette's hue. */
   --primary-ink: #2b4fd0;
   --accent-ink: #b8442f;
   /* Text on a saturated danger fill. White on the dark red works; on the lighter
@@ -86,9 +84,7 @@
   --font-body: var(--font);
   --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --focus: #3357e8;
-  /* One motion ladder: interactions snap, surfaces settle. The authored entrance
-     sequences (the cinematic and login sheets under themes/) keep their own longer
-     timings on purpose — a cinematic cover is not a hover. */
+  /* One motion ladder: interactions snap and larger surfaces settle. */
   --dur-instant: 90ms; /* a chip, a caret, a row highlight */
   --dur-fast: 120ms; /* hover and press feedback */
   --dur-base: 180ms; /* a state change: a toggle, a disclosure, a badge */

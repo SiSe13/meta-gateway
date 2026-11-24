@@ -1,4 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useI18n } from "../i18n";
 
@@ -96,17 +97,18 @@ export function ScopePicker({
 
   return (
     <div ref={rootRef} className="scope-picker">
-      <button
+      <HeroButton
         type="button"
+        variant="ghost"
         className="scope-picker-trigger"
-        disabled={disabled}
-        onClick={() => (open ? setOpen(false) : openPanel())}
+        isDisabled={disabled}
+        onPress={() => (open ? setOpen(false) : openPanel())}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
         <span className="mono truncate">{display}</span>
         <ChevronDown size={14} aria-hidden="true" />
-      </button>
+      </HeroButton>
       {open && panelStyle ? (
         <div
           className="scope-picker-panel"

@@ -1,6 +1,7 @@
 import { AlertTriangle, Check, Merge } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { UnifyApplyResult, UnifyGroup, UnifyRule, UnifyVariant } from "../../api/types";
 import { Button, Dialog, Empty } from "../../components/ui";
@@ -136,13 +137,14 @@ export function UnifyDialog({ onClose }: { onClose: () => void }) {
       ) : (
         <div className="unify-body-wrap">
           <div className="unify-selectall">
-            <button
+            <HeroButton
+              variant="ghost"
               type="button"
               className="unify-covered-toggle"
-              onClick={() => setAllChecked(!allSelected)}
+              onPress={() => setAllChecked(!allSelected)}
             >
               {allSelected ? t("modelsPage.unify.deselectAll") : t("modelsPage.unify.selectAll")}
-            </button>
+            </HeroButton>
           </div>
           <div className="unify-body">
             {safeGroups.length > 0 ? (
@@ -310,17 +312,18 @@ function GroupCard({
         {pendingVariants.map(renderVariant)}
         {coveredVariants.length > 0 ? (
           <li>
-            <button
+            <HeroButton
+              variant="ghost"
               type="button"
               className="unify-covered-toggle"
-              onClick={() => setShowCovered((value) => !value)}
+              onPress={() => setShowCovered((value) => !value)}
             >
               {showCovered
                 ? t("modelsPage.unify.collapseCovered")
                 : t("modelsPage.unify.showCovered", {
                     count: coveredVariants.length,
                   })}
-            </button>
+            </HeroButton>
           </li>
         ) : null}
         {showCovered ? coveredVariants.map(renderVariant) : null}

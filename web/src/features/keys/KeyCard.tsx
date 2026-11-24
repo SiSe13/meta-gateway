@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { ActionMenu, type ActionMenuItem } from "../../components/ActionMenu";
 import { useI18n } from "../../i18n";
 import { formatCost, formatTokens } from "../../lib/format";
@@ -78,16 +79,17 @@ export function KeyCard({
       <div className="key-card-token">
         <code title={t("keys.card.tokenHint")}>{masked}</code>
         {onCopy ? (
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className="key-card-copy"
-            onClick={onCopy}
-            disabled={copyPending}
+            onPress={onCopy}
+            isDisabled={copyPending}
             aria-label={t("keys.card.copyToken", { name })}
           >
             {copied ? <Check size={13} /> : <Copy size={13} />}
             <span>{copied ? t("dashboard.copied") : t("dashboard.copy")}</span>
-          </button>
+          </HeroButton>
         ) : null}
       </div>
 

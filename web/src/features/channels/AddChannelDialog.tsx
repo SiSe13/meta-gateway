@@ -1,4 +1,5 @@
 import { Cable, ChevronDown, ListPlus } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
@@ -221,37 +222,6 @@ export function AddChannelDialog({
         <span>{t("channels.addHint")}</span>
       </div>
       <div className="form-grid form-grid-single">
-        <Field label={t("common.type")}>
-          <SearchableSelect
-            options={TYPE_OPTIONS}
-            groups={TYPE_GROUPS}
-            value={typeHint}
-            onChange={(next) => {
-              const provider = normalizeTypeChoice(next ?? "") || "openai-compatible";
-              // Auto-fill the provider default base URL when the field is
-              // empty or still holds the previous provider's default.
-              setBaseUrl((current) => {
-                const currentTrimmed = current.trim().replace(/\/+$/, "");
-                const previousDefault = PROVIDER_BASE_URLS[typeHint] ?? "";
-                if (
-                  currentTrimmed === "" ||
-                  (previousDefault && currentTrimmed === previousDefault.replace(/\/+$/, ""))
-                ) {
-                  return PROVIDER_BASE_URLS[provider] ?? "";
-                }
-                return current;
-              });
-              setTypeHint(provider);
-              setTypeTouched(true);
-              // The protocol changed under the preview; recompute it instead of
-              // leaving the previous type's endpoint on screen.
-              refreshEndpointPreview(baseUrl, provider);
-            }}
-            disabled={pending}
-            allowCustom
-            placeholder={t("common.type")}
-          />
-        </Field>
         <Field label={t("common.name")}>
           <input
             value={name}
@@ -336,6 +306,34 @@ export function AddChannelDialog({
             </>
           ) : null}
         </Field>
+        <Field label={t("common.type")}>
+          <SearchableSelect
+            options={TYPE_OPTIONS}
+            groups={TYPE_GROUPS}
+            value={typeHint}
+            onChange={(next) => {
+              const provider = normalizeTypeChoice(next ?? "") || "openai-compatible";
+              // 空值或仍是旧类型预设地址时，切换类型后同步切换默认地址。
+              setBaseUrl((current) => {
+                const currentTrimmed = current.trim().replace(/\/+$/, "");
+                const previousDefault = PROVIDER_BASE_URLS[typeHint] ?? "";
+                if (
+                  currentTrimmed === "" ||
+                  (previousDefault && currentTrimmed === previousDefault.replace(/\/+$/, ""))
+                ) {
+                  return PROVIDER_BASE_URLS[provider] ?? "";
+                }
+                return current;
+              });
+              setTypeHint(provider);
+              setTypeTouched(true);
+              refreshEndpointPreview(baseUrl, provider);
+            }}
+            disabled={pending}
+            allowCustom
+            placeholder={t("common.type")}
+          />
+        </Field>
         <Field label={t("channels.group")} hint={t("channels.groupHint")}>
           <input
             value={groupName}
@@ -375,18 +373,21 @@ export function AddChannelDialog({
           {/* Same header shape as the channel detail's model block: the title on
               the left, the thing you can do about it on the right. */}
           <div className="detail-section-actions">
-            <button
+            <HeroButton
               type="button"
+              variant="ghost"
               className="detail-section-expand connection-manage-button"
-              onClick={fetchModels}
-              disabled={!canFetchModels}
-              title={
-                canFetchModels ? t("channels.modelsFetchHint") : t("channels.modelsFetchNeedsInput")
-              }
+              onPress={fetchModels}
+              isDisabled={!canFetchModels}
+              {...{
+                title: canFetchModels
+                  ? t("channels.modelsFetchHint")
+                  : t("channels.modelsFetchNeedsInput"),
+              }}
             >
               <ListPlus size={12} className={fetchingModels ? "spin" : undefined} />
               {fetchingModels ? t("common.working") : t("channels.modelsFetch")}
-            </button>
+            </HeroButton>
           </div>
         </div>
         <SyncModePicker
@@ -421,10 +422,11 @@ export function AddChannelDialog({
         ) : null}
       </section>
 
-      <button
+      <HeroButton
         type="button"
+        variant="ghost"
         className={`advanced-toggle${showAdvanced ? " is-open" : ""}`}
-        onClick={() => setShowAdvanced((value) => !value)}
+        onPress={() => setShowAdvanced((value) => !value)}
       >
         <ChevronDown size={13} />
         {showAdvanced
@@ -432,7 +434,7 @@ export function AddChannelDialog({
           : Object.keys(advanced).length > 0
             ? t("channels.showAdvancedWithCount", { n: Object.keys(advanced).length })
             : t("channels.showAdvanced")}
-      </button>
+      </HeroButton>
       {showAdvanced ? (
         <div className="advanced-fields">
           <div className="form-grid">

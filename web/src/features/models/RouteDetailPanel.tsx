@@ -1,5 +1,6 @@
 import { type FocusEvent } from "react";
 import { ChevronDown, Pencil, Plus, Target, Trash2, Wand2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import type { Route, RoutingCandidate } from "../../api/types";
 import { ActionMenu } from "../../components/ActionMenu";
 import { Button, Empty, InfoTip } from "../../components/ui";
@@ -149,17 +150,18 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
       ) : null}
 
       <div className="member-section-heading">
-        <button
+        <HeroButton
+          variant="ghost"
           type="button"
           aria-expanded={showAdvanced}
-          onClick={() => setShowAdvanced((value) => !value)}
+          onPress={() => setShowAdvanced((value) => !value)}
         >
           {t("modelsPage.members")}
           <ChevronDown
             size={14}
             className={showAdvanced ? "chevron-flip is-open" : "chevron-flip"}
           />
-        </button>
+        </HeroButton>
         <InfoTip
           label={`${t("modelsPage.routingHint")} ${t("routing.reorderHint")} ${t("routing.groupTabsHint")}`}
         />
@@ -213,18 +215,24 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                   const count = groupCounts.get(name) ?? 0;
                   return (
                     <div key={name} className={`member-group-tab${active ? " is-active" : ""}`}>
-                      <button
+                      <HeroButton
+                        variant="ghost"
                         type="button"
-                        role="tab"
                         aria-selected={active}
-                        title={count === 0 ? t("routing.groupEmptyHint") : undefined}
-                        onClick={() => setActiveGroup(name)}
+                        ref={(element) => {
+                          if (!element) return;
+                          element.setAttribute("role", "tab");
+                          const title = count === 0 ? t("routing.groupEmptyHint") : "";
+                          if (title) element.setAttribute("title", title);
+                          else element.removeAttribute("title");
+                        }}
+                        onPress={() => setActiveGroup(name)}
                       >
                         <span className="member-group-tab-main">
                           {name === "default" ? t("routing.groupDefault") : name}
                           <span className="member-group-count">{count}</span>
                         </span>
-                      </button>
+                      </HeroButton>
                       {name !== "default" ? (
                         <ActionMenu
                           compact
@@ -271,14 +279,15 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                     onBlur={groupEditorBlur}
                   />
                 ) : (
-                  <button
+                  <HeroButton
+                    variant="ghost"
                     type="button"
                     className="member-group-add"
-                    onClick={() => setGroupDraft({ mode: "new", value: "" })}
+                    onPress={() => setGroupDraft({ mode: "new", value: "" })}
                   >
                     <Plus size={12} />
                     {t("routing.groupNew")}
-                  </button>
+                  </HeroButton>
                 )}
               </div>
               {groupDraft?.mode === "new" ? (

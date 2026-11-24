@@ -1,4 +1,5 @@
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useMemo, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -523,19 +524,26 @@ export function ChannelModelsPanel({
           aria-label={t("channels.syncMode")}
         >
           {(["manual", "auto"] as const).map((mode) => (
-            <button
+            <HeroButton
               key={mode}
               type="button"
+              variant="ghost"
               className={`channel-models-syncbar-option${syncMode === mode ? " is-active" : ""}`}
               aria-pressed={syncMode === mode}
-              disabled={setSyncMode.isPending || !channel}
-              title={
-                mode === "auto" ? t("channels.syncModeAutoHint") : t("channels.syncModeManualHint")
-              }
-              onClick={() => setSyncMode.mutate(mode)}
+              isDisabled={setSyncMode.isPending || !channel}
+              ref={(element) => {
+                if (!element) return;
+                element.setAttribute(
+                  "title",
+                  mode === "auto"
+                    ? t("channels.syncModeAutoHint")
+                    : t("channels.syncModeManualHint"),
+                );
+              }}
+              onPress={() => setSyncMode.mutate(mode)}
             >
               {mode === "auto" ? t("channels.syncModeAuto") : t("channels.syncModeManual")}
-            </button>
+            </HeroButton>
           ))}
         </div>
       </div>
@@ -593,17 +601,18 @@ export function ChannelModelsPanel({
                 ],
               ] as const
             ).map(([mode, label, count]) => (
-              <button
+              <HeroButton
                 key={mode}
                 type="button"
+                variant="ghost"
                 className={statusFilter === mode ? "is-active" : ""}
                 aria-pressed={statusFilter === mode}
-                title={t("channels.modelsFilterHint")}
-                onClick={() => setStatusFilter(mode)}
+                ref={(element) => element?.setAttribute("title", t("channels.modelsFilterHint"))}
+                onPress={() => setStatusFilter(mode)}
               >
                 {label}
                 <span className="channel-model-status-count">{count}</span>
-              </button>
+              </HeroButton>
             ))}
           </div>
           <div className="channel-model-add">
@@ -796,16 +805,19 @@ export function ChannelModelsPanel({
                                     }
                                   />
                                   {aliasInfo && inputValue === alias ? (
-                                    <button
+                                    <HeroButton
                                       type="button"
+                                      variant="ghost"
                                       className="icon-button"
                                       aria-label={t("channels.aliasRemove")}
-                                      title={t("channels.aliasRemove")}
-                                      disabled={removeAlias.isPending}
-                                      onClick={() => removeAlias.mutate(item.name)}
+                                      ref={(element) =>
+                                        element?.setAttribute("title", t("channels.aliasRemove"))
+                                      }
+                                      isDisabled={removeAlias.isPending}
+                                      onPress={() => removeAlias.mutate(item.name)}
                                     >
                                       <Trash2 size={13} />
-                                    </button>
+                                    </HeroButton>
                                   ) : inputValue.trim() !== alias ? (
                                     <Button
                                       variant="secondary"

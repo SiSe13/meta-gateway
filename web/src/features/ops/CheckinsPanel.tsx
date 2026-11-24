@@ -1,4 +1,4 @@
-import { Play } from "lucide-react";
+import { Play, Settings2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
@@ -18,6 +18,7 @@ import {
   Button,
   ConfirmDialog,
   DataTable,
+  Dialog,
   ErrorState,
   Loading,
   Panel,
@@ -55,37 +56,39 @@ function siteDisplayName(
   siteId: number,
   sitesById: Map<number, { name: string; base_url: string }>,
   t: (key: string, vars?: Record<string, string | number>) => string,
-): { title: string; subtitle: string } {
+): string {
   const site = sitesById.get(siteId);
-  if (!site) {
-    return {
-      title: t("common.siteId", { id: siteId }),
-      subtitle: "",
-    };
-  }
-  const name = site.name.trim() || site.base_url.trim() || t("common.siteId", { id: siteId });
-  let host = "";
-  try {
-    host = site.base_url ? new URL(site.base_url).host : "";
-  } catch {
-    host = site.base_url;
-  }
-  const subtitleParts = [`#${siteId}`];
-  if (host && host !== name) subtitleParts.push(host);
-  return {
-    title: name,
-    subtitle: subtitleParts.join(" · "),
-  };
+  return site?.name.trim() || site?.base_url.trim() || t("common.siteId", { id: siteId });
 }
 
-export function CheckinsPanel({ children }: { children?: React.ReactNode }) {
+// localDateBounds 将浏览器本地日期转换为左闭右开的 RFC3339 时间范围。
+function localDateBounds(day: string): { since: string; until: string } | null {
+  if (!day) return null;
+  const start = new Date(`${day}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { since: start.toISOString(), until: end.toISOString() };
+}
+
+// todayLocalDate 返回浏览器本地日历日期作为默认筛选值。
+function todayLocalDate(): string {
+  const now = new Date();
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+export function CheckinsPanel() {
   const { client } = useSession();
   const { t } = useI18n();
   const toast = useToast();
   const s = api(client!);
   const qc = useQueryClient();
   const [status, setStatus] = useState("");
+  const [siteId, setSiteId] = useState("");
+  const [date, setDate] = useState(todayLocalDate);
   const [confirmRun, setConfirmRun] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const runtime = useQuery({
     queryKey: ["runtime-settings"],
     queryFn: ({ signal }) => s.runtimeSettings(signal),
@@ -116,13 +119,23 @@ export function CheckinsPanel({ children }: { children?: React.ReactNode }) {
     },
     invalidateKeys: [["runtime-settings"]],
     onSuccess: () => {
+      setScheduleOpen(false);
       toast.push({ tone: "success", message: t("ops.checkin.scheduleSaved") });
     },
   });
   const logs = useQuery({
-    queryKey: ["checkin-logs", status],
-    queryFn: ({ signal }) =>
-      s.checkinLogs(`?limit=100${status ? `&status=${status}` : ""}`, signal),
+    queryKey: ["checkin-logs", status, siteId, date],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({ limit: "500" });
+      if (status) params.set("status", status);
+      if (siteId) params.set("site_id", siteId);
+      const bounds = localDateBounds(date);
+      if (bounds) {
+        params.set("since", bounds.since);
+        params.set("until", bounds.until);
+      }
+      return s.checkinLogs(`?${params.toString()}`, signal);
+    },
     retry: (failureCount, error) => {
       const message = error instanceof Error ? error.message : String(error);
       if (/plugin_disabled/i.test(message)) return false;
@@ -181,124 +194,56 @@ export function CheckinsPanel({ children }: { children?: React.ReactNode }) {
   return (
     <>
       <Panel
-        title={t("ops.checkin.scheduleTitle")}
-        lede={t("ops.checkin.scheduleLede")}
-        titleHelp={t("ops.checkin.scheduleHint")}
-      >
-        <label className="check">
-          <input
-            className="switch"
-            type="checkbox"
-            disabled={saveSchedule.isPending || scheduleDraft == null}
-            checked={schedule.preset !== "off"}
-            onChange={(e) => {
-              if (!scheduleDraft) return;
-              setScheduleDraft(
-                e.target.checked
-                  ? { preset: "daily", cron: "0 8 * * *" }
-                  : { preset: "off", cron: scheduleDraft.cron },
-              );
-            }}
-          />
-          <span>{t("ops.checkin.scheduleEnabled")}</span>
-        </label>
-        {schedule.preset !== "off" ? (
-          <div className="form-grid is-spaced">
-            <label className="field">
-              <span>{t("ops.checkin.schedulePreset")}</span>
+        actions={
+          <div className="checkin-log-toolbar">
+            <div className="checkin-log-filters">
               <select
-                disabled={saveSchedule.isPending}
-                value={schedule.preset}
-                onChange={(e) => {
-                  const preset = e.target.value as SchedulePresetId;
-                  if (!scheduleDraft) return;
-                  const known = SCHEDULE_PRESETS.find((item) => item.id === preset);
-                  setScheduleDraft({
-                    preset,
-                    cron:
-                      preset === "custom"
-                        ? scheduleDraft.cron
-                        : (known?.cron ?? scheduleDraft.cron),
-                  });
-                }}
+                aria-label={t("ops.checkin.siteFilter")}
+                value={siteId}
+                onChange={(e) => setSiteId(e.target.value)}
               >
-                {SCHEDULE_PRESETS.filter((item) => item.id !== "off").map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {t(`ops.schedule.preset.${item.id}`)}
+                <option value="">{t("ops.checkin.allSites")}</option>
+                {(sites.data ?? []).map((site) => (
+                  <option key={site.id} value={site.id}>
+                    {site.name.trim() || site.base_url || t("common.siteId", { id: site.id })}
                   </option>
                 ))}
               </select>
-            </label>
-            {schedule.preset === "custom" || schedule.preset === "daily" ? (
-              <label className="field">
-                <span>{t("ops.checkin.scheduleCron")}</span>
-                <CheckinTimePicker
-                  value={schedule.cron}
-                  disabled={saveSchedule.isPending}
-                  onChange={(cron) => setScheduleDraft({ preset: "custom", cron })}
-                />
-              </label>
-            ) : (
-              <div className="field">
-                <span>{t("ops.checkin.scheduleCron")}</span>
-                <input className="mono" disabled value={schedule.cron} readOnly />
-              </div>
-            )}
+              <input
+                type="date"
+                aria-label={t("ops.checkin.dateFilter")}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <select
+                aria-label={t("ops.statusFilter")}
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">{t("ops.allStatuses")}</option>
+                <option value="success">{t("status.success")}</option>
+                <option value="failed">{t("status.failed")}</option>
+                <option value="skipped">{t("status.skipped")}</option>
+              </select>
+            </div>
+            <div className="checkin-log-actions">
+              <Button
+                icon={<Play size={16} />}
+                disabled={run.isPending}
+                onClick={() => setConfirmRun(true)}
+              >
+                {run.isPending ? t("ops.running") : t("ops.runEnabled")}
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Settings2 size={16} />}
+                disabled={scheduleDraft == null}
+                onClick={() => setScheduleOpen(true)}
+              >
+                {t("ops.checkin.settings")}
+              </Button>
+            </div>
           </div>
-        ) : null}
-        <div className="stack-tight">
-          <Button
-            variant="secondary"
-            disabled={!scheduleDirty || saveSchedule.isPending || scheduleDraft == null}
-            onClick={() => saveSchedule.mutate(settingsFromSchedule(scheduleDraft!))}
-          >
-            {saveSchedule.isPending ? t("common.working") : t("ops.checkin.scheduleSave")}
-          </Button>
-        </div>
-        {/* Where the schedule comes from decides whether a container rebuild
-            keeps it: an admin override lives in the database, the environment
-            does not. One short line, in the same type as everything else — the
-            mechanics behind it are in the panel's (i) rather than repeated here
-            as a paragraph the reader has to skip. */}
-        {runtime.data ? (
-          <p className="ops-panel-context">
-            <span>
-              {t("ops.checkin.scheduleSource", {
-                source: t(
-                  runtime.data.source === "admin_override"
-                    ? "ops.runtime.sourceAdmin"
-                    : "ops.runtime.sourceEnvironment",
-                ),
-              })}
-              {runtime.data.has_override ? "" : ` ${t("ops.checkin.scheduleEnvHint")}`}
-            </span>
-          </p>
-        ) : null}
-      </Panel>
-
-      {children}
-
-      <Panel
-        actions={
-          <>
-            <select
-              aria-label={t("ops.statusFilter")}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">{t("ops.allStatuses")}</option>
-              <option value="success">success</option>
-              <option value="failed">failed</option>
-              <option value="skipped">skipped</option>
-            </select>
-            <Button
-              icon={<Play size={16} />}
-              disabled={run.isPending}
-              onClick={() => setConfirmRun(true)}
-            >
-              {run.isPending ? t("ops.running") : t("ops.runEnabled")}
-            </Button>
-          </>
         }
       >
         {run.error && <ErrorState error={run.error} />}
@@ -335,21 +280,7 @@ export function CheckinsPanel({ children }: { children?: React.ReactNode }) {
               {checkinPagination.pageItems.map((l) => (
                 <tr key={l.id}>
                   <td>
-                    {(() => {
-                      const display = siteDisplayName(l.site_id, sitesById, t);
-                      return (
-                        <>
-                          <strong title={display.subtitle || undefined}>{display.title}</strong>
-                          <small>
-                            {display.subtitle
-                              ? `${display.subtitle} · ${t("common.credentialId", { id: l.credential_id })}`
-                              : t("common.credentialId", {
-                                  id: l.credential_id,
-                                })}
-                          </small>
-                        </>
-                      );
-                    })()}
+                    <strong>{siteDisplayName(l.site_id, sitesById, t)}</strong>
                   </td>
                   <td>
                     <StatusBadge value={l.status} />
@@ -390,6 +321,105 @@ export function CheckinsPanel({ children }: { children?: React.ReactNode }) {
           />
         ) : null}
       </Panel>
+      {scheduleOpen ? (
+        <Dialog
+          title={t("ops.checkin.scheduleTitle")}
+          onClose={() => setScheduleOpen(false)}
+          busy={saveSchedule.isPending}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setScheduleOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button
+                disabled={!scheduleDirty || saveSchedule.isPending || scheduleDraft == null}
+                onClick={() =>
+                  scheduleDraft && saveSchedule.mutate(settingsFromSchedule(scheduleDraft))
+                }
+              >
+                {saveSchedule.isPending ? t("common.working") : t("ops.checkin.scheduleSave")}
+              </Button>
+            </>
+          }
+        >
+          <p className="panel-lede muted">{t("ops.checkin.scheduleLede")}</p>
+          <label className="check">
+            <input
+              className="switch"
+              type="checkbox"
+              disabled={saveSchedule.isPending || scheduleDraft == null}
+              checked={schedule.preset !== "off"}
+              onChange={(e) => {
+                if (!scheduleDraft) return;
+                setScheduleDraft(
+                  e.target.checked
+                    ? { preset: "daily", cron: "0 8 * * *" }
+                    : { preset: "off", cron: scheduleDraft.cron },
+                );
+              }}
+            />
+            <span>{t("ops.checkin.scheduleEnabled")}</span>
+          </label>
+          {schedule.preset !== "off" ? (
+            <div className="form-grid is-spaced">
+              <label className="field">
+                <span>{t("ops.checkin.schedulePreset")}</span>
+                <select
+                  disabled={saveSchedule.isPending}
+                  value={schedule.preset}
+                  onChange={(e) => {
+                    const preset = e.target.value as SchedulePresetId;
+                    if (!scheduleDraft) return;
+                    const known = SCHEDULE_PRESETS.find((item) => item.id === preset);
+                    setScheduleDraft({
+                      preset,
+                      cron:
+                        preset === "custom"
+                          ? scheduleDraft.cron
+                          : (known?.cron ?? scheduleDraft.cron),
+                    });
+                  }}
+                >
+                  {SCHEDULE_PRESETS.filter((item) => item.id !== "off").map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {t(`ops.schedule.preset.${item.id}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {schedule.preset === "custom" || schedule.preset === "daily" ? (
+                <label className="field">
+                  <span>{t("ops.checkin.scheduleCron")}</span>
+                  <CheckinTimePicker
+                    value={schedule.cron}
+                    disabled={saveSchedule.isPending}
+                    onChange={(cron) => setScheduleDraft({ preset: "custom", cron })}
+                  />
+                </label>
+              ) : (
+                <div className="field">
+                  <span>{t("ops.checkin.scheduleCron")}</span>
+                  <input className="mono" disabled value={schedule.cron} readOnly />
+                </div>
+              )}
+            </div>
+          ) : null}
+          {runtime.data ? (
+            <p className="ops-panel-context">
+              <span>
+                {t("ops.checkin.scheduleSource", {
+                  source: t(
+                    runtime.data.source === "admin_override"
+                      ? "ops.runtime.sourceAdmin"
+                      : "ops.runtime.sourceEnvironment",
+                  ),
+                })}
+                {runtime.data.has_override ? "" : ` ${t("ops.checkin.scheduleEnvHint")}`}
+              </span>
+            </p>
+          ) : null}
+        </Dialog>
+      ) : null}
     </>
   );
 }

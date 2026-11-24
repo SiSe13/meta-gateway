@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -72,13 +73,13 @@ function TOTPPanel() {
           <p className="muted panel-note">{t("ops.runtime.totpSetupHint")}</p>
           <div className="totp-secret-row mono">
             <code>{setupData.secret}</code>
-            <button
+            <HeroButton
               type="button"
               className="redemption-copy"
-              onClick={() => void navigator.clipboard.writeText(setupData.secret)}
+              onPress={() => void navigator.clipboard.writeText(setupData.secret)}
             >
               {t("keys.redemptionCopy")}
-            </button>
+            </HeroButton>
           </div>
           <a
             className="totp-uri-link"

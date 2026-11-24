@@ -3,9 +3,14 @@ import { CHROME_NAV_ITEMS } from "./chromeNav";
 import { MODE_GATED_NAV, modeHiddenNav } from "./topBar";
 
 describe("console navigation registry", () => {
-  it("keeps user management in the real navigation, not the single settings slot", () => {
-    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users")?.group).toBe("primary");
-    expect(CHROME_NAV_ITEMS.filter((item) => item.group === "settings")).toHaveLength(1);
+  it("keeps the requested workspaces and pages in one navigation registry", () => {
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users")?.group).toBe("users");
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users/oauth")?.group).toBe("users");
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/backups")?.group).toBe("backup");
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/workbench")).toBeUndefined();
+    expect(CHROME_NAV_ITEMS.filter((item) => item.group === "settings")).toEqual([
+      expect.objectContaining({ path: "/settings?tab=runtime" }),
+    ]);
   });
 
   // The multi-user area is the one entry hidden by state instead of by a
@@ -24,13 +29,13 @@ describe("console navigation registry", () => {
 
 it("reserves personal settings for a team account while retaining deployment settings", async () => {
   const { CHROME_NAV_ITEMS, canAccessNav } = await import("./chromeNav");
-  const account = CHROME_NAV_ITEMS.find((item) => item.path === "/account")!;
-  expect(canAccessNav(account, null)).toBe(false);
-  for (const role of ["member", "owner", "admin"] as const)
-    expect(canAccessNav(account, role)).toBe(true);
+  expect(CHROME_NAV_ITEMS.some((item) => item.path === "/account")).toBe(false);
+  const users = CHROME_NAV_ITEMS.find((item) => item.path === "/users")!;
+  expect(canAccessNav(users, "admin")).toBe(true);
+  expect(canAccessNav(users, "member")).toBe(false);
   expect(
     canAccessNav(
-      CHROME_NAV_ITEMS.find((item) => item.path === "/settings")!,
+      CHROME_NAV_ITEMS.find((item) => item.path === "/settings?tab=runtime")!,
       null,
     ),
   ).toBe(true);

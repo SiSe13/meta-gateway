@@ -2,10 +2,14 @@ import type { ComponentType, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import type { UpdateCheckStatus } from "../api/types";
 
-export type UIThemeId = "classic" | "modern";
+export type UIThemeId = "metapi";
 export type ThemeNavItem = { to: string; label: string; icon: LucideIcon };
 export type ThemeChromeProps = {
   navigation: ReactNode;
+  topNavigation: { id: string; label: string; to: string }[];
+  activeTopNavigation: string;
+  showAdminAccount: boolean;
+  appearanceHiddenNav: string[];
   sections: { label: string; items: ThemeNavItem[] }[];
   version: string;
   theme: "light" | "dark";
@@ -18,10 +22,10 @@ export type ThemeChromeProps = {
   collapsed: boolean;
   onCollapse: () => void;
   onOpenNav: () => void;
+  onSelectTopNavigation: (to: string) => void;
   sectionLabel: string;
   pageLabel: string;
 };
-export type EntrancePhase = "sealing" | "revealing" | "sheathing";
 export type ThemeDetailsProps = {
   open: boolean;
   onClose: () => void;
@@ -32,10 +36,7 @@ export type UIThemePackage = {
   id: UIThemeId;
   version: string;
   apiVersion: 1;
-  nameKey: string;
-  descriptionKey: string;
   Chrome: ComponentType<ThemeChromeProps>;
-  Entrance: ComponentType<{ phase: EntrancePhase }>;
   Details: ComponentType<ThemeDetailsProps>;
   channelDetails: "split" | "drawer";
 };

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useI18n } from "../i18n";
 
 export type TelemetryItem = {
@@ -83,16 +84,17 @@ export function TelemetryStrip({ items }: { items: TelemetryItem[] }) {
           );
         }
         return (
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             key={item.label}
             className={className}
-            onClick={item.onClick}
+            onPress={item.onClick}
+            ref={(element) => element?.setAttribute("title", item.hint ?? "")}
             aria-pressed={Boolean(item.active)}
-            title={item.hint}
           >
             <SegmentBody item={item} />
-          </button>
+          </HeroButton>
         );
       })}
     </div>

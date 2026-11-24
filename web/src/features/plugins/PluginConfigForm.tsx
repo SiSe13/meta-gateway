@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { PluginConfigField } from "../../api/types";
 import { ErrorState, Loading } from "../../components/ui";
@@ -256,15 +257,16 @@ export function PluginConfigForm({
       <div className="form-stack">{basic.map(renderField)}</div>
       {advanced.length > 0 ? (
         <div className="config-advanced">
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className="config-advanced-toggle"
-            onClick={() => setShowAdvanced((open) => !open)}
+            onPress={() => setShowAdvanced((open) => !open)}
             aria-expanded={showAdvanced}
           >
             {showAdvanced ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             {t("plugins.advancedFields", { count: advanced.length })}
-          </button>
+          </HeroButton>
           {showAdvanced ? <div className="form-stack">{advanced.map(renderField)}</div> : null}
         </div>
       ) : null}

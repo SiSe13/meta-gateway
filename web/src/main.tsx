@@ -10,9 +10,14 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { installPreloadRecovery } from "./lib/preloadRecovery";
 import { UnsavedChangesBoundary } from "./lib/RouterBoundary";
 import "./styles.css";
-import "./themes/modern/theme.css";
-import "./themes/classic/theme.css";
-import "./themes/classic/compat.css";
+import "./styles/tokens.css";
+import "./styles/system.css";
+import "./styles/shell.css";
+import "./styles/workspaces.css";
+import "./styles/member.css";
+import "./styles/login.css";
+import "./styles/motion.css";
+import "./themes/metapi/theme.css";
 import "./styles/theme-gallery.css";
 // Last on purpose: a palette ties on specificity with the theme token blocks,
 // so cascade order is what lets it win. See styles/palettes.css.
@@ -27,6 +32,7 @@ import "./styles/exchange-workspace.css";
 // members now render inside the console's own shell and panels, so a second
 // copy of a top bar, side rail or card could only drift from the real one.
 import "./member/workspaces.css";
+import "./styles/heroui-overrides.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

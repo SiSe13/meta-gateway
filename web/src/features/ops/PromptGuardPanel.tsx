@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { PromptGuardRule } from "../../api/types";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
@@ -32,16 +33,19 @@ function PromptGuardPanel() {
     invalidateKeys: [["prompt-guards"]],
   });
   const items = query.data?.items ?? [];
+  const addButtonTitle = { title: t("ops.guard.add") };
   return (
     <section className="panel runtime-section runtime-tool-prompt-guard" id="runtime-prompt-guards">
       <div className="panel-header">
         <strong>{t("ops.guard.title")}</strong>
         <InfoTip label={t("ops.guard.hint")} />
-        <button
+        <HeroButton
+          {...addButtonTitle}
           type="button"
           className="icon-button"
-          title={t("ops.guard.add")}
-          onClick={() =>
+          isIconOnly
+          aria-label={t("ops.guard.add")}
+          onPress={() =>
             setDraft({
               name: "",
               pattern: "",
@@ -54,7 +58,7 @@ function PromptGuardPanel() {
           }
         >
           +
-        </button>
+        </HeroButton>
       </div>
       <p className="muted panel-lede">{t("ops.guard.lede")}</p>
       {items.length === 0 ? (
@@ -73,20 +77,20 @@ function PromptGuardPanel() {
                 <span className="error-rule-off">{t("common.disabled")}</span>
               ) : null}
               <span className="flex-spacer" />
-              <button
+              <HeroButton
                 type="button"
                 className="error-rule-edit"
-                onClick={() => setDraft({ ...rule })}
+                onPress={() => setDraft({ ...rule })}
               >
                 {t("common.edit")}
-              </button>
-              <button
+              </HeroButton>
+              <HeroButton
                 type="button"
                 className="error-rule-del"
-                onClick={() => setConfirmDelete(rule)}
+                onPress={() => setConfirmDelete(rule)}
               >
                 {t("common.delete")}
-              </button>
+              </HeroButton>
             </div>
           ))}
         </div>

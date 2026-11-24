@@ -10,6 +10,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type FocusEvent } from "react";
 import { BillingRuleDialog } from "./models/BillingRulePanel";
@@ -853,28 +854,30 @@ function ModelsWorkspace({
               count: missing.data.items.length,
             })}
           </span>
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className="missing-models-focus"
-            onClick={() => {
+            onPress={() => {
               const first = missing.data!.items[0];
               if (first) setQuery(first.model);
             }}
           >
             {t("modelsPage.missingModelsFocus")}
-          </button>
-          <button
+          </HeroButton>
+          <HeroButton
             type="button"
+            variant="ghost"
             className="missing-models-close"
             aria-label={t("common.dismiss")}
-            title={t("common.dismiss")}
-            onClick={() => {
+            ref={(element) => element?.setAttribute("title", t("common.dismiss"))}
+            onPress={() => {
               storeMissingDismissed();
               setMissingDismissed(true);
             }}
           >
             <X size={12} />
-          </button>
+          </HeroButton>
         </div>
       ) : null}
 

@@ -31,7 +31,7 @@ describe("i18n", () => {
     expect(result.current.locale).toBe("zh-CN");
     expect(localStorage.getItem("meta-gateway.locale")).toBe("zh-CN");
     expect(document.documentElement.lang).toBe("zh-CN");
-    expect(result.current.t("app.nav.channels")).toBe("连接");
+    expect(result.current.t("app.nav.channels")).toBe("站点管理");
     expect(result.current.t("assets.refreshResult", { models: 2, routes: 1 })).toContain("2");
   });
 

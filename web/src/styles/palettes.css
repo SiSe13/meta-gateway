@@ -1,12 +1,12 @@
 /* Preset colour palettes.
    ---------------------------------------------------------------------------
-   A palette is orthogonal to both the appearance (classic / modern) and the
-   colour scheme (light / dark), so it only ever restates the brand tokens.
+   A palette is orthogonal to the colour scheme (light / dark), so it only ever
+   restates the brand tokens.
    Every derived token is computed from the two base colours with color-mix,
    which is why adding a palette costs two hex values rather than ten.
 
    This file is imported last in main.tsx on purpose: `:root[data-palette="…"]`
-   ties on specificity with `:root[data-appearance="…"]` in the classic theme,
+   ties on specificity with `:root[data-appearance="…"]` in the shared theme,
    so the cascade order is what makes a palette win. Keep the import last.
 
    The same rule also sets the tokens on the picker chip itself, which lets the
@@ -14,7 +14,7 @@
 
 /* Derived tokens.
    Light surfaces darken on hover, dark surfaces lighten — mirroring how
-   tokens.css and the classic theme each derive their own hover states. */
+   tokens.css and the shared appearance each derive their own hover states. */
 :root[data-palette]:not([data-palette="default"]) {
   --primary-hover: color-mix(in srgb, var(--primary) 86%, #000);
   --primary-active: color-mix(in srgb, var(--primary) 74%, #000);
@@ -123,8 +123,8 @@
 
 /* ------------------------------------------------------------------ picker --
    Chips live in the appearance panel next to the style and mode pickers.
-   Radii come from the token scale rather than fixed pixels, so the chips adopt
-   the classic zero-radius language without needing a compat bridge.
+   Radii come from the token scale rather than fixed pixels, so the chips match
+   the selected card style without a separate compatibility layer.
 
    The grid is a fixed seven columns rather than auto-fill: there are exactly
    seven palettes, and auto-fill left the seventh orphaned on a row of its own
@@ -192,4 +192,3 @@
    show the built-in brand pairs of whichever appearance is active rather than
    whatever palette happens to be selected. */
 .palette-swatch[data-palette="default"] { --swatch-primary: #3357e8; --swatch-accent: #e55d49; }
-:root[data-appearance="classic"] .palette-swatch[data-palette="default"] { --swatch-primary: #7cc4f0; --swatch-accent: #d4af37; }

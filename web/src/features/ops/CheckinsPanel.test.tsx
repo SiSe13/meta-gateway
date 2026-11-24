@@ -31,12 +31,14 @@ const settings = (overrides: Record<string, unknown>) => ({
   ...overrides,
 });
 
-function setup(payload: Record<string, unknown>) {
+function setup(payload: Record<string, unknown>, logRows: unknown[] = []) {
   const calls: { path: string; body: Record<string, unknown> }[] = [];
+  const logQueries: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = new URL(String(input), "http://localhost").pathname;
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname;
       if (path === "/admin/runtime-settings") {
         if (init?.method === "PUT") {
           const body = JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -51,8 +53,13 @@ function setup(payload: Record<string, unknown>) {
         }
         return response(payload);
       }
-      if (path === "/admin/checkin/logs") return response([]);
-      if (path === "/admin/sites") return response([]);
+      if (path === "/admin/checkin/logs") {
+        logQueries.push(url.search);
+        return response(logRows);
+      }
+      if (path === "/admin/sites") {
+        return response([{ id: 7, name: "示例站点", base_url: "https://example.com" }]);
+      }
       if (path === "/admin/checkin/run") {
         return response({ items: [], success_count: 2, failure_count: 1, skipped_count: 0 });
       }
@@ -73,7 +80,7 @@ function setup(payload: Record<string, unknown>) {
       </I18nProvider>
     </QueryClientProvider>,
   );
-  return { calls };
+  return { calls, logQueries };
 }
 
 describe("scheduled check-in panel", () => {
@@ -93,6 +100,9 @@ describe("scheduled check-in panel", () => {
   // recreated, which reads as "the update deleted my setting".
   it("says when the schedule still comes from the environment", async () => {
     setup(settings({}));
+    const settingsButton = await screen.findByRole("button", { name: "设置" });
+    await waitFor(() => expect(settingsButton).toBeEnabled());
+    fireEvent.click(settingsButton);
     expect(await screen.findByText(/定时设置来源：环境变量/)).toBeInTheDocument();
     // One short line, not a paragraph: the mechanics behind it (which env vars,
     // what a compose rebuild re-reads) live in the panel's (i).
@@ -114,12 +124,18 @@ describe("scheduled check-in panel", () => {
         },
       }),
     );
+    const settingsButton = await screen.findByRole("button", { name: "设置" });
+    await waitFor(() => expect(settingsButton).toBeEnabled());
+    fireEvent.click(settingsButton);
     expect(await screen.findByText("定时设置来源：管理端覆盖")).toBeInTheDocument();
     expect(screen.queryByText(/重建容器会读回 .env/)).not.toBeInTheDocument();
   });
 
   it("saves the schedule as a console override", async () => {
     const { calls } = setup(settings({}));
+    const settingsButton = await screen.findByRole("button", { name: "设置" });
+    await waitFor(() => expect(settingsButton).toBeEnabled());
+    fireEvent.click(settingsButton);
     // Wait for the settings document: the checkbox stays disabled until it arrives.
     await screen.findByText(/定时设置来源：环境变量/);
     // Turning the schedule on is what pins it: the save carries the flag and
@@ -134,11 +150,60 @@ describe("scheduled check-in panel", () => {
   // the history table: the toast is what makes a failed count noticeable.
   it("shows a failed manual run as an explicit error toast", async () => {
     setup(settings({}));
-    await screen.findByText(/定时设置来源：环境变量/);
+    await screen.findByRole("button", { name: "设置" });
     fireEvent.click(screen.getByRole("button", { name: "运行已启用项" }));
     const confirmButtons = await screen.findAllByRole("button", { name: "运行已启用项" });
     fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
     expect(await screen.findByText("签到完成：2 成功 · 1 失败 · 0 跳过")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("签到完成：2 成功 · 1 失败 · 0 跳过");
+  });
+
+  it("filters logs by site, local date, and translated status", async () => {
+    const { logQueries } = setup(settings({}));
+    const siteFilter = await screen.findByLabelText("站点筛选");
+    const dateFilter = screen.getByLabelText("签到日期") as HTMLInputElement;
+    const statusFilter = screen.getByLabelText("状态筛选");
+
+    expect(dateFilter.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(screen.getByRole("option", { name: "成功" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "失败" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "已跳过" })).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "示例站点" })).toBeInTheDocument();
+
+    fireEvent.change(siteFilter, { target: { value: "7" } });
+    fireEvent.change(dateFilter, { target: { value: "2026-10-15" } });
+    fireEvent.change(statusFilter, { target: { value: "failed" } });
+
+    await waitFor(() => {
+      const query = logQueries
+        .map((value) => new URLSearchParams(value))
+        .find(
+          (params) =>
+            params.get("site_id") === "7" &&
+            params.get("status") === "failed" &&
+            params.get("since") === new Date("2026-10-15T00:00:00").toISOString() &&
+            params.get("until") === new Date("2026-10-16T00:00:00").toISOString(),
+        );
+      expect(query).toBeDefined();
+    });
+  });
+
+  it("shows just the site name in the history list", async () => {
+    setup(settings({}), [
+      {
+        id: 1,
+        site_id: 7,
+        credential_id: 9,
+        source: "manual",
+        status: "success",
+        category: "checked_in",
+        message: "",
+        reward: "3.5",
+        latency_ms: 10,
+        ran_at: "2026-11-24T00:00:00Z",
+      },
+    ]);
+    expect(await screen.findByRole("cell", { name: "示例站点" })).toBeInTheDocument();
+    expect(screen.queryByText(/#7|example\.com|凭证 #9/)).not.toBeInTheDocument();
   });
 });

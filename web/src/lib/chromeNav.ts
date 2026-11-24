@@ -9,93 +9,152 @@ import {
   Package,
   ScrollText,
   Settings,
-  Wand2,
   UserRound,
   Users,
+  Eye,
   type LucideIcon,
 } from "lucide-react";
 
+export type ChromeNavGroupId = "console" | "backup" | "users" | "settings" | "observations";
+
+export interface ChromeNavGroup {
+  id: ChromeNavGroupId;
+  labelKey: string;
+  /** 顶栏切组后打开的默认页面。 */
+  defaultPath: string;
+}
+
 /**
- * The console's own navigation entries, in the order the chrome shows them.
- *
- * This is the single source for both the sidebar/rail (App builds its nav from
- * it) and the appearance panel's per-entry switches — a label that exists twice
- * drifts, and the panel would list a page the nav does not have.
- *
- * Plugin entries are not here: their labels are runtime data and they already
- * carry their own per-plugin hide switch (lib/pluginNav.ts).
+ * 顶栏工作区与页面导航共用这份注册表，避免顶栏、侧栏和外观开关分叉。
  */
+export const CHROME_NAV_GROUPS: ChromeNavGroup[] = [
+  { id: "console", labelKey: "app.topNav.console", defaultPath: "/" },
+  { id: "backup", labelKey: "app.topNav.backupExtensions", defaultPath: "/exchange" },
+  { id: "users", labelKey: "app.topNav.users", defaultPath: "/users" },
+  { id: "settings", labelKey: "app.topNav.settings", defaultPath: "/settings?tab=runtime" },
+  {
+    id: "observations",
+    labelKey: "app.topNav.observations",
+    defaultPath: "/channels?view=observations",
+  },
+];
+
 export interface ChromeNavItem {
+  /** 用于权限、隐藏偏好和当前页判断的稳定路径，可带 query。 */
   path: string;
-  /** i18n key for the entry's label, shared with the nav itself. */
   labelKey: string;
   icon: LucideIcon;
-  /** The pages the console opens on, kept apart from the utility entries. */
-  group: "primary" | "settings";
-  /**
-   * Roles that may see this entry. Absent means everyone.
-   *
-   * This is a display rule, not the security boundary: the API already scopes
-   * a member to their own rows and refuses the gateway's endpoints outright
-   * (team principal gate). What it buys is a console that does not offer a
-   * member doors that will not open.
-   */
+  group: ChromeNavGroupId;
   roles?: ConsoleRole[];
-  /** Requires a real team account, not the deployment bearer credential. */
+  /** 需要团队成员会话；部署管理员令牌不显示个人账户入口。 */
   accountOnly?: boolean;
 }
 
-/** Everyone signed in, staff or not. */
+/** 所有已登录用户可见的控制台页面。 */
 const ALL: ConsoleRole[] = ["owner", "admin", "member"];
-/** The gateway's own pages: an operator's business, not a member's. */
+/** 网关运维页面只对站点管理员开放。 */
 const STAFF: ConsoleRole[] = ["owner", "admin"];
+/** 团队管理中的策略和财务配置由站长管理。 */
+const OWNER: ConsoleRole[] = ["owner"];
 
 export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
-  { path: "/", labelKey: "app.nav.overview", icon: Activity, group: "primary", roles: ALL },
-  { path: "/channels", labelKey: "app.nav.channels", icon: Cable, group: "primary", roles: STAFF },
-  { path: "/models", labelKey: "app.nav.models", icon: Boxes, group: "primary", roles: ALL },
-  { path: "/keys", labelKey: "app.nav.keys", icon: KeyRound, group: "primary", roles: ALL },
-  { path: "/workbench", labelKey: "app.nav.workbench", icon: Wand2, group: "primary", roles: ALL },
-  { path: "/logs", labelKey: "app.nav.logs", icon: ScrollText, group: "primary", roles: ALL },
+  { path: "/", labelKey: "app.nav.overview", icon: Activity, group: "console", roles: ALL },
+  {
+    path: "/channels",
+    labelKey: "app.nav.channels",
+    icon: Cable,
+    group: "console",
+    roles: STAFF,
+  },
+  { path: "/models", labelKey: "app.nav.models", icon: Boxes, group: "console", roles: ALL },
+  { path: "/keys", labelKey: "app.nav.keys", icon: KeyRound, group: "console", roles: ALL },
+  { path: "/logs", labelKey: "app.nav.logs", icon: ScrollText, group: "console", roles: ALL },
   {
     path: "/checkins",
     labelKey: "app.nav.checkins",
     icon: CalendarCheck,
-    group: "primary",
+    group: "console",
     roles: STAFF,
   },
   {
     path: "/exchange",
     labelKey: "app.nav.exchange",
     icon: ArrowLeftRight,
-    group: "primary",
+    group: "backup",
     roles: STAFF,
   },
-  { path: "/store", labelKey: "app.nav.store", icon: Package, group: "primary", roles: STAFF },
   {
-    path: "/account",
-    labelKey: "app.nav.account",
-    icon: UserRound,
-    group: "primary",
-    roles: ALL,
-    accountOnly: true,
+    path: "/store",
+    labelKey: "app.nav.store",
+    icon: Package,
+    group: "backup",
+    roles: STAFF,
   },
   {
-    path: "/settings",
-    labelKey: "app.nav.settings",
+    path: "/backups",
+    labelKey: "ops.tab.backups",
+    icon: Package,
+    group: "backup",
+    roles: STAFF,
+  },
+  { path: "/users", labelKey: "users.nav.members", icon: Users, group: "users", roles: STAFF },
+  {
+    path: "/users/policies",
+    labelKey: "users.nav.policies",
+    icon: Users,
+    group: "users",
+    roles: OWNER,
+  },
+  {
+    path: "/users/quotas",
+    labelKey: "users.nav.quotas",
+    icon: Users,
+    group: "users",
+    roles: OWNER,
+  },
+  {
+    path: "/users/codes",
+    labelKey: "users.nav.codes",
+    icon: KeyRound,
+    group: "users",
+    roles: OWNER,
+  },
+  {
+    path: "/users/pricing",
+    labelKey: "users.nav.pricing",
+    icon: Settings,
+    group: "users",
+    roles: OWNER,
+  },
+  {
+    path: "/users/oauth",
+    labelKey: "users.nav.oauth",
+    icon: UserRound,
+    group: "users",
+    roles: OWNER,
+  },
+  {
+    path: "/settings?tab=runtime",
+    labelKey: "ops.tab.runtime",
     icon: Settings,
     group: "settings",
     roles: STAFF,
   },
-  { path: "/users", labelKey: "app.nav.team", icon: Users, group: "primary", roles: STAFF },
+  {
+    path: "/channels?view=observations",
+    labelKey: "app.nav.observations",
+    icon: Eye,
+    group: "observations",
+    roles: STAFF,
+  },
 ];
 
-/** Paths only staff may open. Used by the router guard; the API refuses them
- *  to a member anyway, so this is about not walking into a dead end. */
+/** 成员通过导航看不到这些站点管理页面，服务端仍负责最终鉴权。 */
 export const STAFF_ONLY_PATHS = [
   "/channels",
   "/checkins",
   "/exchange",
+  "/backups",
   "/settings",
   "/store",
   "/users",
@@ -103,7 +162,24 @@ export const STAFF_ONLY_PATHS = [
   "/plugins",
 ];
 
+/** 判断当前会话能否看见某个入口；接口授权仍由服务端执行。 */
 export function canAccessNav(item: ChromeNavItem, role: ConsoleRole | null): boolean {
   if (item.accountOnly && role === null) return false;
   return !item.roles || item.roles.includes(role ?? "owner");
+}
+
+/** 根据路径与 query 确定顶栏当前工作区。 */
+export function chromeNavGroupForLocation(pathname: string, search: string): ChromeNavGroupId {
+  const params = new URLSearchParams(search);
+  if (pathname === "/channels" && params.get("view") === "observations") return "observations";
+  if (pathname === "/users" || pathname.startsWith("/users/")) return "users";
+  if (pathname === "/settings" || pathname === "/maintain") return "settings";
+  if (
+    pathname === "/exchange" ||
+    pathname === "/backups" ||
+    pathname === "/store" ||
+    pathname.startsWith("/plugins/")
+  )
+    return "backup";
+  return "console";
 }

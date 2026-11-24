@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useMemo, useEffect, useRef, useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { ModuleStatus, PluginRecord } from "../api/types";
@@ -251,18 +252,18 @@ function StoreExtensions() {
                 {add.isPending ? t("common.working") : t("plugins.addBtn")}
               </Button>
             </div>
-            <button
+            <HeroButton
               type="button"
               aria-expanded={advancedOpen}
               className="plugin-add-toggle"
-              onClick={() => setAdvancedOpen((v) => !v)}
+              onPress={() => setAdvancedOpen((v) => !v)}
             >
               <ChevronDown
                 size={14}
                 className={advancedOpen ? "chevron-flip is-open" : "chevron-flip"}
               />
               {t("plugins.advanced")}
-            </button>
+            </HeroButton>
             {advancedOpen ? (
               <div className="plugin-add-advanced">
                 <p className="muted">{t("plugins.advancedHint")}</p>

@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import {
-  Button,
-  Empty,
-  ErrorState,
-  Field,
-  IconButton,
-  Panel,
-  formatDate,
-} from "../../components/ui";
+import { Empty, ErrorState, Field, Panel, formatDate } from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { upstreamMessage } from "../../lib/upstreamError";
 import type { ImageBody, WorkbenchRunner } from "./runner";
@@ -425,28 +418,32 @@ export default function ImageStudio({
               {refs.map((image, index) => (
                 <div className="workbench-ref" key={`${image.name}-${index}`}>
                   <img src={image.dataUrl} alt={image.name} />
-                  <button
+                  <HeroButton
                     type="button"
+                    isIconOnly
+                    variant="ghost"
+                    size="sm"
                     className="workbench-ref-remove"
                     aria-label={t("workbench.image.removeRef", { name: image.name })}
-                    onClick={() => {
+                    onPress={() => {
                       setRefs((current) => current.filter((_, position) => position !== index));
                       setError(null);
                       setFeedback("");
                     }}
                   >
                     <Trash2 size={12} />
-                  </button>
+                  </HeroButton>
                 </div>
               ))}
-              <button
+              <HeroButton
                 type="button"
+                variant="outline"
                 className="workbench-ref-add"
-                disabled={!canEdit || (maxImages > 0 && refs.length >= maxImages)}
-                onClick={() => fileInput.current?.click()}
+                isDisabled={!canEdit || (maxImages > 0 && refs.length >= maxImages)}
+                onPress={() => fileInput.current?.click()}
               >
                 + {t("workbench.image.addRef")}
-              </button>
+              </HeroButton>
               <input
                 ref={fileInput}
                 type="file"
@@ -481,9 +478,10 @@ export default function ImageStudio({
           ) : null}
           <div className="dialog-actions">
             <span className="flex-spacer" />
-            <Button
-              disabled={busy || !activeModel || !prompt.trim() || !!inputIssue}
-              onClick={() =>
+            <HeroButton
+              type="button"
+              isDisabled={busy || !activeModel || !prompt.trim() || !!inputIssue}
+              onPress={() =>
                 run.mutate({
                   model: activeModel,
                   prompt,
@@ -498,7 +496,7 @@ export default function ImageStudio({
               {busy
                 ? t("common.working")
                 : t(editing ? "workbench.image.editRun" : "workbench.image.generateRun")}
-            </Button>
+            </HeroButton>
           </div>
         </fieldset>
       </Panel>
@@ -573,9 +571,10 @@ export default function ImageStudio({
                 {t("workbench.image.historyCount", { count: history.length })}
               </span>
               <span className="flex-spacer" />
-              <Button variant="quiet" icon={<Trash2 size={14} />} onClick={forgetAll}>
+              <HeroButton type="button" variant="tertiary" onPress={forgetAll}>
+                <Trash2 size={14} />
                 {t("workbench.image.historyClear")}
-              </Button>
+              </HeroButton>
             </div>
             {persistWarning ? (
               <p className="panel-hint" role="status">
@@ -585,15 +584,16 @@ export default function ImageStudio({
             <ul>
               {history.map((item) => (
                 <li key={item.id} className={item.id === latest?.id ? "is-current" : undefined}>
-                  <button
+                  <HeroButton
                     type="button"
+                    variant="ghost"
                     className="workbench-history-item"
                     aria-pressed={item.id === latest?.id}
                     aria-label={t("workbench.image.historyOpen", {
                       model: item.model,
                       time: formatDate(item.at),
                     })}
-                    onClick={() => reuse(item, false)}
+                    onPress={() => reuse(item, false)}
                   >
                     <img
                       src={imageSource(item.images[0])}
@@ -614,20 +614,30 @@ export default function ImageStudio({
                         })}
                       </span>
                     </span>
-                  </button>
+                  </HeroButton>
                   <span className="workbench-history-actions">
-                    <IconButton
-                      label={t("workbench.image.historyReuse")}
-                      onClick={() => reuse(item, true)}
+                    <HeroButton
+                      type="button"
+                      isIconOnly
+                      variant="ghost"
+                      size="sm"
+                      className="icon-button"
+                      aria-label={t("workbench.image.historyReuse")}
+                      onPress={() => reuse(item, true)}
                     >
                       <RotateCcw size={13} />
-                    </IconButton>
-                    <IconButton
-                      label={t("workbench.image.historyDelete")}
-                      onClick={() => forget(item.id)}
+                    </HeroButton>
+                    <HeroButton
+                      type="button"
+                      isIconOnly
+                      variant="ghost"
+                      size="sm"
+                      className="icon-button"
+                      aria-label={t("workbench.image.historyDelete")}
+                      onPress={() => forget(item.id)}
                     >
                       <Trash2 size={13} />
-                    </IconButton>
+                    </HeroButton>
                   </span>
                 </li>
               ))}

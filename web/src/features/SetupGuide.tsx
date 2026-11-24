@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../api/client";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
@@ -107,9 +108,14 @@ export function SetupGuide() {
           <span className="setup-guide-progress">
             {t("setup.progress", { done: doneCount, total: steps.length })}
           </span>
-          <button type="button" className="setup-guide-dismiss" onClick={dismiss}>
+          <HeroButton
+            type="button"
+            variant="ghost"
+            className="setup-guide-dismiss"
+            onPress={dismiss}
+          >
             {t("setup.dismiss")}
-          </button>
+          </HeroButton>
         </div>
       }
     >
@@ -135,10 +141,10 @@ export function SetupGuide() {
       <div className="setup-guide-curl">
         <div className="setup-guide-curl-head">
           <span>curl</span>
-          <button type="button" onClick={copyCurl}>
+          <HeroButton type="button" variant="ghost" onPress={copyCurl}>
             <Copy size={12} />
             {copied ? t("setup.copied") : t("setup.copy")}
-          </button>
+          </HeroButton>
         </div>
         <pre>{curl}</pre>
       </div>

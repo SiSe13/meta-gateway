@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { ActionMenu } from "../components/ActionMenu";
-import { Button, DataTable, ErrorState, Field, Panel, StatusBadge } from "../components/ui";
+import { DataTable, ErrorState, Field, Panel, StatusBadge } from "../components/ui";
 import { teamError, type TeamKey, type TeamText } from "./text";
 import { formatCost } from "../lib/format";
 import type { MintedCode, Policy, TeamCode, TeamRequest } from "./types";
@@ -132,15 +133,18 @@ export function CodePanel({
               <option value="invite">{t("codeKindInvite")}</option>
               <option value="credit">{t("codeKindCredit")}</option>
             </select>
-            <Button
-              icon={<Plus size={14} />}
-              onClick={() => {
+            <HeroButton
+              type="button"
+              variant="primary"
+              className="button button-primary"
+              onPress={() => {
                 setError(null);
                 setMinting(true);
               }}
             >
+              <Plus size={14} aria-hidden="true" />
               {t("codeMint")}
-            </Button>
+            </HeroButton>
           </>
         }
       >
@@ -155,15 +159,22 @@ export function CodePanel({
             <div className="team-minted-head">
               <strong>{t("codeMinted", { n: minted.length })}</strong>
               <div className="team-actions">
-                <Button
+                <HeroButton
+                  type="button"
                   variant="secondary"
-                  onClick={() => void copy(minted.map((item) => item.code).join("\n"), "all")}
+                  className="button button-secondary"
+                  onPress={() => void copy(minted.map((item) => item.code).join("\n"), "all")}
                 >
                   {copied === "all" ? t("copied") : t("copyAll")}
-                </Button>
-                <Button variant="quiet" onClick={() => setMinted(null)}>
+                </HeroButton>
+                <HeroButton
+                  type="button"
+                  variant="ghost"
+                  className="button button-quiet"
+                  onPress={() => setMinted(null)}
+                >
                   {t("close")}
-                </Button>
+                </HeroButton>
               </div>
             </div>
             <p className="panel-hint">{t("codeMintedOnce")}</p>
@@ -171,9 +182,14 @@ export function CodePanel({
               {minted.map((item) => (
                 <li key={item.id}>
                   <code>{item.code}</code>
-                  <Button variant="quiet" onClick={() => void copy(item.code, String(item.id))}>
+                  <HeroButton
+                    type="button"
+                    variant="ghost"
+                    className="button button-quiet"
+                    onPress={() => void copy(item.code, String(item.id))}
+                  >
                     {copied === String(item.id) ? t("copied") : t("copy")}
-                  </Button>
+                  </HeroButton>
                 </li>
               ))}
             </ul>
@@ -238,12 +254,23 @@ export function CodePanel({
             </div>
             <p className="panel-hint">{t("codeFormHint")}</p>
             <div className="form-actions">
-              <Button type="submit" loading={busy}>
+              <HeroButton
+                type="submit"
+                variant="primary"
+                className="button button-primary"
+                isDisabled={busy}
+                isPending={busy}
+              >
                 {t("codeMint")}
-              </Button>
-              <Button variant="quiet" type="button" onClick={() => setMinting(false)}>
+              </HeroButton>
+              <HeroButton
+                variant="ghost"
+                className="button button-quiet"
+                type="button"
+                onPress={() => setMinting(false)}
+              >
                 {t("cancel")}
-              </Button>
+              </HeroButton>
             </div>
           </form>
         ) : null}

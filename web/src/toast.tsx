@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { formatErrorMessage } from "./formatError";
 import { useI18n } from "./i18n";
 
@@ -162,14 +163,16 @@ function ToastViewport({
             )}
           </span>
           <p className="toast-message">{item.message}</p>
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
+            isIconOnly
             className="toast-dismiss"
             aria-label={t("common.close")}
-            onClick={() => onDismiss(item.id)}
+            onPress={() => onDismiss(item.id)}
           >
             <X size={14} />
-          </button>
+          </HeroButton>
         </div>
       ))}
     </div>,

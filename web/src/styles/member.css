@@ -7,9 +7,8 @@
    traffic: the home band, the catalogue cards' personal figures, the key cards.
 
    Nothing here introduces a second design language. Colour, radius, shadow and
-   spacing come from the sheet's tokens, which each package redefines — the
-   modern workspace gets its blue on paper white, the classic console keeps its
-   powder blue and gold with square corners. Only the composition is new.
+   spacing come from the shared appearance tokens; only the member composition
+   is specific to these pages.
 --------------------------------------------------------------------------- */
 
 /* ---- Home band ---------------------------------------------------------- */

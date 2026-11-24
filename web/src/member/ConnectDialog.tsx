@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { Button, Dialog, Field, Loading } from "../components/ui";
 import { accountRequest } from "../team/transport";
 import { teamError, type TeamText } from "../team/text";
@@ -130,14 +131,15 @@ export function ConnectDialog({
           </div>
           <div className="tabs" style={{ marginTop: 18 }}>
             {CLIENTS.map((entry) => (
-              <button
+              <HeroButton
                 key={entry.id}
                 type="button"
+                variant="ghost"
                 aria-selected={client === entry.id}
-                onClick={() => setClient(entry.id)}
+                onPress={() => setClient(entry.id)}
               >
                 {entry.label}
-              </button>
+              </HeroButton>
             ))}
           </div>
           {client === "ccswitch" && (

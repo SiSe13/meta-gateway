@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Copy, Eraser, Pencil, RefreshCw, Send, Square, Trash2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import {
-  Button,
-  Empty,
-  ErrorState,
-  Field,
-  IconButton,
-  Panel,
-  formatDate,
-} from "../../components/ui";
+import { Empty, ErrorState, Field, Panel, formatDate } from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { parseSseJson, splitSseFrames } from "../../lib/sse";
 import { upstreamMessage } from "../../lib/upstreamError";
@@ -468,14 +461,15 @@ export default function Playground({
       title={t("playground.title")}
       titleHelp={t(runner.descKeys.help)}
       actions={
-        <Button
+        <HeroButton
+          type="button"
           variant="secondary"
-          icon={<Eraser size={14} />}
-          disabled={busy || turns.length === 0}
-          onClick={clear}
+          isDisabled={busy || turns.length === 0}
+          onPress={clear}
         >
+          <Eraser size={14} />
           {t("playground.clear")}
-        </Button>
+        </HeroButton>
       }
     >
       <p className="panel-hint">{t(runner.descKeys.desc)}</p>
@@ -592,14 +586,15 @@ export default function Playground({
             <p className="muted">{t("playground.empty")}</p>
             <div className="pg-suggestions">
               {SUGGESTIONS.map((key) => (
-                <button
+                <HeroButton
                   type="button"
+                  variant="outline"
                   key={key}
                   className="pg-suggestion"
-                  onClick={() => setDraft(t(key))}
+                  onPress={() => setDraft(t(key))}
                 >
                   {t(key)}
-                </button>
+                </HeroButton>
               ))}
             </div>
           </div>
@@ -647,17 +642,15 @@ export default function Playground({
           <span className="muted">{t("playground.promptHint")}</span>
           <span className="flex-spacer" />
           {busy ? (
-            <Button
-              variant="secondary"
-              icon={<Square size={14} />}
-              onClick={() => abortRef.current?.abort()}
-            >
+            <HeroButton type="button" variant="secondary" onPress={() => abortRef.current?.abort()}>
+              <Square size={14} />
               {t("playground.stop")}
-            </Button>
+            </HeroButton>
           ) : null}
-          <Button disabled={!canSend} icon={<Send size={14} />} onClick={() => send()}>
+          <HeroButton type="button" isDisabled={!canSend} onPress={() => send()}>
+            <Send size={14} />
             {t("playground.send")}
-          </Button>
+          </HeroButton>
         </div>
       </div>
     </Panel>
@@ -718,15 +711,19 @@ function TurnView({
             onChange={(event) => onEdit(event.target.value)}
           />
           <div className="pg-turn-actions">
-            <Button variant="secondary" onClick={onEditCancel}>
+            <HeroButton type="button" variant="secondary" onPress={onEditCancel}>
               {t("common.cancel")}
-            </Button>
-            <Button variant="secondary" onClick={() => onEditSave(draft)}>
+            </HeroButton>
+            <HeroButton type="button" variant="secondary" onPress={() => onEditSave(draft)}>
               {t("playground.save")}
-            </Button>
-            <Button disabled={busy || !draft.trim()} onClick={() => onEditSubmit(draft)}>
+            </HeroButton>
+            <HeroButton
+              type="button"
+              isDisabled={busy || !draft.trim()}
+              onPress={() => onEditSubmit(draft)}
+            >
               {t("playground.saveAndSubmit")}
-            </Button>
+            </HeroButton>
           </div>
         </div>
       ) : (
@@ -749,28 +746,56 @@ function TurnView({
             </p>
           ) : null}
           <div className="pg-turn-actions">
-            <IconButton
-              label={copied ? t("playground.copied") : t("playground.copy")}
-              disabled={!turn.content}
-              onClick={onCopy}
+            <HeroButton
+              type="button"
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              className="icon-button"
+              aria-label={copied ? t("playground.copied") : t("playground.copy")}
+              isDisabled={!turn.content}
+              onPress={onCopy}
             >
               <Copy size={13} />
-            </IconButton>
-            <IconButton
-              label={t("playground.edit")}
-              disabled={busy}
-              onClick={() => onEdit(turn.content)}
+            </HeroButton>
+            <HeroButton
+              type="button"
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              className="icon-button"
+              aria-label={t("playground.edit")}
+              isDisabled={busy}
+              onPress={() => onEdit(turn.content)}
             >
               <Pencil size={13} />
-            </IconButton>
+            </HeroButton>
             {turn.role === "assistant" ? (
-              <IconButton label={t("playground.regenerate")} disabled={busy} onClick={onRegenerate}>
+              <HeroButton
+                type="button"
+                isIconOnly
+                variant="ghost"
+                size="sm"
+                className="icon-button"
+                aria-label={t("playground.regenerate")}
+                isDisabled={busy}
+                onPress={onRegenerate}
+              >
                 <RefreshCw size={13} />
-              </IconButton>
+              </HeroButton>
             ) : null}
-            <IconButton label={t("playground.delete")} disabled={busy} onClick={onDelete}>
+            <HeroButton
+              type="button"
+              isIconOnly
+              variant="ghost"
+              size="sm"
+              className="icon-button"
+              aria-label={t("playground.delete")}
+              isDisabled={busy}
+              onPress={onDelete}
+            >
               <Trash2 size={13} />
-            </IconButton>
+            </HeroButton>
           </div>
         </>
       )}

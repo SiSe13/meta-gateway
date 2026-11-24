@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { ErrorPassRule } from "../../api/types";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
@@ -32,6 +33,7 @@ function ErrorRulesPanel() {
     invalidateKeys: [["error-rules"]],
   });
   const items = query.data?.items ?? [];
+  const addButtonTitle = { title: t("ops.errorRules.add") };
   return (
     <section className="panel runtime-section runtime-tool-error-rules" id="runtime-error-rules">
       <div className="panel-header">
@@ -39,11 +41,13 @@ function ErrorRulesPanel() {
         {/* The actions and their meanings are mechanics: they belong behind the
             (i), not as three wrapped lines above the list they describe. */}
         <InfoTip label={t("ops.errorRules.hint")} />
-        <button
+        <HeroButton
+          {...addButtonTitle}
           type="button"
           className="icon-button"
-          title={t("ops.errorRules.add")}
-          onClick={() =>
+          isIconOnly
+          aria-label={t("ops.errorRules.add")}
+          onPress={() =>
             setDraft({
               name: "",
               status_code: 0,
@@ -57,7 +61,7 @@ function ErrorRulesPanel() {
           }
         >
           +
-        </button>
+        </HeroButton>
       </div>
       <p className="muted panel-lede">{t("ops.errorRules.lede")}</p>
       {items.length === 0 ? (
@@ -76,20 +80,20 @@ function ErrorRulesPanel() {
                 <span className="error-rule-off">{t("common.disabled")}</span>
               ) : null}
               <span className="flex-spacer" />
-              <button
+              <HeroButton
                 type="button"
                 className="error-rule-edit"
-                onClick={() => setDraft({ ...rule })}
+                onPress={() => setDraft({ ...rule })}
               >
                 {t("common.edit")}
-              </button>
-              <button
+              </HeroButton>
+              <HeroButton
                 type="button"
                 className="error-rule-del"
-                onClick={() => setConfirmDelete(rule)}
+                onPress={() => setConfirmDelete(rule)}
               >
                 {t("common.delete")}
-              </button>
+              </HeroButton>
             </div>
           ))}
         </div>

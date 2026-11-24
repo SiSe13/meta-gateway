@@ -1,5 +1,12 @@
 import { AlertTriangle, ChevronDown, Info, LoaderCircle, X } from "lucide-react";
 import {
+  Button as HeroButton,
+  Card,
+  Modal as HeroModal,
+  Tabs as HeroTabs,
+  useOverlayState,
+} from "@heroui/react";
+import {
   cloneElement,
   createContext,
   isValidElement,
@@ -15,9 +22,26 @@ import {
 import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 import { formatErrorObject } from "../formatError";
-import { useModalFocus } from "./overlayFocus";
+import { registerOverlay } from "./overlayStack";
 
 const PageActionHost = createContext<HTMLElement | null>(null);
+
+/** 保留 HeroUI 未写入 DOM 的原生标题提示，并合并调用方的按钮 ref。 */
+function useButtonTitleRef(
+  title: string | undefined,
+  forwardedRef: React.Ref<HTMLButtonElement> | undefined,
+) {
+  return useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (typeof forwardedRef === "function") forwardedRef(node);
+      else if (forwardedRef) forwardedRef.current = node;
+      if (!node) return;
+      if (title) node.title = title;
+      else node.removeAttribute("title");
+    },
+    [forwardedRef, title],
+  );
+}
 
 /** Lets a page's data-owning child place actions in its shared page header. */
 export function PageActions({ children }: { children: ReactNode }) {
@@ -34,23 +58,38 @@ export function Button({
   loading = false,
   disabled,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "value"> & {
   variant?: "primary" | "secondary" | "danger" | "quiet";
   icon?: ReactNode;
   loading?: boolean;
   ref?: React.Ref<HTMLButtonElement>;
+  value?: string;
 }) {
+  const { onClick, value, title, ref: forwardedRef, ...buttonProps } = props;
+  const buttonRef = useButtonTitleRef(title, forwardedRef);
+  const heroVariant =
+    variant === "secondary"
+      ? "secondary"
+      : variant === "danger"
+        ? "danger"
+        : variant === "quiet"
+          ? "ghost"
+          : "primary";
   return (
-    <button
+    <HeroButton
       type={type}
-      disabled={disabled || loading}
-      aria-busy={loading || undefined}
-      className={[`button button-${variant}`, className].filter(Boolean).join(" ")}
-      {...props}
+      variant={heroVariant}
+      isDisabled={disabled || loading}
+      isPending={loading}
+      className={["button", `button-${variant}`, className].filter(Boolean).join(" ")}
+      value={value}
+      {...(buttonProps as React.ComponentProps<typeof HeroButton>)}
+      onPress={(event) => onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
+      ref={buttonRef}
     >
       {loading ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : icon}
       {children}
-    </button>
+    </HeroButton>
   );
 }
 
@@ -59,22 +98,31 @@ export function IconButton({
   children,
   className,
   type = "button",
+  disabled,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+}: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "value"> & {
   label: string;
   // React 19 passes ref as a regular prop; callers anchor popovers to it.
   ref?: React.Ref<HTMLButtonElement>;
+  value?: string;
 }) {
+  const { onClick, value, title, ref: forwardedRef, ...buttonProps } = props;
+  const buttonRef = useButtonTitleRef(title, forwardedRef);
   return (
-    <button
+    <HeroButton
       type={type}
+      isIconOnly
+      variant="ghost"
+      isDisabled={disabled}
       className={["icon-button", className].filter(Boolean).join(" ")}
       aria-label={label}
-      title={label}
-      {...props}
+      value={value}
+      {...(buttonProps as React.ComponentProps<typeof HeroButton>)}
+      onPress={(event) => onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
+      ref={buttonRef}
     >
       {children}
-    </button>
+    </HeroButton>
   );
 }
 
@@ -179,23 +227,32 @@ export function Panel({
     });
   };
   return (
-    <section id={id} className={`panel ${className}${folded ? " is-collapsed" : ""}`.trim()}>
+    <Card
+      id={id}
+      role="region"
+      aria-label={title}
+      className={`panel heroui-card ${className}${folded ? " is-collapsed" : ""}`.trim()}
+    >
       {(title || actions) && (
         <header className="panel-header">
           {title ? (
             <div className="panel-title">
               {collapsible ? (
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
                   className="panel-toggle"
                   aria-expanded={open}
                   aria-controls={bodyId}
-                  title={open ? t("common.collapse") : t("common.expand")}
-                  onClick={toggle}
+                  aria-label={title}
+                  ref={(element) =>
+                    element?.setAttribute("title", open ? t("common.collapse") : t("common.expand"))
+                  }
+                  onPress={toggle}
                 >
                   <ChevronDown size={14} className="panel-toggle-icon" aria-hidden="true" />
                   <h2>{title}</h2>
-                </button>
+                </HeroButton>
               ) : (
                 <h2>{title}</h2>
               )}
@@ -222,7 +279,7 @@ export function Panel({
           {children}
         </>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -243,52 +300,64 @@ export function Dialog({
 }) {
   const { t } = useI18n();
   const titleId = useId();
-  const dialogRef = useRef<HTMLElement | null>(null);
-  const close = () => {
-    if (!busy) onClose();
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const closeRef = useRef<() => void>(() => {});
+  const state = useOverlayState({
+    defaultOpen: true,
+    onOpenChange: (open) => {
+      if (!open && !busy) onClose();
+    },
+  });
+  closeRef.current = () => {
+    if (!busy) state.close();
   };
-  useModalFocus(dialogRef, close);
-  // Portal to document.body so fixed backdrop is not clipped by Panel/content
-  // overflow:hidden or filtered/transformed ancestors (common after ops shell restyle).
-  return createPortal(
-    <div
-      className="dialog-backdrop"
-      role="presentation"
-      onMouseDown={(e) => e.target === e.currentTarget && close()}
-    >
-      <section
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    return registerOverlay(() => closeRef.current(), { element: dialog });
+  }, []);
+  return (
+    <HeroModal state={state}>
+      <HeroModal.Trigger className="dialog-trigger">
+        <span aria-hidden="true" />
+      </HeroModal.Trigger>
+      <HeroModal.Backdrop
         ref={dialogRef}
-        tabIndex={-1}
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-busy={busy || undefined}
+        className="dialog-backdrop"
+        isDismissable={!busy}
+        isKeyboardDismissDisabled
       >
-        <header>
-          <div className={danger ? "danger-title" : ""}>
-            {danger && <AlertTriangle size={18} />}
-            <h2 id={titleId}>{title}</h2>
-          </div>
-          <IconButton label={t("common.close")} onClick={close} disabled={busy}>
-            <X size={18} />
-          </IconButton>
-        </header>
-        <div className="dialog-body">
-          <fieldset className="overlay-fields" disabled={busy}>
-            {children}
-          </fieldset>
-        </div>
-        {actions && (
-          <footer>
-            <fieldset className="overlay-actions" disabled={busy}>
-              {actions}
-            </fieldset>
-          </footer>
-        )}
-      </section>
-    </div>,
-    document.body,
+        <HeroModal.Container>
+          <HeroModal.Dialog
+            className="dialog"
+            aria-labelledby={titleId}
+            aria-busy={busy || undefined}
+          >
+            <HeroModal.Header>
+              <div className={danger ? "danger-title" : ""}>
+                {danger && <AlertTriangle size={18} />}
+                <HeroModal.Heading id={titleId}>{title}</HeroModal.Heading>
+              </div>
+              <IconButton label={t("common.close")} onClick={state.close} disabled={busy}>
+                <X size={18} />
+              </IconButton>
+            </HeroModal.Header>
+            <HeroModal.Body className="dialog-body">
+              <fieldset className="overlay-fields" disabled={busy}>
+                {children}
+              </fieldset>
+            </HeroModal.Body>
+            {actions ? (
+              <HeroModal.Footer>
+                <fieldset className="overlay-actions" disabled={busy}>
+                  {actions}
+                </fieldset>
+              </HeroModal.Footer>
+            ) : null}
+          </HeroModal.Dialog>
+        </HeroModal.Container>
+      </HeroModal.Backdrop>
+    </HeroModal>
   );
 }
 
@@ -418,16 +487,15 @@ export function InfoTip({ label }: { label: string }) {
   }, [open, placeBubble]);
 
   useEffect(() => {
-    if (!open) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      setHovered(false);
-      setFocused(false);
-    };
-    window.addEventListener("keydown", closeOnEscape, true);
-    return () => window.removeEventListener("keydown", closeOnEscape, true);
+    const bubble = bubbleRef.current;
+    if (!open || !bubble) return;
+    return registerOverlay(
+      () => {
+        setHovered(false);
+        setFocused(false);
+      },
+      { modal: false, transient: true, element: bubble },
+    );
   }, [open]);
 
   const bubble =
@@ -610,48 +678,21 @@ export function Tabs({
   active: string;
   onChange: (value: string) => void;
 }) {
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const moveFocus = (index: number) => {
-    if (items.length === 0) return;
-    const next = (index + items.length) % items.length;
-    const item = items[next];
-    if (!item) return;
-    onChange(item.value);
-    tabRefs.current[next]?.focus();
-  };
   return (
-    <div className="tabs" role="tablist">
-      {items.map((item, index) => (
-        <button
-          ref={(node) => {
-            tabRefs.current[index] = node;
-          }}
-          role="tab"
-          aria-selected={active === item.value}
-          tabIndex={active === item.value ? 0 : -1}
-          key={item.value}
-          onClick={() => onChange(item.value)}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowRight") {
-              event.preventDefault();
-              moveFocus(index + 1);
-            } else if (event.key === "ArrowLeft") {
-              event.preventDefault();
-              moveFocus(index - 1);
-            } else if (event.key === "Home") {
-              event.preventDefault();
-              moveFocus(0);
-            } else if (event.key === "End") {
-              event.preventDefault();
-              moveFocus(items.length - 1);
-            }
-          }}
-        >
-          {item.icon}
-          {item.label}
-        </button>
-      ))}
-    </div>
+    <HeroTabs
+      className="hero-tabs"
+      selectedKey={active}
+      onSelectionChange={(key) => onChange(String(key))}
+    >
+      <HeroTabs.List className="tabs">
+        {items.map((item) => (
+          <HeroTabs.Tab id={item.value} key={item.value}>
+            {item.icon}
+            {item.label}
+          </HeroTabs.Tab>
+        ))}
+      </HeroTabs.List>
+    </HeroTabs>
   );
 }
 

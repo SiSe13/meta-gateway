@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AvailabilityItem, AvailabilitySeries } from "../api/types";
 import { useI18n } from "../i18n";
+import { Button as HeroButton } from "@heroui/react";
 import { Button, Dialog } from "./ui";
 
 export function availabilityPercent(ratio: number | null | undefined) {
@@ -117,23 +118,20 @@ export function AvailabilityIndicator({
             .join(" · ");
   return (
     <>
-      <button
-        type="button"
+      <HeroButton
+        variant="ghost"
         className={`availability-indicator is-${state}${compact ? " is-compact" : ""}`}
-        disabled={loading || error || !item}
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen(true);
-        }}
+        isDisabled={loading || error || !item}
+        ref={(element) => element?.setAttribute("title", title)}
+        onPress={() => setOpen(true)}
         aria-label={`${t("availability.details")} ${item?.model ?? ""}`}
-        title={title}
       >
         <span className="availability-readout">
           {shape === "history" && series ? <AvailabilityBars series={series} /> : null}
           {shape === "gauge" && series ? <AvailabilityGauge series={series} /> : null}
           <strong className={`is-${band}`}>{availabilityPercent(series?.ratio)}</strong>
         </span>
-      </button>
+      </HeroButton>
       {open && item ? <AvailabilityDetails item={item} onClose={() => setOpen(false)} /> : null}
     </>
   );

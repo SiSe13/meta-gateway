@@ -8,6 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { createPortal } from "react-dom";
 import { useI18n } from "../i18n";
 import { registerOverlay } from "./overlayStack";
@@ -18,6 +19,14 @@ export type SelectOption = {
   label: string;
   group?: string;
 };
+
+/** 恢复 HeroUI Button 规范化后的列表选项语义与手动焦点顺序。 */
+function setListOptionAttributes(element: HTMLButtonElement | null, selected: boolean) {
+  if (!element) return;
+  element.setAttribute("role", "option");
+  element.setAttribute("aria-selected", String(selected));
+  element.tabIndex = -1;
+}
 
 /**
  * Self-styled searchable dropdown with optional group headers and a
@@ -261,12 +270,13 @@ export function SearchableSelect({
   return (
     <div className="searchable-select" ref={rootRef}>
       {!customMode ? (
-        <button
+        <HeroButton
           ref={triggerRef}
           type="button"
+          variant="ghost"
           className="searchable-select-trigger"
-          disabled={disabled}
-          onClick={() => (open ? setOpen(false) : openPanel())}
+          isDisabled={disabled}
+          onPress={() => (open ? setOpen(false) : openPanel())}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
@@ -282,7 +292,7 @@ export function SearchableSelect({
             {triggerValue || <em className="is-quiet">{placeholder}</em>}
           </span>
           <ChevronDown size={14} />
-        </button>
+        </HeroButton>
       ) : (
         <>
           <input
@@ -300,11 +310,12 @@ export function SearchableSelect({
               until the operator picks from the list or clears the field.
               Without this, an accidental click on the custom item stranded
               the field until the whole form was reopened. */}
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className="advanced-toggle"
-            disabled={disabled}
-            onClick={() => {
+            isDisabled={disabled}
+            onPress={() => {
               // Back to the trigger, keeping whatever was typed as the value;
               // opening the list is the operator's next click.
               returnFocusRef.current = true;
@@ -314,7 +325,7 @@ export function SearchableSelect({
           >
             <ChevronDown size={12} />
             {t("select.backToList")}
-          </button>
+          </HeroButton>
         </>
       )}
       {open
@@ -401,16 +412,15 @@ export function SearchableSelect({
                       <div className="searchable-select-group-label">{key}</div>
                     ) : null}
                     {groupOptions.map((option) => (
-                      <button
+                      <HeroButton
                         type="button"
+                        variant="ghost"
                         key={option.value}
-                        role="option"
-                        aria-selected={option.value === value}
-                        tabIndex={-1}
+                        ref={(element) => setListOptionAttributes(element, option.value === value)}
                         className={`searchable-select-item${
                           option.value === value ? " is-selected" : ""
                         }`}
-                        onClick={() => {
+                        onPress={() => {
                           if (option.value === "__custom__") {
                             enterCustom();
                             return;
@@ -420,22 +430,21 @@ export function SearchableSelect({
                       >
                         <span className="truncate">{option.label}</span>
                         {option.value === value ? <Check size={14} /> : null}
-                      </button>
+                      </HeroButton>
                     ))}
                   </div>
                 ))}
                 {allowCustom ? (
-                  <button
+                  <HeroButton
                     type="button"
-                    role="option"
-                    aria-selected={isCustom}
-                    tabIndex={-1}
+                    variant="ghost"
+                    ref={(element) => setListOptionAttributes(element, isCustom)}
                     className="searchable-select-item searchable-select-custom"
-                    onClick={enterCustom}
+                    onPress={enterCustom}
                   >
                     {customSentinel?.label ?? customLabel ?? t("select.custom")}
                     {query.trim() ? ": " + query.trim() : ""}
-                  </button>
+                  </HeroButton>
                 ) : null}
                 {filtered.length === 0 && !allowCustom ? (
                   <div className="searchable-select-empty">{t("select.noMatches")}</div>

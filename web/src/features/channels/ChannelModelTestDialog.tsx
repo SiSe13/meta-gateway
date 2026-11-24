@@ -1,4 +1,5 @@
 import { CheckCircle2, Loader2, Play, Search, Square, XCircle } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { Button, Dialog } from "../../components/ui";
@@ -231,15 +232,16 @@ export function ChannelModelTestDialog({
             onChange={(event) => setMaxTokens(Number(event.target.value))}
           />
         </label>
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="unify-covered-toggle"
           aria-pressed={onlyFailures}
-          disabled={tally.failed === 0}
-          onClick={() => setOnlyFailures((current) => !current)}
+          isDisabled={tally.failed === 0}
+          onPress={() => setOnlyFailures((current) => !current)}
         >
           {onlyFailures ? t("channels.testDialog.showAll") : t("channels.testDialog.onlyFailures")}
-        </button>
+        </HeroButton>
       </div>
 
       {/* The running total sits under the controls that produce it, so raising
@@ -275,16 +277,17 @@ export function ChannelModelTestDialog({
                     {verdict.error}
                   </span>
                 ) : null}
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
                   className="unify-covered-toggle channel-model-test-run"
-                  disabled={running || verdict?.status === "testing"}
-                  onClick={() => void run([model.name])}
+                  isDisabled={running || verdict?.status === "testing"}
+                  onPress={() => void run([model.name])}
                 >
                   {verdict?.status === "ok"
                     ? t("channels.testDialog.retest")
                     : t("channels.testDialog.test")}
-                </button>
+                </HeroButton>
               </li>
             );
           })}

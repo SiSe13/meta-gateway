@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type {} from "../../api/types";
 import { useI18n } from "../../i18n";
@@ -29,14 +30,15 @@ function ChannelModelBlocks({ channelId }: { channelId: number }) {
         {blocks.map((block) => (
           <div key={block.id} className="detail-pricing-row is-blocked">
             <code>{block.model}</code>
-            <button
+            <HeroButton
               type="button"
+              variant="ghost"
               className="model-block-clear"
-              title={t("channels.modelBlockClear")}
-              onClick={() => void unblock(block.model)}
+              ref={(element) => element?.setAttribute("title", t("channels.modelBlockClear"))}
+              onPress={() => void unblock(block.model)}
             >
               {t("channels.modelBlockClear")}
-            </button>
+            </HeroButton>
           </div>
         ))}
       </div>

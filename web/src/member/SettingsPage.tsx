@@ -8,8 +8,6 @@ import { accountRequest } from "../team/transport";
 import { teamError, type TeamText } from "../team/text";
 import type { Account, PreferencesView, RequestPreferences } from "../team/types";
 import { useI18n } from "../i18n";
-import { APPEARANCES, type Appearance } from "../appearance";
-import { UI_THEMES } from "../themes/registry";
 
 type Session = {
   id: string;
@@ -29,8 +27,6 @@ type Session = {
  */
 export function SettingsPage({
   account,
-  appearance,
-  onAppearance,
   scheme,
   onScheme,
   density,
@@ -39,8 +35,6 @@ export function SettingsPage({
   onDisconnected,
 }: {
   account: Account;
-  appearance: Appearance;
-  onAppearance: (value: Appearance) => void;
   scheme: string;
   onScheme: (value: string) => void;
   density: string;
@@ -48,7 +42,7 @@ export function SettingsPage({
   t: TeamText;
   onDisconnected: () => void;
 }) {
-  const { locale, t: consoleT } = useI18n();
+  const { locale } = useI18n();
   const userID = account.user.id;
   const [draft, setDraft] = useState<RequestPreferences>({
     failover: "inherit",
@@ -351,21 +345,6 @@ export function SettingsPage({
 
       <Panel className="settings-display" title={t("displayPreferences")}>
         <div className="form-grid">
-          {/* The member app wears the console's themes, so the picker offers
-              the same two sheets by name. */}
-          <label className="field">
-            <span className="field-label">{t("interfaceTheme")}</span>
-            <select value={appearance} onChange={(e) => onAppearance(e.target.value as Appearance)}>
-              {APPEARANCES.map((style) => (
-                <option key={style} value={style}>
-                  {/* The theme names live in the console's shared dictionary
-                      (they are the same sheets the console offers), not in
-                      the team copy — teamText would render them blank. */}
-                  {consoleT(UI_THEMES[style].nameKey)}
-                </option>
-              ))}
-            </select>
-          </label>
           <label className="field">
             <span className="field-label">{t("colorScheme")}</span>
             <select value={scheme} onChange={(e) => onScheme(e.target.value)}>

@@ -1,0 +1,606 @@
+/* MetaAPI 风格的控制台外观，业务页面与交互保持共享。 */
+:root[data-appearance="metapi"] {
+  --bg: #f4f5f8;
+  --bg-deep: #eff1f5;
+  --bg-canvas: #f4f5f8;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f8f9fc;
+  --surface-hover: #f2f3ff;
+  --surface-active: #ebeaff;
+  --surface-glass: #ffffff;
+  --surface-glass-border: #e9eaf0;
+  --ink: #252631;
+  --ink-primary: #1b1c24;
+  --ink-soft: #555765;
+  --muted: #777985;
+  --muted-strong: #666875;
+  --muted-dark: #9698a2;
+  --line: #e8e9ee;
+  --line-light: #eff0f4;
+  --line-strong: #dfe1e8;
+  --primary: #5948eb;
+  --primary-hover: #4c3dd9;
+  --primary-active: #4838d2;
+  --primary-soft: #f0efff;
+  --primary-glow: rgba(89, 72, 235, 0.12);
+  --primary-hairline: rgba(89, 72, 235, 0.3);
+  --primary-ink: #5040df;
+  --accent: #ee6e65;
+  --accent-hover: #d95b53;
+  --accent-soft: #fff0ef;
+  --accent-glow: rgba(238, 110, 101, 0.12);
+  --header-bg: #ffffff;
+  --sidebar: #ffffff;
+  --sidebar-raised: #f7f8fb;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 2px 5px rgba(25, 28, 44, 0.035), 0 5px 14px rgba(25, 28, 44, 0.025);
+  --shadow-md: 0 5px 15px rgba(25, 28, 44, 0.055), 0 14px 32px rgba(25, 28, 44, 0.035);
+  --shadow-lg: 0 12px 34px rgba(25, 28, 44, 0.1), 0 28px 68px rgba(25, 28, 44, 0.08);
+  --focus: #5948eb;
+  --ambient-a: transparent;
+  --ambient-b: transparent;
+  --ambient-c: transparent;
+  color-scheme: light;
+}
+
+:root.dark[data-appearance="metapi"] {
+  --bg: #17181e;
+  --bg-deep: #131419;
+  --bg-canvas: #17181e;
+  --surface: #202129;
+  --surface-raised: #272934;
+  --surface-subtle: #242630;
+  --surface-hover: #2d2f3d;
+  --surface-active: #35334f;
+  --surface-glass: #202129;
+  --surface-glass-border: #30323d;
+  --ink: #f0f0f4;
+  --ink-primary: #fafaff;
+  --ink-soft: #c3c4ce;
+  --muted: #a3a4b0;
+  --muted-strong: #b5b6c1;
+  --muted-dark: #82838f;
+  --line: #30323b;
+  --line-light: #2a2c35;
+  --line-strong: #40424e;
+  --primary: #a69aff;
+  --primary-hover: #b7adff;
+  --primary-active: #b7adff;
+  --primary-soft: #322f50;
+  --primary-glow: rgba(166, 154, 255, 0.15);
+  --primary-hairline: rgba(166, 154, 255, 0.34);
+  --primary-ink: #b7adff;
+  --accent: #ff9c91;
+  --accent-hover: #ffb0a6;
+  --accent-soft: #482e32;
+  --accent-glow: rgba(255, 156, 145, 0.14);
+  --header-bg: #202129;
+  --sidebar: #202129;
+  --sidebar-raised: #2a2c35;
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.15), 0 5px 14px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.2), 0 14px 32px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 12px 34px rgba(0, 0, 0, 0.28), 0 28px 68px rgba(0, 0, 0, 0.18);
+  --focus: #b7adff;
+  color-scheme: dark;
+}
+
+.theme-metapi {
+  --nav-width: 248px;
+  min-height: 100dvh;
+  background: var(--bg-canvas);
+}
+
+.theme-metapi .console-atmosphere {
+  background: none;
+}
+
+.theme-metapi > .metapi-topbar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 70;
+  min-height: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0 22px 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--header-bg);
+  backdrop-filter: none;
+  box-shadow: 0 1px 3px rgba(27, 28, 43, 0.025);
+}
+
+.theme-metapi .metapi-brand {
+  display: flex;
+  flex: 0 0 var(--nav-width);
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  padding: 0 18px;
+  border-right: 1px solid var(--line-light);
+  white-space: nowrap;
+}
+
+.theme-metapi .metapi-brand-mark {
+  display: grid;
+  flex: 0 0 30px;
+  height: 30px;
+  place-items: center;
+}
+
+.theme-metapi .metapi-brand-mark svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.theme-metapi .metapi-brand-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.theme-metapi .metapi-brand-copy strong {
+  color: var(--ink-primary);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.theme-metapi .metapi-brand-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.theme-metapi .metapi-top-navigation {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.theme-metapi .metapi-top-navigation::-webkit-scrollbar {
+  display: none;
+}
+
+.theme-metapi .metapi-top-navigation a {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.theme-metapi .metapi-top-navigation a:hover,
+.theme-metapi .metapi-top-navigation a.active {
+  color: var(--primary-ink);
+}
+
+.theme-metapi .metapi-top-navigation a.active::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--primary);
+  content: "";
+}
+
+.theme-metapi .metapi-profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.theme-metapi .metapi-avatar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 5px 3px 3px;
+  border: 1px solid var(--line-light);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.theme-metapi .metapi-avatar-trigger:hover,
+.theme-metapi .metapi-avatar-trigger[aria-expanded="true"] {
+  border-color: var(--primary-hairline);
+  color: var(--primary-ink);
+}
+
+.theme-metapi .metapi-avatar {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.theme-metapi .metapi-profile-popover {
+  width: min(220px, calc(100vw - 2rem));
+  min-width: min(220px, calc(100vw - 2rem));
+  max-width: min(220px, calc(100vw - 2rem));
+}
+
+.theme-metapi .metapi-profile-menu-list {
+  gap: 3px;
+  padding: 7px;
+}
+
+.theme-metapi .metapi-profile-menu-list [role="menuitem"] {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+}
+
+.theme-metapi .metapi-profile-menu-list [role="menuitem"]:hover,
+.theme-metapi .metapi-profile-menu-list [role="menuitem"][data-hovered="true"] {
+  background: var(--surface-hover);
+  color: var(--primary-ink);
+}
+
+.theme-metapi .metapi-profile-menu-list [role="menuitem"].menu-item--danger {
+  color: var(--danger);
+}
+
+.theme-metapi .metapi-profile-menu-list [data-slot="separator"] {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--line-light);
+}
+
+.theme-metapi .console-mobile-top-nav {
+  display: none;
+}
+
+.theme-metapi .appearance-drawer .drawer-body {
+  overflow: auto;
+}
+
+.theme-metapi .console-breadcrumb {
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.theme-metapi .console-breadcrumb strong {
+  color: var(--ink-primary);
+  font-weight: 600;
+}
+
+.theme-metapi .console-global-actions {
+  gap: 7px;
+}
+
+.theme-metapi .console-global-actions .icon-button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted-strong);
+}
+
+.theme-metapi .console-global-actions .icon-button:hover {
+  background: var(--surface-hover);
+  color: var(--primary-ink);
+}
+
+.theme-metapi > .metapi-sidebar {
+  top: 64px;
+  bottom: 0;
+  left: 0;
+  width: var(--nav-width);
+  padding: 16px 11px 12px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--sidebar);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.theme-metapi .console-search {
+  height: 36px;
+  margin: 0 1px 18px;
+  border-color: var(--line);
+  border-radius: 8px;
+  background: var(--sidebar-raised);
+  box-shadow: none;
+}
+
+.theme-metapi .console-navigation {
+  gap: 18px;
+  padding: 0 1px 4px;
+}
+
+.theme-metapi .console-nav-group {
+  gap: 3px;
+}
+
+.theme-metapi .console-nav-caption {
+  padding: 2px 11px 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.theme-metapi .console-nav-link {
+  min-height: 39px;
+  gap: 11px;
+  padding: 8px 11px;
+  border-radius: 8px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.theme-metapi .console-nav-link:hover {
+  background: var(--surface-hover);
+  color: var(--primary-ink);
+}
+
+.theme-metapi .console-nav-link.active {
+  border-color: transparent;
+  background: var(--primary-soft);
+  box-shadow: none;
+  color: var(--primary-ink);
+  font-weight: 650;
+}
+
+.theme-metapi .console-nav-link.active .console-nav-indicator {
+  right: auto;
+  left: -11px;
+  width: 3px;
+  height: 22px;
+  transform: none;
+  border-radius: 0 3px 3px 0;
+  background: var(--primary);
+}
+
+.theme-metapi .console-sidebar-foot {
+  padding: 12px 2px 0;
+}
+
+.theme-metapi .console-health {
+  border-top-color: var(--line-light);
+}
+
+.theme-metapi .console-sidebar-meta {
+  min-height: 30px;
+  padding: 0 4px;
+}
+
+.theme-metapi .console-main {
+  min-height: calc(100dvh - 64px);
+  margin-top: 64px;
+}
+
+.theme-metapi .console-content {
+  width: 100%;
+  max-width: 1880px;
+  padding: 30px 34px 24px;
+}
+
+.theme-metapi .console-page-foot {
+  padding: 12px 34px 20px;
+}
+
+.theme-metapi :is(.panel, .dashboard-panel, .dashboard-chart-panel, .dashboard-subpanel, .table-card, .settings-display, .settings-account) {
+  border-color: var(--line-light);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-metapi .panel-header {
+  border-color: var(--line-light);
+}
+
+.theme-metapi .page-heading h1,
+.theme-metapi .page-head h1 {
+  color: var(--ink-primary);
+  font-size: clamp(20px, 1.6vw, 25px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.theme-metapi :is(.page-heading p, .page-head p) {
+  color: var(--muted);
+}
+
+.theme-metapi :is(.button, button.button) {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.theme-metapi :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-color: var(--line-strong);
+  border-radius: 8px;
+  background-color: var(--surface);
+}
+
+.theme-metapi :is(input, select, textarea):focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.theme-metapi .table thead th {
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.theme-metapi .table tbody tr:hover {
+  background: var(--surface-hover);
+}
+
+.theme-metapi .badge,
+.theme-metapi .status-pill {
+  border-radius: 999px;
+}
+
+.theme-metapi .tab-button[aria-selected="true"],
+.theme-metapi .tab-button.is-active {
+  color: var(--primary-ink);
+}
+
+.theme-metapi .console-nav-drawer .drawer {
+  border-radius: 12px;
+}
+
+@media (min-width: 761px) and (max-width: 1120px) {
+  .theme-metapi {
+    --nav-width: 88px;
+  }
+
+  .theme-metapi .metapi-brand-copy,
+  .theme-metapi .console-nav-caption,
+  .theme-metapi .console-nav-link > span,
+  .theme-metapi .console-health > div,
+  .theme-metapi .console-sidebar-meta > span,
+  .theme-metapi .console-search span,
+  .theme-metapi .console-search kbd {
+    display: none;
+  }
+
+  .theme-metapi .metapi-brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .theme-metapi .console-search,
+  .theme-metapi .console-nav-link {
+    justify-content: center;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .theme-metapi .console-sidebar-meta {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 760px) {
+  .theme-metapi {
+    --nav-width: 0px;
+  }
+
+  .theme-metapi > .metapi-topbar {
+    min-height: 58px;
+    height: 58px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+
+  .theme-metapi .metapi-brand {
+    flex: 0 0 auto;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+  }
+
+  .theme-metapi .metapi-brand-mark {
+    flex-basis: 26px;
+    height: 26px;
+  }
+
+  .theme-metapi .metapi-brand-copy small,
+  .theme-metapi .console-breadcrumb,
+  .theme-metapi .metapi-top-navigation {
+    display: none;
+  }
+
+  .theme-metapi .console-topbar .console-mobile-trigger,
+  .theme-metapi .console-topbar .console-mobile-search {
+    display: inline-flex;
+  }
+
+  .theme-metapi .console-global-actions {
+    flex: 0 0 auto;
+    gap: 3px;
+  }
+
+  .theme-metapi .console-language {
+    width: 34px;
+    min-width: 34px;
+    overflow: hidden;
+  }
+
+  .theme-metapi .console-language select {
+    width: 34px;
+    padding: 0 2px;
+    color: transparent;
+  }
+
+  .theme-metapi .metapi-avatar-trigger {
+    flex: 0 0 auto;
+  }
+
+  .theme-metapi .metapi-profile-popover {
+    right: 0 !important;
+    left: auto !important;
+  }
+
+  .theme-metapi .console-main {
+    min-height: calc(100dvh - 58px);
+    margin-top: 58px;
+  }
+
+  .theme-metapi .console-content {
+    padding: 22px 16px 20px;
+  }
+
+  .theme-metapi .console-page-foot {
+    padding: 12px 16px 20px;
+  }
+
+  .theme-metapi .console-mobile-top-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 0 0 16px;
+  }
+
+  .theme-metapi .console-mobile-top-nav button {
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted-strong);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+  }
+
+  .theme-metapi .console-mobile-top-nav button.active {
+    background: var(--primary-soft);
+    color: var(--primary-ink);
+  }
+}

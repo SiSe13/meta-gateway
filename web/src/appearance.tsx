@@ -10,19 +10,28 @@ import {
 } from "react";
 import { flushSync } from "react-dom";
 import { normalizePalette, type PaletteId } from "./palettes";
-import { UI_THEMES } from "./themes/registry";
 import type { UIThemeId } from "./themes/types";
 
-export const APPEARANCES = Object.keys(UI_THEMES) as UIThemeId[];
 export type Appearance = UIThemeId;
 export type ColorScheme = "light" | "dark";
-const STYLE_KEY = "meta-gateway.appearance";
 // Keep the original key so existing light/dark preferences survive the upgrade.
 const SCHEME_KEY = "meta-gateway.theme";
 const PALETTE_KEY = "meta-gateway.palette";
-const validStyle = (value: string | null): Appearance =>
-  APPEARANCES.find((style) => style === value) ?? "classic";
+const BACKGROUND_KEY = "meta-gateway.background";
+const CARD_STYLE_KEY = "meta-gateway.card-style";
+const DENSITY_KEY = "meta-gateway.density";
 const validScheme = (value: string | null): ColorScheme => (value === "dark" ? "dark" : "light");
+
+export type BackgroundStyle = "paper" | "mist" | "warm";
+export type CardStyle = "raised" | "outlined" | "flat";
+export type PageDensity = "comfortable" | "standard" | "compact";
+
+const validBackground = (value: string | null): BackgroundStyle =>
+  value === "mist" || value === "warm" ? value : "paper";
+const validCardStyle = (value: string | null): CardStyle =>
+  value === "outlined" || value === "flat" ? value : "raised";
+const validDensity = (value: string | null): PageDensity =>
+  value === "comfortable" || value === "compact" ? value : "standard";
 /**
  * The colour scheme to start in.
  *
@@ -58,9 +67,14 @@ type AppearanceContextValue = {
   appearance: Appearance;
   scheme: ColorScheme;
   palette: PaletteId;
-  setAppearance: (value: Appearance) => void;
+  background: BackgroundStyle;
+  cardStyle: CardStyle;
+  density: PageDensity;
   setScheme: (value: ColorScheme) => void;
   setPalette: (value: PaletteId) => void;
+  setBackground: (value: BackgroundStyle) => void;
+  setCardStyle: (value: CardStyle) => void;
+  setDensity: (value: PageDensity) => void;
   toggleScheme: () => void;
 };
 const AppearanceContext = createContext<AppearanceContextValue | null>(null);
@@ -77,14 +91,24 @@ function transition(apply: () => void) {
 }
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
-  const [appearance, updateAppearance] = useState<Appearance>(() => validStyle(read(STYLE_KEY)));
+  const appearance: Appearance = "metapi";
   const [scheme, updateScheme] = useState<ColorScheme>(preferredScheme);
   const [palette, updatePalette] = useState<PaletteId>(() => normalizePalette(read(PALETTE_KEY)));
+  const [background, updateBackground] = useState<BackgroundStyle>(() =>
+    validBackground(read(BACKGROUND_KEY)),
+  );
+  const [cardStyle, updateCardStyle] = useState<CardStyle>(() =>
+    validCardStyle(read(CARD_STYLE_KEY)),
+  );
+  const [density, updateDensity] = useState<PageDensity>(() => validDensity(read(DENSITY_KEY)));
   useLayoutEffect(() => {
     document.documentElement.dataset.appearance = appearance;
     document.documentElement.dataset.palette = palette;
+    document.documentElement.dataset.background = background;
+    document.documentElement.dataset.cardStyle = cardStyle;
+    document.documentElement.dataset.density = density;
     document.documentElement.classList.toggle("dark", scheme === "dark");
-  }, [appearance, palette, scheme]);
+  }, [appearance, background, cardStyle, density, palette, scheme]);
   useEffect(() => {
     const sync = () => {
       document.documentElement.dataset.visibility = document.hidden ? "hidden" : "visible";
@@ -96,27 +120,20 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.storageArea && event.storageArea !== localStorage) return;
-      if (event.key === STYLE_KEY || event.key === null)
-        updateAppearance(validStyle(read(STYLE_KEY)));
       if (event.key === SCHEME_KEY || event.key === null)
         updateScheme(validScheme(read(SCHEME_KEY)));
       if (event.key === PALETTE_KEY || event.key === null)
         updatePalette(normalizePalette(read(PALETTE_KEY)));
+      if (event.key === BACKGROUND_KEY || event.key === null)
+        updateBackground(validBackground(read(BACKGROUND_KEY)));
+      if (event.key === CARD_STYLE_KEY || event.key === null)
+        updateCardStyle(validCardStyle(read(CARD_STYLE_KEY)));
+      if (event.key === DENSITY_KEY || event.key === null)
+        updateDensity(validDensity(read(DENSITY_KEY)));
     };
     window.addEventListener("storage", sync);
     return () => window.removeEventListener("storage", sync);
   }, []);
-  const setAppearance = useCallback(
-    (value: Appearance) => {
-      if (value === appearance) return;
-      transition(() => {
-        document.documentElement.dataset.appearance = value;
-        updateAppearance(value);
-        persist(STYLE_KEY, value);
-      });
-    },
-    [appearance],
-  );
   // `remember` distinguishes "the operator picked this" from "the system
   // changed"; only the former is written to storage, so a system-driven scheme
   // keeps following the system afterwards.
@@ -148,8 +165,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     () => setScheme(scheme === "dark" ? "light" : "dark"),
     [scheme, setScheme],
   );
-  // Swapping palettes is colour tuning rather than a mode change, so it skips
-  // the clip-path wipe that setAppearance/setScheme use.
+  // 调整配色只更新颜色变量，不触发布局切换动画。
   const setPalette = useCallback(
     (value: PaletteId) => {
       if (value === palette) return;
@@ -159,9 +175,60 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     },
     [palette],
   );
+  // 背景预设、卡片样式和页面密度都是本地偏好，切换后立即作用于全局样式。
+  const setBackground = useCallback(
+    (value: BackgroundStyle) => {
+      if (value === background) return;
+      updateBackground(value);
+      persist(BACKGROUND_KEY, value);
+    },
+    [background],
+  );
+  const setCardStyle = useCallback(
+    (value: CardStyle) => {
+      if (value === cardStyle) return;
+      updateCardStyle(value);
+      persist(CARD_STYLE_KEY, value);
+    },
+    [cardStyle],
+  );
+  const setDensity = useCallback(
+    (value: PageDensity) => {
+      if (value === density) return;
+      updateDensity(value);
+      persist(DENSITY_KEY, value);
+    },
+    [density],
+  );
   const value = useMemo(
-    () => ({ appearance, scheme, palette, setAppearance, setScheme, setPalette, toggleScheme }),
-    [appearance, scheme, palette, setAppearance, setScheme, setPalette, toggleScheme],
+    () => ({
+      appearance,
+      scheme,
+      palette,
+      background,
+      cardStyle,
+      density,
+      setScheme,
+      setPalette,
+      setBackground,
+      setCardStyle,
+      setDensity,
+      toggleScheme,
+    }),
+    [
+      appearance,
+      scheme,
+      palette,
+      background,
+      cardStyle,
+      density,
+      setScheme,
+      setPalette,
+      setBackground,
+      setCardStyle,
+      setDensity,
+      toggleScheme,
+    ],
   );
   return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;
 }
@@ -172,7 +239,7 @@ export function useAppearance() {
   return value;
 }
 
-/** Standalone business views use the modern presentation unless hosted by a theme. */
+/** 独立业务页面也使用统一控制台布局。 */
 export function useUITheme() {
-  return useContext(AppearanceContext)?.appearance ?? "modern";
+  return useContext(AppearanceContext)?.appearance ?? "metapi";
 }

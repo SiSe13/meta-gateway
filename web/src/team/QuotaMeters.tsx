@@ -1,3 +1,4 @@
+import { Button as HeroButton } from "@heroui/react";
 import { QuotaMeter } from "../components/QuotaMeter";
 import { useUsers } from "./UsersContext";
 
@@ -56,8 +57,13 @@ export function QuotaMeters({
   );
   if (!onEdit) return body;
   return (
-    <button className="quota-meters-button" onClick={onEdit} title={t("editQuota")}>
+    <HeroButton
+      variant="ghost"
+      className="quota-meters-button"
+      onPress={onEdit}
+      aria-label={t("editQuota")}
+    >
       {body}
-    </button>
+    </HeroButton>
   );
 }

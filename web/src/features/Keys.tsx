@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button as HeroButton, Switch as HeroSwitch } from "@heroui/react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -87,18 +88,18 @@ function EnabledSwitch({
   const { t, status } = useI18n();
   const action = t(on ? "common.disableAction" : "common.enableAction");
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
+    <HeroSwitch
+      className="key-toggle-switch"
+      isSelected={on}
+      isDisabled={pending}
       aria-label={`${name} · ${action}`}
-      title={action}
-      disabled={pending}
-      className={`badge badge-${on ? "enabled" : "disabled"} key-toggle`}
-      onClick={onToggle}
+      {...{ title: action }}
+      onChange={onToggle}
     >
-      {status(on)}
-    </button>
+      <HeroSwitch.Content className={`badge badge-${on ? "enabled" : "disabled"} key-toggle`}>
+        {status(on)}
+      </HeroSwitch.Content>
+    </HeroSwitch>
   );
 }
 
@@ -164,15 +165,16 @@ function RedemptionDialog({ onClose }: { onClose: () => void }) {
           {minted.map((m) => (
             <div key={m.id} className="redemption-code-row">
               <code>{m.code}</code>
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
                 className="redemption-copy"
-                onClick={() => {
+                onPress={() => {
                   void navigator.clipboard.writeText(m.code);
                 }}
               >
                 {t("keys.redemptionCopy")}
-              </button>
+              </HeroButton>
             </div>
           ))}
         </div>
@@ -191,14 +193,15 @@ function RedemptionDialog({ onClose }: { onClose: () => void }) {
                   {t("keys.redemptionUsed")} · #{c.redeemed_by_key_id}
                 </span>
               ) : (
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
                   className="redemption-void"
-                  disabled={voidCode.pendingId === c.id}
-                  onClick={() => voidCode.mutate(c.id)}
+                  isDisabled={voidCode.pendingId === c.id}
+                  onPress={() => voidCode.mutate(c.id)}
                 >
                   {voidCode.pendingId === c.id ? t("common.working") : t("keys.redemptionVoid")}
-                </button>
+                </HeroButton>
               )}
             </div>
           ))
@@ -1231,16 +1234,17 @@ function KeyDialog({
       </Field>
 
       <div className="key-dialog-section">
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="key-dialog-fold"
           aria-expanded={openBilling}
-          onClick={() => setOpenBilling((v) => !v)}
+          onPress={() => setOpenBilling((v) => !v)}
         >
           <ChevronDown size={13} className={openBilling ? "is-open" : ""} />
           <span>{t("keys.sectionBilling")}</span>
           {openBilling ? null : <small>{t("keys.sectionBillingHint")}</small>}
-        </button>
+        </HeroButton>
         {openBilling ? (
           <div className="key-dialog-fold-body">
             <Field label={t("keys.quotaTotal")} hint={t("keys.quotaTotalHint")}>
@@ -1281,16 +1285,17 @@ function KeyDialog({
       </div>
 
       <div className="key-dialog-section">
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="key-dialog-fold"
           aria-expanded={openModels}
-          onClick={() => setOpenModels((v) => !v)}
+          onPress={() => setOpenModels((v) => !v)}
         >
           <ChevronDown size={13} className={openModels ? "is-open" : ""} />
           <span>{t("keys.sectionModels")}</span>
           {openModels ? null : <small>{t("keys.sectionModelsHint")}</small>}
-        </button>
+        </HeroButton>
         {openModels ? (
           <div className="key-dialog-fold-body">
             <Field label={t("keys.modelAllowlist")} hint={t("keys.modelAllowlistHint")}>
@@ -1333,16 +1338,17 @@ function KeyDialog({
       </div>
 
       <div className="key-dialog-section">
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="key-dialog-fold"
           aria-expanded={openAdvanced}
-          onClick={() => setOpenAdvanced((v) => !v)}
+          onPress={() => setOpenAdvanced((v) => !v)}
         >
           <ChevronDown size={13} className={openAdvanced ? "is-open" : ""} />
           <span>{t("keys.sectionAdvanced")}</span>
           {openAdvanced ? null : <small>{t("keys.sectionAdvancedHint")}</small>}
-        </button>
+        </HeroButton>
         {openAdvanced ? (
           <div className="key-dialog-fold-body">
             {tenantGroupNames.length > 0 || tenantGroup ? (

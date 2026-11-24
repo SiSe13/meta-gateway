@@ -1,0 +1,237 @@
+/* Metapi maps the HeroUI semantic palette onto the existing appearance tokens. */
+:root[data-appearance="metapi"] {
+  --background: var(--bg-canvas);
+  --foreground: var(--ink);
+  --surface-foreground: var(--ink);
+  --surface-secondary: var(--surface-subtle);
+  --surface-secondary-foreground: var(--ink);
+  --surface-tertiary: var(--surface-hover);
+  --surface-tertiary-foreground: var(--ink);
+  --overlay: var(--surface-raised);
+  --overlay-foreground: var(--ink);
+  --default: var(--surface-subtle);
+  --default-foreground: var(--ink);
+  --default-hover: var(--surface-hover);
+  --default-soft: var(--primary-soft);
+  --default-soft-foreground: var(--primary-ink);
+  --default-soft-hover: var(--surface-active);
+  --border: var(--line-strong);
+  --separator: var(--line);
+  --focus: var(--primary);
+  --danger-foreground: var(--on-danger);
+  --danger-soft-foreground: var(--danger);
+  --danger-soft-hover: color-mix(in srgb, var(--danger-soft) 80%, var(--danger));
+  --field-background: var(--surface);
+  --field-foreground: var(--ink);
+  --field-placeholder: var(--muted);
+  --field-border: var(--line-strong);
+  --field-border-hover: var(--primary-hairline);
+  --field-border-focus: var(--primary);
+  --field-focus: var(--surface);
+  --field-border-width: 1px;
+  --field-radius: 9px;
+  --field-shadow: none;
+  --backdrop: color-mix(in srgb, #141822 38%, transparent);
+  --surface-shadow: var(--shadow-sm);
+  --overlay-shadow: var(--shadow-lg);
+  --radius: 12px;
+}
+
+.theme-metapi .button--primary {
+  --accent: var(--primary);
+  --accent-hover: var(--primary-hover);
+  --accent-foreground: var(--on-primary);
+}
+
+.theme-metapi .button--secondary,
+.theme-metapi .button--tertiary {
+  --default: var(--surface-subtle);
+  --default-hover: var(--surface-hover);
+  --default-foreground: var(--ink);
+  --accent-soft-foreground: var(--ink-soft);
+}
+
+.theme-metapi .button--danger {
+  --danger: var(--danger);
+  --danger-hover: var(--danger-hover);
+  --danger-foreground: var(--on-danger);
+}
+
+.theme-metapi :is(.button, button.button) {
+  min-height: 36px;
+  border-radius: 9px;
+  font-family: var(--font);
+  font-weight: 600;
+}
+
+.theme-metapi .button--icon-only {
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 9px;
+}
+
+.theme-metapi .icon-button.button--icon-only {
+  color: var(--muted-strong);
+}
+
+.theme-metapi .icon-button.button--icon-only:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--primary-ink);
+}
+
+.theme-metapi :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, .input) {
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background-color: var(--surface);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+.theme-metapi :is(input, select, textarea, .input):focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.theme-metapi .hero-tabs {
+  color: var(--ink);
+}
+
+.theme-metapi .hero-tabs .tabs {
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 20px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-subtle);
+}
+
+.theme-metapi .hero-tabs [role="tab"] {
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-strong);
+  font: 500 13px/1.4 var(--font);
+  white-space: nowrap;
+}
+
+.theme-metapi .hero-tabs [role="tab"][aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line-light);
+  box-shadow: var(--shadow-sm);
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+
+.theme-metapi .hero-tabs [role="tab"]:hover:not([aria-selected="true"]) {
+  background: var(--surface-hover);
+  color: var(--ink);
+}
+
+.theme-metapi .panel.heroui-card {
+  display: block;
+  min-width: 0;
+  gap: 0;
+  padding: 22px;
+  overflow: visible;
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.theme-metapi .dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-overlay, 100000);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--backdrop);
+  backdrop-filter: blur(7px);
+}
+
+.theme-metapi .dialog-trigger {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.theme-metapi .dialog {
+  width: min(700px, 100%);
+  max-height: min(88dvh, 820px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  box-shadow: var(--shadow-lg);
+}
+
+.theme-metapi .dialog [data-slot="modal-header"] {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 21px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.theme-metapi .dialog [data-slot="modal-heading"] {
+  margin: 0;
+  color: var(--ink-primary);
+  font: 600 17px/1.4 var(--font);
+  letter-spacing: -0.03em;
+}
+
+.theme-metapi .dialog [data-slot="modal-body"] {
+  min-height: 0;
+  padding: 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.theme-metapi .dialog [data-slot="modal-footer"] {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-subtle);
+}
+
+@media (max-width: 600px) {
+  .theme-metapi .dialog-backdrop {
+    padding: 12px;
+  }
+
+  .theme-metapi .dialog {
+    max-height: calc(100dvh - 24px);
+    border-radius: 14px;
+  }
+
+  .theme-metapi .dialog [data-slot="modal-header"],
+  .theme-metapi .dialog [data-slot="modal-body"],
+  .theme-metapi .dialog [data-slot="modal-footer"] {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-metapi :is(.button, .hero-tabs [role="tab"]) {
+    transition-duration: 0.01ms !important;
+  }
+}

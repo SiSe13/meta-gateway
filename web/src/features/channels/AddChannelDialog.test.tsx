@@ -14,7 +14,7 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 /** Answers the preview the way the backend does: one endpoint per channel type. */
-function stubPreview() {
+function stubPreview(detectedFamily = "") {
   const calls: Array<{ url: string; type: string }> = [];
   vi.stubGlobal(
     "fetch",
@@ -41,6 +41,9 @@ function stubPreview() {
         });
       }
       if (path === "/admin/sites") return jsonResponse([]);
+      if (path === "/admin/site-type") {
+        return jsonResponse(detectedFamily ? { family: detectedFamily } : {});
+      }
       if (path === "/admin/runtime-settings") {
         return jsonResponse({ editable: { default_model_sync_mode: "manual" } });
       }
@@ -78,6 +81,25 @@ describe("AddChannelDialog endpoint preview", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  it("detects a provider from the base URL and keeps the type directly below it", async () => {
+    stubPreview("deepseek");
+    renderDialog();
+
+    const baseUrl = screen.getByPlaceholderText("https://api.example.com");
+    const baseUrlField = baseUrl.closest(".field");
+    const typeButton = screen.getByRole("button", { name: "Type" });
+    expect(baseUrlField?.compareDocumentPosition(typeButton) ?? 0).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+
+    fireEvent.change(baseUrl, { target: { value: "https://api.deepseek.com/v1" } });
+    fireEvent.blur(baseUrl);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Type" })).toHaveTextContent("DeepSeek"),
+    );
   });
 
   // The upstream can speak one of three wire shapes, and the dialog has to answer

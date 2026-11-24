@@ -11,7 +11,6 @@ import {
 import { MemoryRouter, RouterProvider, createMemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { DAILY_REVEAL_MS } from "./lib/entranceMotion";
 import { I18nProvider } from "./i18n";
 import { UnsavedChangesBoundary } from "./lib/RouterBoundary";
 import { SessionProvider } from "./session";
@@ -212,7 +211,6 @@ describe("channel-first shell", () => {
   });
 
   it("uses one account form and immediately adopts a member session", async () => {
-    vi.useFakeTimers();
     const requests: string[] = [];
     vi.stubGlobal(
       "fetch",
@@ -233,7 +231,6 @@ describe("channel-first shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     await flushAsyncWork();
     expect(document.querySelector(".gateway-transition")).toBeNull();
-    await act(async () => vi.advanceTimersByTime(DAILY_REVEAL_MS));
     expect(
       requests.filter((path) => path.startsWith("/admin/") && path !== "/admin/session"),
     ).toEqual([]);
@@ -291,16 +288,12 @@ describe("channel-first shell", () => {
         return jsonResponse([]);
       }),
     );
-    renderApp();
+    renderApp(["/users/members"]);
     expect(await screen.findByRole("heading", { name: "User management" })).toBeInTheDocument();
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/users/overview"),
-    );
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users/members"));
     expect(document.querySelector(".console-shell")).toBeInTheDocument();
     expect(document.querySelector('a[href="/console/users/policies"]')).toBeNull();
     expect(document.querySelector('a[href="/console/channels"]')).toBeNull();
-    fireEvent.click(screen.getByRole("link", { name: "Members & invitations" }));
-    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users/members"));
     expect(
       requests.filter(
         (path) =>
@@ -345,7 +338,6 @@ describe("channel-first shell", () => {
   });
 
   it("mounts the workspace immediately after authentication without a blocking entrance", async () => {
-    vi.useFakeTimers();
     const fetcher = stubAdminFetch();
     vi.stubGlobal("fetch", fetcher);
     renderApp();
@@ -355,11 +347,10 @@ describe("channel-first shell", () => {
     await flushAsyncWork();
     expect(localStorage.getItem("meta-gateway.admin-token")).toBe("mg-sess.test");
     expect(document.querySelector(".gateway-transition")).toBeNull();
-    act(() => vi.advanceTimersByTime(DAILY_REVEAL_MS));
-    vi.useRealTimers();
     expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
     expect(document.querySelector(".authenticated-stage.is-revealing")).toBeNull();
+    expect(document.querySelector(".gateway-transition")).toBeNull();
     expect(fetcher.mock.calls.filter(([input]) => String(input) === "/admin/session")).toHaveLength(
       1,
     );
@@ -384,8 +375,7 @@ describe("channel-first shell", () => {
     expect(localStorage.getItem("meta-gateway.admin-token")).toBeNull();
   });
 
-  it("does not log in twice when the brief reveal finishes", async () => {
-    vi.useFakeTimers();
+  it("logs in only once without an entrance animation", async () => {
     const fetch = stubAdminFetch();
     vi.stubGlobal("fetch", fetch);
     renderApp();
@@ -393,12 +383,7 @@ describe("channel-first shell", () => {
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "skip-token" } });
     fireEvent.click(screen.getByRole("button", { name: "Connect" }));
     await flushAsyncWork();
-    act(() => vi.advanceTimersByTime(DAILY_REVEAL_MS));
-    await flushAsyncWork();
-    expect(screen.queryByRole("dialog", { name: "Workspace entrance" })).not.toBeInTheDocument();
     expect(localStorage.getItem("meta-gateway.admin-token")).toBe("mg-sess.test");
-    act(() => vi.advanceTimersByTime(5000));
-    vi.useRealTimers();
     expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
     expect(fetch.mock.calls.filter(([input]) => String(input) === "/admin/session")).toHaveLength(
       1,
@@ -436,8 +421,7 @@ describe("channel-first shell", () => {
     vi.stubGlobal("fetch", stubAdminFetch());
 
     // The nav label is read off the navigation itself rather than by role,
-    // because both theme packages render navigation of their own (classic
-    // deck rail / modern sidebar).
+    // because the shared console shell renders its own navigation.
     const navLabels = () =>
       [
         ...document.querySelectorAll(
@@ -448,12 +432,12 @@ describe("channel-first shell", () => {
     renderApp(["/models"]);
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
     expect(navLabels()).toContain("Check-in");
-    expect(navLabels()).toContain("Workbench");
+    expect(navLabels()).not.toContain("Workbench");
 
     cleanup();
     localStorage.setItem(
       "meta-gateway.topbar-items",
-      JSON.stringify({ controls: {}, hiddenNav: ["/checkins", "/workbench"] }),
+      JSON.stringify({ controls: {}, hiddenNav: ["/checkins"] }),
     );
     renderApp(["/models"]);
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
@@ -477,14 +461,12 @@ describe("channel-first shell", () => {
   // The mode switch is a server-side capability change and now lives in the
   // multi-user area itself; that area's navigation entry appears and
   // disappears with the mode (see lib/topBar.ts for the pinning override).
-  it("shows user management in the navigation only in team mode", async () => {
+  it("shows the user-management workspace only in team mode", async () => {
     localStorage.setItem("meta-gateway.admin-token", "nav-token");
-    const navLabels = () =>
-      [
-        ...document.querySelectorAll(
-          ".console-navigation .console-nav-link, .deck-sector .deck-sector-label",
-        ),
-      ].map((element) => element.textContent?.trim());
+    const topNavLabels = () =>
+      [...document.querySelectorAll(".metapi-top-navigation a")].map((element) =>
+        element.textContent?.trim(),
+      );
 
     vi.stubGlobal(
       "fetch",
@@ -492,13 +474,13 @@ describe("channel-first shell", () => {
     );
     renderApp(["/models"]);
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
-    await waitFor(() => expect(navLabels()).toContain("User management"));
+    await waitFor(() => expect(topNavLabels()).toContain("User management"));
 
     cleanup();
     vi.stubGlobal("fetch", stubAdminFetch());
     renderApp(["/models"]);
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
-    await waitFor(() => expect(navLabels()).not.toContain("User management"));
+    await waitFor(() => expect(topNavLabels()).not.toContain("User management"));
   });
 
   it("has no check-in shortcut in the chrome", async () => {
@@ -509,7 +491,7 @@ describe("channel-first shell", () => {
     expect(document.querySelector(".console-checkin, .deck-checkin-btn")).toBeNull();
   });
 
-  it("opens models, logs, and maintain from the product nav", async () => {
+  it("opens models, logs, settings, and backups from the console", async () => {
     localStorage.setItem("meta-gateway.admin-token", "nav-token");
     vi.stubGlobal("fetch", stubAdminFetch());
 
@@ -523,8 +505,13 @@ describe("channel-first shell", () => {
     cleanup();
     renderApp(["/settings"]);
     expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Runtime" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Backups" })).toBeInTheDocument();
+    expect(
+      document.querySelector('.console-navigation a[href="/console/settings?tab=runtime"]'),
+    ).toBeInTheDocument();
+
+    cleanup();
+    renderApp(["/backups"]);
+    expect(await screen.findByRole("heading", { name: "Backups" })).toBeInTheDocument();
   });
 
   it("routes the console on the data-router shape main.tsx ships", async () => {
@@ -543,44 +530,6 @@ describe("channel-first shell", () => {
     cleanup();
     renderDataRouterApp(["/account"]);
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/settings"));
-  });
-
-  it("uses the short safe path when reduced motion is requested", async () => {
-    vi.useFakeTimers();
-    vi.stubGlobal(
-      "matchMedia",
-      vi.fn().mockImplementation(() => ({
-        matches: true,
-        media: "(prefers-reduced-motion: reduce)",
-        onchange: null,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        addListener: vi.fn(),
-        removeListener: vi.fn(),
-        dispatchEvent: vi.fn(),
-      })),
-    );
-    vi.stubGlobal("fetch", stubAdminFetch());
-
-    renderApp();
-    fireEvent.change(screen.getByLabelText("Username"), { target: { value: "admin" } });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "reduced-token" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
-    await flushAsyncWork();
-    await act(async () => {
-      vi.advanceTimersByTime(620);
-      await Promise.resolve();
-    });
-
-    expect(localStorage.getItem("meta-gateway.admin-token")).toBe("mg-sess.test");
-    expect(screen.getByRole("heading", { name: "Overview" })).toBeInTheDocument();
-    await act(async () => {
-      vi.advanceTimersByTime(200);
-      await Promise.resolve();
-    });
-    expect(document.querySelector(".gateway-transition")).not.toBeInTheDocument();
   });
 
   // A plugin-answered model ("auto-jev" is answered by jev-router's route hook)

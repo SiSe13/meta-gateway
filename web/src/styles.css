@@ -1,3 +1,5 @@
+@import "@heroui/styles";
+
 /* Feature-specific layouts. Shared tokens, components, shell and workspace composition live in styles/. */
 
 html,
@@ -3213,6 +3215,37 @@ td.actions {
 .field .checkin-time-picker select {
   width: auto;
 }
+.checkin-log-toolbar {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.checkin-log-filters,
+.checkin-log-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.checkin-log-actions {
+  margin-left: auto;
+}
+.checkin-log-filters select,
+.checkin-log-filters input[type="date"] {
+  width: auto;
+}
+@media (max-width: 760px) {
+  .checkin-log-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .checkin-log-actions {
+    justify-content: flex-end;
+    margin-left: 0;
+  }
+}
 .ua-preset-row {
   display: flex;
   gap: 8px;
@@ -5443,8 +5476,7 @@ td.actions {
 }
 /* Route-free 试调: one channel, its whole inventory, one verdict per row. The
    layout mirrors .channel-model-row so the dialog and the drawer read as the
-   same list, and every colour comes from a theme variable so both appearances
-   resolve it without a classic-specific override. */
+   same list, with colours supplied by the shared appearance tokens. */
 .channel-model-test-bar {
   display: flex;
   align-items: center;
@@ -9946,10 +9978,8 @@ Whole-app render guard — see components/ErrorBoundary.tsx
    digits wide, so the right half of each row was a hole, and a card with an odd
    number of fields ended in another one. A stack has no holes, and it is how
    every other form in the console reads. */
-/* `:root[data-appearance]` is load-bearing, not decoration: the skins style
-   `.form-grid` themselves (`:root[data-appearance="classic"] .form-grid` in
-   theme.css) and that selector outranks a bare page rule loaded earlier, so
-   without the prefix this one silently loses and the fields stay two-up. */
+/* The root attribute gives this runtime layout enough specificity to override
+   the shared form grid, keeping each setting and its hint on one row. */
 :root[data-appearance] .runtime-cards-grid .runtime-rows {
   grid-template-columns: minmax(0, 1fr);
   row-gap: 20px;

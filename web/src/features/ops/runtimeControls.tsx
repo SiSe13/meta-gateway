@@ -1,5 +1,6 @@
 import { useId, type InputHTMLAttributes, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useI18n } from "../../i18n";
 import { InfoTip } from "../../components/ui";
 
@@ -226,12 +227,12 @@ export function CollapsibleGroup({
       className={`runtime-fold${open ? " is-open" : ""}${danger ? " is-danger" : ""}`}
       id={id}
     >
-      <button
+      <HeroButton
         type="button"
         className="runtime-fold-toggle"
         aria-expanded={open}
         aria-controls={`${id}-body`}
-        onClick={onToggle}
+        onPress={onToggle}
       >
         <span className="runtime-fold-chevron" aria-hidden="true">
           <ChevronRight size={15} />
@@ -240,7 +241,7 @@ export function CollapsibleGroup({
           <span className="runtime-fold-title">{title}</span>
           <span className="runtime-fold-desc">{description}</span>
         </span>
-      </button>
+      </HeroButton>
       {open ? (
         <div className="runtime-fold-body" id={`${id}-body`}>
           {children}

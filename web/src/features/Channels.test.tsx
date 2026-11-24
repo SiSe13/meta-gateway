@@ -160,7 +160,7 @@ describe("Channels two-phase create", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
     fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
@@ -180,6 +180,78 @@ describe("Channels two-phase create", () => {
       expect(screen.getByText(/saved and fetched 1 models/i)).toBeInTheDocument(),
     );
     expect(createConnection).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("site observations console entry", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("meta-gateway.locale", "en");
+    localStorage.setItem("meta-gateway.admin-token", "test-token");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows the observations workspace and full connection directory without an inner tab", async () => {
+    const overview = {
+      channel: {
+        id: 5,
+        name: "observation-directory-channel",
+        base_url: "https://api.example.com",
+        models_csv: "gpt-test",
+        group_name: "default",
+        priority: 0,
+        weight: 100,
+        status: "enabled",
+        type_hint: "openai-compatible",
+        created_at: "",
+        updated_at: "",
+      },
+      credential_kind: "api_key",
+      checkin_enabled: false,
+      has_user_credential: false,
+      has_platform_user_id: false,
+      has_api_key: true,
+      site_usable: true,
+      credential_usable: true,
+      model_count: 1,
+      discovered_model_count: 1,
+      route_count: 0,
+      enabled_member_count: 0,
+      cooling_member_count: 0,
+      failure_count: 0,
+      checkin_supported: true,
+      account_supported: true,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input).split("?")[0] ?? "";
+        switch (path) {
+          case "/admin/channels/overview":
+            return jsonResponse([overview]);
+          case "/admin/sites":
+          case "/admin/channels":
+          case "/admin/routes/overview":
+          case "/admin/plugins/status":
+            return jsonResponse([]);
+          case "/admin/site-probe/observations":
+            return jsonResponse({ sites: [], samples: [], hours: 24 });
+          default:
+            return jsonResponse({ error: `unexpected ${path}` }, 500);
+        }
+      }),
+    );
+
+    renderChannelsAt("/?view=observations");
+
+    expect(await screen.findByRole("heading", { name: "Site observations" })).toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "Connection views" })).not.toBeInTheDocument();
+    expect(await screen.findByText("observation-directory-channel")).toBeInTheDocument();
   });
 });
 
@@ -265,7 +337,7 @@ describe("Channels model sync payload", () => {
     );
 
     renderChannels();
-    await screen.findByRole("heading", { name: "Connections" });
+    await screen.findByRole("heading", { name: "Site management" });
     await screen.findByText("empty-upstream");
     fireEvent.click(screen.getAllByRole("button", { name: "More actions" })[0]!);
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sync models" }));
@@ -774,7 +846,7 @@ describe("Channels edit dialog sync mode", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
 
     await waitFor(async () => {
       const trigger = screen.getByRole("button", { name: /more actions/i });
@@ -865,7 +937,7 @@ describe("Channels edit dialog sync mode", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
 
     await waitFor(async () => {
       const trigger = screen.getByRole("button", { name: /more actions/i });
@@ -1037,7 +1109,7 @@ describe("Channels edit dialog user id", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Connections" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
 
     await waitFor(async () => {
       const trigger = screen.getByRole("button", { name: /more actions/i });
@@ -1297,7 +1369,7 @@ describe("Channels edit dialog endpoint mapping visibility", () => {
     );
 
     renderChannels();
-    await screen.findByRole("heading", { name: "Connections" });
+    await screen.findByRole("heading", { name: "Site management" });
 
     await waitFor(async () => {
       screen.getByRole("button", { name: /more actions/i }).click();

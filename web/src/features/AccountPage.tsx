@@ -28,7 +28,7 @@ export function AccountPage() {
   const { locale, t: consoleT } = useI18n();
   const t = teamText(locale);
   const { disconnect, role } = useSession();
-  const { appearance, scheme, setAppearance, setScheme } = useAppearance();
+  const { scheme, setScheme } = useAppearance();
   const [density, setDensity] = useState(() => {
     try {
       return localStorage.getItem(DENSITY_KEY) ?? "comfortable";
@@ -71,8 +71,6 @@ export function AccountPage() {
   return (
     <SettingsPage
       account={account.data}
-      appearance={appearance}
-      onAppearance={setAppearance}
       scheme={scheme}
       onScheme={(value) => setScheme(value as ColorScheme)}
       density={density}

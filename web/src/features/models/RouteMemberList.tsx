@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { BillingRuleDialog } from "./BillingRulePanel";
 import { nativeAmount } from "./pricingTypes";
 import { GripVertical, Power, RotateCcw, Shield, Target } from "lucide-react";
@@ -194,22 +195,24 @@ export function RouteMemberList(props: RouteMemberListProps) {
                 />
               </label>
             ) : (
-              <button
+              <HeroButton
+                variant="ghost"
                 type="button"
                 className="member-drag-handle"
                 aria-label={t("routing.orderLabel")}
-                title={t("routing.reorderHint")}
+                ref={(element) => element?.setAttribute("title", t("routing.reorderHint"))}
               >
                 <GripVertical size={16} />
-              </button>
+              </HeroButton>
             )}
             <div className="member-row-main">
               <strong>
-                <button
+                <HeroButton
+                  variant="ghost"
                   type="button"
                   className="member-channel-link"
-                  title={t("routing.openChannelModels")}
-                  onClick={() =>
+                  ref={(element) => element?.setAttribute("title", t("routing.openChannelModels"))}
+                  onPress={() =>
                     navigate(
                       `/models/channel/${candidate.channel.id}?model=${encodeURIComponent(
                         origin || selectedModel,
@@ -218,7 +221,7 @@ export function RouteMemberList(props: RouteMemberListProps) {
                   }
                 >
                   {candidate.channel.name}
-                </button>
+                </HeroButton>
                 {origin ? (
                   <span className="member-origin-badge" title={t("routing.memberOriginHint")}>
                     {t("routing.memberOrigin", { model: origin })}
@@ -333,51 +336,62 @@ export function RouteMemberList(props: RouteMemberListProps) {
                 <StatusBadge value={state} />
               </span>
               {candidate.channel.status === "auto_disabled" ? (
-                <button
+                <HeroButton
+                  variant="ghost"
                   type="button"
                   className="member-clear-health"
-                  title={t("routing.reenableChannelHint")}
-                  disabled={enableChannel.pendingId === candidate.channel.id}
-                  onClick={() => enableChannel.mutate(candidate.channel.id)}
+                  ref={(element) =>
+                    element?.setAttribute("title", t("routing.reenableChannelHint"))
+                  }
+                  isDisabled={enableChannel.pendingId === candidate.channel.id}
+                  onPress={() => enableChannel.mutate(candidate.channel.id)}
                 >
                   <Power size={13} />
                   {t("routing.reenableChannel")}
-                </button>
+                </HeroButton>
               ) : null}
               {canResetMemberHealth ? (
-                <button
+                <HeroButton
+                  variant="ghost"
                   type="button"
                   className="member-clear-health"
-                  title={t(
-                    resetActionIsCooldown ? "routing.clearHealth" : "routing.recoverMemberHint",
-                  )}
-                  disabled={mutations.clearHealth.isPending}
-                  onClick={() => mutations.clearHealth.mutate(entry.id)}
+                  ref={(element) =>
+                    element?.setAttribute(
+                      "title",
+                      t(
+                        resetActionIsCooldown ? "routing.clearHealth" : "routing.recoverMemberHint",
+                      ),
+                    )
+                  }
+                  isDisabled={mutations.clearHealth.isPending}
+                  onPress={() => mutations.clearHealth.mutate(entry.id)}
                 >
                   <RotateCcw size={13} />
                   {t(resetActionIsCooldown ? "routing.clearHealth" : "routing.recoverMember")}
-                </button>
+                </HeroButton>
               ) : null}
-              <button
+              <HeroButton
+                variant="ghost"
                 type="button"
                 className="icon-button"
                 aria-label={t("routing.moveUp")}
-                title={t("routing.moveUp")}
-                disabled={busy || rowIndex <= 0}
-                onClick={() => moveBy(-1)}
+                ref={(element) => element?.setAttribute("title", t("routing.moveUp"))}
+                isDisabled={busy || rowIndex <= 0}
+                onPress={() => moveBy(-1)}
               >
                 ↑
-              </button>
-              <button
+              </HeroButton>
+              <HeroButton
+                variant="ghost"
                 type="button"
                 className="icon-button"
                 aria-label={t("routing.moveDown")}
-                title={t("routing.moveDown")}
-                disabled={busy || rowIndex >= members.length - 1}
-                onClick={() => moveBy(1)}
+                ref={(element) => element?.setAttribute("title", t("routing.moveDown"))}
+                isDisabled={busy || rowIndex >= members.length - 1}
+                onPress={() => moveBy(1)}
               >
                 ↓
-              </button>
+              </HeroButton>
               <ActionMenu
                 compact
                 label={t("common.moreActions")}

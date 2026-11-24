@@ -1,4 +1,5 @@
 import { useState, useRef, type FormEvent } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { TeamField as Field, TeamModal } from "./ui";
 import { formatCost } from "../lib/format";
 import { teamError, type TeamKey, type TeamText } from "./text";
@@ -82,19 +83,21 @@ export function NewMemberDialog({
             <code>
               {created.username} / {created.password}
             </code>
-            <button
+            <HeroButton
+              type="button"
+              variant="ghost"
               className="team-button quiet"
-              onClick={() =>
+              onPress={() =>
                 void navigator.clipboard.writeText(`${created.username} / ${created.password}`)
               }
             >
               {t("copy")}
-            </button>
+            </HeroButton>
           </div>
           <div className="team-actions">
-            <button className="team-button" type="button" onClick={onClose}>
+            <HeroButton variant="outline" className="team-button" type="button" onPress={onClose}>
               {t("close")}
-            </button>
+            </HeroButton>
           </div>
         </>
       ) : (
@@ -145,12 +148,22 @@ export function NewMemberDialog({
             </div>
           ) : null}
           <div className="team-actions">
-            <button className="team-button primary" type="submit" disabled={busy}>
+            <HeroButton
+              variant="primary"
+              className="team-button primary"
+              type="submit"
+              isDisabled={busy}
+            >
               {busy ? t("saving") : t("create")}
-            </button>
-            <button className="team-button quiet" type="button" onClick={onClose}>
+            </HeroButton>
+            <HeroButton
+              variant="ghost"
+              className="team-button quiet"
+              type="button"
+              onPress={onClose}
+            >
               {t("cancel")}
-            </button>
+            </HeroButton>
           </div>
         </form>
       )}
@@ -237,16 +250,22 @@ export function ImportMembersDialog({
             </>
           ) : null}
           <div className="team-actions">
-            <button
+            <HeroButton
+              variant="primary"
               className="team-button primary"
-              disabled={!outcome.created.length}
-              onClick={() => void navigator.clipboard.writeText(credentials)}
+              isDisabled={!outcome.created.length}
+              onPress={() => void navigator.clipboard.writeText(credentials)}
             >
               {t("copyCredentials")}
-            </button>
-            <button className="team-button quiet" type="button" onClick={onClose}>
+            </HeroButton>
+            <HeroButton
+              variant="ghost"
+              className="team-button quiet"
+              type="button"
+              onPress={onClose}
+            >
               {t("close")}
-            </button>
+            </HeroButton>
           </div>
         </>
       ) : (
@@ -294,12 +313,22 @@ export function ImportMembersDialog({
             </div>
           ) : null}
           <div className="team-actions">
-            <button className="team-button primary" type="submit" disabled={busy}>
+            <HeroButton
+              variant="primary"
+              className="team-button primary"
+              type="submit"
+              isDisabled={busy}
+            >
               {busy ? t("saving") : t("import")}
-            </button>
-            <button className="team-button quiet" type="button" onClick={onClose}>
+            </HeroButton>
+            <HeroButton
+              variant="ghost"
+              className="team-button quiet"
+              type="button"
+              onPress={onClose}
+            >
               {t("cancel")}
-            </button>
+            </HeroButton>
           </div>
         </form>
       )}
@@ -421,16 +450,17 @@ export function QuotaDialog({
         </div>
       ) : null}
       <div className="team-actions">
-        <button
+        <HeroButton
+          variant="primary"
           className="team-button primary"
-          disabled={busy || !valid}
-          onClick={() => void save()}
+          isDisabled={busy || !valid}
+          onPress={() => void save()}
         >
           {busy ? t("saving") : t("save")}
-        </button>
-        <button className="team-button quiet" type="button" onClick={onClose}>
+        </HeroButton>
+        <HeroButton variant="ghost" className="team-button quiet" type="button" onPress={onClose}>
           {t("cancel")}
-        </button>
+        </HeroButton>
       </div>
     </TeamModal>
   );

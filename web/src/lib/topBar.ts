@@ -35,7 +35,14 @@ const CHANGE_EVENT = "meta-gateway:topbar-changed";
  * the mode changes. An operator who wants the door before switching modes pins
  * it in the appearance panel (see ChromePrefs.pinnedNav).
  */
-export const MODE_GATED_NAV = ["/users"];
+export const MODE_GATED_NAV = [
+  "/users",
+  "/users/policies",
+  "/users/quotas",
+  "/users/codes",
+  "/users/pricing",
+  "/users/oauth",
+];
 
 /** The mode-gated entries that are currently hidden from the chrome. */
 export function modeHiddenNav(mode: string | undefined): string[] {

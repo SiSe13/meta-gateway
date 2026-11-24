@@ -1,11 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { I18nProvider } from "../i18n";
 import { UsersLayout } from "./UsersLayout";
 import { MembersPanel } from "./panels/MembersPanel";
-import { OverviewPanel } from "./panels/OverviewPanel";
 import { QuotasPanel } from "./panels/QuotasPanel";
 import type { TeamRequest } from "./types";
 
@@ -73,7 +72,7 @@ interface Call {
 function renderUsers({
   role = "owner",
   mode = "team",
-  entry = "/members",
+  entry = "/",
 }: { role?: string; mode?: "personal" | "team"; entry?: string } = {}) {
   const calls: Call[] = [];
   const request: TeamRequest = async <T,>(path: string, init?: RequestInit) => {
@@ -100,7 +99,7 @@ function renderUsers({
         <MemoryRouter initialEntries={[entry]}>
           <Routes>
             <Route path="/" element={<UsersLayout request={request} />}>
-              <Route path="overview" element={<OverviewPanel />} />
+              <Route index element={<Navigate to="members" replace />} />
               <Route path="members" element={<MembersPanel />} />
               <Route path="quotas" element={<QuotasPanel />} />
             </Route>
@@ -120,38 +119,20 @@ describe("user management module", () => {
   });
   afterEach(cleanup);
 
-  // The module is the multi-user switch. A gateway that has not switched it on
-  // gets one board — the one that explains and performs the switch — instead of
-  // a roster of empty rooms.
-  it("shows only the switch while the gateway is personal", async () => {
-    renderUsers({ mode: "personal" });
-    expect(await screen.findByRole("link", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Members & invitations" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Pricing" })).not.toBeInTheDocument();
+  // The shared shell owns page navigation; personal mode keeps its setup action
+  // inside the user-management page and never mounts team-only boards.
+  it("shows the team-mode setup in place of the member board while personal", async () => {
+    const calls = renderUsers({ mode: "personal" });
+    expect(await screen.findByLabelText("Operating mode")).toBeInTheDocument();
+    expect(screen.queryByText("Alice")).not.toBeInTheDocument();
+    expect(calls.some((call) => call.path === "/admin/team/settings")).toBe(false);
   });
 
-  it("lists every board for an owner once the module is on", async () => {
+  it("opens the member list by default in team mode", async () => {
     renderUsers();
-    for (const label of [
-      "Overview",
-      "Members & invitations",
-      "Access & routing",
-      "Credit & quotas",
-      "Pricing",
-      "Codes",
-      "Third-party sign-in",
-      "Member interface",
-    ])
-      expect(await screen.findByRole("link", { name: label })).toBeInTheDocument();
-  });
-
-  // An admin runs people, not the gateway: the boards they cannot operate are
-  // absent rather than disabled.
-  it("offers an admin only the boards they may operate", async () => {
-    renderUsers({ role: "admin" });
-    expect(await screen.findByRole("link", { name: "Members & invitations" })).toBeInTheDocument();
+    expect(await screen.findByText("Alice")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Member interface" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Access & routing" })).not.toBeInTheDocument();
   });
 
   // The roster used to print the token pool alone, which is why "how much is

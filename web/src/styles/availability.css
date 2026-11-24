@@ -121,9 +121,8 @@
 .observation-impact-results p { border-bottom: 1px solid var(--line); padding: 12px 0; }
 .observation-impact-results small { display: block; margin-top: 6px; color: var(--muted-strong); }
 .observation-collection-error { padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); color: var(--warning); font-size: 12px; line-height: 1.6; }
-:root[data-appearance="classic"] .member-row.has-availability { grid-template-columns: auto minmax(120px,1fr) 124px auto; }
 @media (max-width: 1200px) {
-  .member-row.has-availability, :root[data-appearance="classic"] .member-row.has-availability { grid-template-columns: auto minmax(0,1fr) auto; }
+  .member-row.has-availability { grid-template-columns: auto minmax(0,1fr) auto; }
   .member-availability { grid-column: 2; grid-row: 2; }
   .member-row.has-availability .member-controls { grid-column: 3; grid-row: 1 / span 2; }
   .observation-model { grid-template-columns: minmax(140px,1fr) minmax(80px,.65fr) 124px; }

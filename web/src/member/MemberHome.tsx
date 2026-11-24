@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { Link } from "react-router-dom";
 import { Boxes, Check, Coins, Copy, KeyRound, ScrollText } from "lucide-react";
 import { QuotaMeter } from "../components/QuotaMeter";
@@ -67,10 +68,15 @@ export function MemberHome() {
         <div className="member-home-endpoint">
           <span className="member-home-endpoint-label">{t("member.home.endpointLabel")}</span>
           <code>{base}</code>
-          <button type="button" className="member-home-copy-button" onClick={copy}>
+          <HeroButton
+            type="button"
+            variant="secondary"
+            className="member-home-copy-button"
+            onPress={copy}
+          >
             {copied ? <Check size={14} /> : <Copy size={14} />}
             <span>{copied ? t("dashboard.copied") : t("dashboard.copy")}</span>
-          </button>
+          </HeroButton>
         </div>
         <nav className="member-home-actions" aria-label={t("member.home.actionsLabel")}>
           {actions.map((action) => (

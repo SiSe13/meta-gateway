@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../api/client";
 import { isStaff, useSession } from "../session";
 import { useI18n } from "../i18n";
@@ -214,18 +215,19 @@ export function CommandPalette({
       );
     }
     rows.push(
-      <button
+      <HeroButton
         key={command.key}
         type="button"
+        variant="ghost"
         className={flatIndex === active ? "command-item is-active" : "command-item"}
         data-index={flatIndex}
-        onMouseEnter={() => setActive(flatIndex)}
-        onClick={command.run}
+        onHoverStart={() => setActive(flatIndex)}
+        onPress={command.run}
       >
         <span className="command-item-icon">{command.icon}</span>
         <span className="command-item-title">{command.title}</span>
         {command.meta ? <span className="command-item-meta">{command.meta}</span> : null}
-      </button>,
+      </HeroButton>,
     );
   }
 
@@ -249,17 +251,19 @@ export function CommandPalette({
             placeholder={t("command.placeholder")}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
+            isIconOnly
             className="command-search-clear"
-            onClick={() => {
+            onPress={() => {
               setQuery("");
               inputRef.current?.focus();
             }}
             aria-label={t("common.close")}
           >
             <X size={14} />
-          </button>
+          </HeroButton>
         </div>
         <div className="command-list" ref={listRef}>
           {results.isFetching && !results.data && q ? (

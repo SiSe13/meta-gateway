@@ -1,6 +1,22 @@
 import "@testing-library/jest-dom/vitest";
 import { configure } from "@testing-library/react";
 
+// jsdom 不实现元素级 scrollTo；React Aria 用它把键盘焦点项滚入可视区。
+if (typeof HTMLElement !== "undefined" && typeof HTMLElement.prototype.scrollTo !== "function") {
+  Object.defineProperty(HTMLElement.prototype, "scrollTo", {
+    configurable: true,
+    value(optionsOrX: ScrollToOptions | number = 0, y?: number) {
+      if (typeof optionsOrX === "number") {
+        this.scrollLeft = optionsOrX;
+        if (typeof y === "number") this.scrollTop = y;
+        return;
+      }
+      if (typeof optionsOrX.left === "number") this.scrollLeft = optionsOrX.left;
+      if (typeof optionsOrX.top === "number") this.scrollTop = optionsOrX.top;
+    },
+  });
+}
+
 // jsdom implements neither `showModal` nor `close` on <dialog>, so any board
 // whose editor is a TeamModal (tenant groups, access policies) would throw as
 // soon as it opened. The polyfill only records the open state — the parts a

@@ -1,9 +1,10 @@
 import { defineConfig } from "vitest/config";
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  base: "/console",
-  plugins: [react()],
+  base: "/console/",
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: "../internal/webui/dist",
     emptyOutDir: true,

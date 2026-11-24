@@ -1,4 +1,5 @@
 import { ChevronDown, Search, X } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import { MODEL_GROUP_ORDER, autoModelGroup } from "../lib/modelGroups";
@@ -209,9 +210,14 @@ export function ModelPicker({
             <span className="model-picker-selected-count">
               {t("modelPicker.selectedCount", { n: selected.length })}
             </span>
-            <button type="button" className="model-picker-clear" onClick={() => onChange([])}>
+            <HeroButton
+              type="button"
+              variant="ghost"
+              className="model-picker-clear"
+              onPress={() => onChange([])}
+            >
               {t("modelPicker.clearSelection")}
-            </button>
+            </HeroButton>
           </div>
           <div className="model-picker-selected">
             {selected.map((name) => (
@@ -222,14 +228,16 @@ export function ModelPicker({
                 <span className="mono truncate" title={name}>
                   {name}
                 </span>
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
+                  isIconOnly
                   className="model-picker-remove"
                   aria-label={t("modelPicker.remove", { name })}
-                  onClick={() => toggle(name)}
+                  onPress={() => toggle(name)}
                 >
                   <X size={11} />
-                </button>
+                </HeroButton>
               </span>
             ))}
           </div>
@@ -241,13 +249,14 @@ export function ModelPicker({
           <span className="model-picker-missing-copy">
             {t("modelPicker.missingTitle", { n: missing.length })}
           </span>
-          <button
+          <HeroButton
             type="button"
+            variant="ghost"
             className="model-picker-missing-clear"
-            onClick={() => onChange(selected.filter((name) => !missing.includes(name)))}
+            onPress={() => onChange(selected.filter((name) => !missing.includes(name)))}
           >
             {t("modelPicker.missingClear", { n: missing.length })}
-          </button>
+          </HeroButton>
         </div>
       ) : null}
 
@@ -279,9 +288,14 @@ export function ModelPicker({
           </select>
         ) : null}
         {filtered.length > 0 ? (
-          <button type="button" className="model-picker-selectall" onClick={selectFiltered}>
+          <HeroButton
+            type="button"
+            variant="ghost"
+            className="model-picker-selectall"
+            onPress={selectFiltered}
+          >
             {t("modelPicker.selectFiltered", { n: filtered.length })}
-          </button>
+          </HeroButton>
         ) : null}
       </div>
 
@@ -294,16 +308,17 @@ export function ModelPicker({
             return (
               <div key={group || "__all"} className="model-picker-group">
                 {group ? (
-                  <button
+                  <HeroButton
                     type="button"
+                    variant="ghost"
                     className={`model-picker-group-head${isCollapsed ? " is-collapsed" : ""}`}
                     aria-expanded={!isCollapsed}
-                    onClick={() => toggleGroup(group)}
+                    onPress={() => toggleGroup(group)}
                   >
                     <ChevronDown size={13} />
                     <span className="model-picker-group-name">{group}</span>
                     <span className="model-picker-group-count">{items.length}</span>
-                  </button>
+                  </HeroButton>
                 ) : null}
                 {!isCollapsed &&
                   items.map((option) => {

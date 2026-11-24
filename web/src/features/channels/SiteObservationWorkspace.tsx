@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Download, RefreshCw, Search, Settings2 } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { ApiError, api } from "../../api/client";
 import type {
   SiteObservation,
@@ -486,14 +487,15 @@ export function SiteObservationWorkspace({
         </label>
         <div className="observation-period" role="group" aria-label={t("observation.period")}>
           {[24, 168].map((value) => (
-            <button
+            <HeroButton
+              variant="ghost"
               type="button"
               key={value}
               aria-pressed={hours === value}
-              onClick={() => setHours(value)}
+              onPress={() => setHours(value)}
             >
               {t(value === 24 ? "observation.day" : "observation.week")}
-            </button>
+            </HeroButton>
           ))}
         </div>
         <Button
@@ -548,14 +550,15 @@ export function SiteObservationWorkspace({
           <nav className="observation-sites" aria-label={t("observation.sites")}>
             <div className="observation-site-filters">
               {(["all", "issues", "data"] as const).map((value) => (
-                <button
+                <HeroButton
+                  variant="ghost"
                   type="button"
                   key={value}
                   aria-pressed={filter === value}
-                  onClick={() => setFilter(value)}
+                  onPress={() => setFilter(value)}
                 >
                   {t(`observation.filter.${value}`)}
-                </button>
+                </HeroButton>
               ))}
             </div>
             {/* The list scrolls on its own so a row never slides under the
@@ -563,12 +566,13 @@ export function SiteObservationWorkspace({
                 not to the pane, so nothing is ever half-covered. */}
             <div className="observation-site-list">
               {siteRows.map((site) => (
-                <button
+                <HeroButton
+                  variant="ghost"
                   type="button"
                   key={site.site_id}
                   className={`observation-site${site.site_id === selected?.site_id ? " is-selected" : ""}`}
                   aria-current={site.site_id === selected?.site_id ? "true" : undefined}
-                  onClick={() => setSelectedId(site.site_id)}
+                  onPress={() => setSelectedId(site.site_id)}
                 >
                   <strong>{site.site_name}</strong>
                   <span>
@@ -592,7 +596,7 @@ export function SiteObservationWorkspace({
                           : t("observation.collectionOff")
                     }
                   />
-                </button>
+                </HeroButton>
               ))}
               {!siteRows.length ? <p className="field-hint">{t("observation.noSites")}</p> : null}
             </div>

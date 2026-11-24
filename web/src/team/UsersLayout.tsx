@@ -1,77 +1,23 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Gauge,
-  KeyRound,
-  LayoutDashboard,
-  Palette,
-  ShieldCheck,
-  Tags,
-  Ticket,
-  Users,
-  type LucideIcon,
-} from "lucide-react";
 import { useI18n } from "../i18n";
 import { ErrorState, Loading, Page } from "../components/ui";
-import { teamText, type TeamKey } from "./text";
+import { teamText } from "./text";
 import type { ModeInfo, TeamRequest, TeamSettings } from "./types";
 import type { UsersContext } from "./UsersContext";
+import { ModePanel } from "./ModePanel";
 
 /**
- * The multi-user module's shell — the one entry point for everything that only
- * exists once a gateway has more than one person using it.
+ * The multi-user module supplies its page content to the console's shared shell.
  *
- * The console's personal side never mounts this: the navigation entry is hidden
- * by operating mode (App decides), and the route itself renders the enable
- * guide when the mode is still `personal`. That is deliberate — the module owns
- * its own on/off switch (see OverviewPanel), so a gateway owner who wants team
- * accounts finds the door from Settings and turns it on from here, instead of
- * the switch living among runtime parameters where it read like a tuning knob.
+ * The shared shell owns the left navigation, so this layout must not render a
+ * second row of tabs. In personal mode the module still needs a way to enable
+ * team accounts; keep that action in the page body without exposing an
+ * Overview navigation item.
  *
- * Sections are routes, not stateful tabs: each board is deep-linkable, survives
- * a reload, and can be hidden individually from the appearance panel. An admin
- * (non-owner) sees only the boards they may actually operate.
- *
- * Eight entries in one unlabelled row was a wall of words that wrapped into two
- * lines on a phone and said nothing about which board belonged with which. They
- * are now two labelled groups — the people who use the gateway, and how they get
- * in and what they see — rendered with the console's own tab anatomy, so this
- * shell reads as the same product as the rest of the console.
+ * Page access remains role-gated by the application and server. The page
+ * components also keep their existing owner-only data and write checks.
  */
-interface Section {
-  to: string;
-  label: TeamKey;
-  icon: LucideIcon;
-  /** Owner-only boards are absent for an admin, not merely disabled. */
-  ownerOnly: boolean;
-}
-
-interface Group {
-  label: TeamKey;
-  sections: Section[];
-}
-
-const GROUPS: Group[] = [
-  {
-    label: "navGroupMembers",
-    sections: [
-      { to: "overview", label: "overview", icon: LayoutDashboard, ownerOnly: false },
-      { to: "members", label: "members", icon: Users, ownerOnly: false },
-      { to: "policies", label: "policies", icon: ShieldCheck, ownerOnly: true },
-      { to: "quotas", label: "quotas", icon: Gauge, ownerOnly: true },
-    ],
-  },
-  {
-    label: "navGroupAccess",
-    sections: [
-      { to: "codes", label: "codes", icon: Ticket, ownerOnly: true },
-      { to: "pricing", label: "pricing", icon: Tags, ownerOnly: true },
-      { to: "oauth", label: "oauth", icon: KeyRound, ownerOnly: true },
-      { to: "branding", label: "branding", icon: Palette, ownerOnly: true },
-    ],
-  },
-];
-
 export function UsersLayout({ request }: { request: TeamRequest }) {
   // The transport is handed in rather than taken from the console session:
   // these boards are also reachable by a member-scoped session and must not
@@ -119,15 +65,25 @@ export function UsersLayout({ request }: { request: TeamRequest }) {
       show_routing: true,
     },
   };
-  // Before the module is switched on there is exactly one meaningful board:
-  // the guide that switches it on. Offering "members" for a gateway that has no
-  // accounts yet would be a door into an empty room.
-  const groups = GROUPS.map((group) => ({
-    label: group.label,
-    sections: group.sections.filter(
-      (section) => section.to === "overview" || (enabled && (!section.ownerOnly || owner)),
-    ),
-  })).filter((group) => group.sections.length > 0);
+  // Before team mode is enabled, member and policy endpoints are intentionally
+  // not mounted. The owner can still enable the module here without restoring
+  // an Overview item to the left navigation.
+  if (!enabled) {
+    return (
+      <Page
+        as="section"
+        className="team-surface"
+        title={t("team")}
+        description={t("teamDescription")}
+      >
+        <div className="team-board">
+          <p className="panel-hint">{t("modeHint")}</p>
+          <ModePanel request={request} locale={locale} />
+        </div>
+      </Page>
+    );
+  }
+
   return (
     <Page
       as="section"
@@ -135,19 +91,6 @@ export function UsersLayout({ request }: { request: TeamRequest }) {
       title={t("team")}
       description={t("teamDescription")}
     >
-      <nav className="tabs is-grouped" aria-label={t("team")}>
-        {groups.map((group) => (
-          <div className="tabs-group" key={group.label}>
-            <span className="tabs-group-label">{t(group.label)}</span>
-            {group.sections.map((section) => (
-              <NavLink key={section.to} to={section.to}>
-                <section.icon size={13} aria-hidden="true" />
-                {t(section.label)}
-              </NavLink>
-            ))}
-          </div>
-        ))}
-      </nav>
       <Outlet
         context={
           {

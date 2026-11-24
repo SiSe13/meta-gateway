@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { Button, Field } from "../components/ui";
 import { useI18n } from "../i18n";
 import { accountRequest } from "../team/transport";
@@ -115,9 +116,15 @@ export function AcceptFlow({
         <Button type="submit" loading={busy} disabled={busy} className="login-submit">
           {busy ? t("load") : title}
         </Button>
-        <button type="button" className="login-back" disabled={busy} onClick={onBack}>
+        <HeroButton
+          type="button"
+          variant="ghost"
+          className="login-back"
+          isDisabled={busy}
+          onPress={onBack}
+        >
           {t("backLogin")}
-        </button>
+        </HeroButton>
       </fieldset>
     </form>
   );

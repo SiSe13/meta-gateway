@@ -13,49 +13,43 @@ afterEach(() => {
   localStorage.clear();
 });
 
-it.each(["classic", "modern"] as const)(
-  "closes mobile navigation in the %s theme after choosing a destination",
-  (appearance) => {
-    function CurrentLocation() {
-      return <output data-testid="destination">{useLocation().pathname}</output>;
-    }
-    render(
-      <I18nProvider>
-        <MemoryRouter initialEntries={["/models"]}>
-          <ConsoleShell
-            appearance={appearance}
-            sections={[
-              {
-                label: "Workspace",
-                items: [
-                  { to: "/channels", label: "Connections", icon: Cable },
-                  { to: "/models", label: "Models", icon: Boxes },
-                ],
-              },
-            ]}
-            version="dev"
-            theme="light"
-            onThemeChange={vi.fn()}
-            onSearch={vi.fn()}
-            onDisconnect={vi.fn()}
-            health={{ total: 2, healthy: 1, loading: false }}
-          >
-            <CurrentLocation />
-          </ConsoleShell>
-        </MemoryRouter>
-      </I18nProvider>,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
-    const drawer = screen.getByRole("dialog", { name: "Meta Gateway" });
-    fireEvent.click(within(drawer).getByRole("link", { name: "Connections" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByTestId("destination")).toHaveTextContent("/channels");
-    expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-  },
-);
+it("closes mobile navigation after choosing a destination", () => {
+  function CurrentLocation() {
+    return <output data-testid="destination">{useLocation().pathname}</output>;
+  }
+  render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/models"]}>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[
+            {
+              label: "Workspace",
+              items: [
+                { to: "/channels", label: "Connections", icon: Cable },
+                { to: "/models", label: "Models", icon: Boxes },
+              ],
+            },
+          ]}
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onSearch={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 2, healthy: 1, loading: false }}
+        >
+          <CurrentLocation />
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
+  const drawer = screen.getByRole("dialog", { name: "Meta Gateway" });
+  fireEvent.click(within(drawer).getByRole("link", { name: "Connections" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByTestId("destination")).toHaveTextContent("/channels");
+  expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "page");
+});
 
 it("keeps page header actions bound to the current selection", () => {
   const edit = vi.fn();

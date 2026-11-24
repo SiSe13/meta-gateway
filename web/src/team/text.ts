@@ -1,6 +1,5 @@
 const zh = {
-  teamDescription:
-    "管理成员、授权与额度。个人／多用户模式在「概览」里切换；成员统一从 /console 登录。",
+  teamDescription: "管理成员、访问权限与额度。团队成员统一从 /console 登录。",
   personalSettings: "个人设置",
   personalSettingsHint: "只调整自己的调用偏好和界面，不改变站点或其他用户。",
   requestControls: "调用偏好",
@@ -413,8 +412,7 @@ const zh = {
   imgEmpty: "还没有生成过图片。",
 };
 const en: Record<keyof typeof zh, string> = {
-  teamDescription:
-    "Manage members, access and credit. The personal / multi-user mode switches on the Overview board; members sign in at /console like everyone else.",
+  teamDescription: "Manage members, access and quotas. Team members sign in at /console.",
   personalSettings: "Personal settings",
   personalSettingsHint:
     "Change only your own request preferences and interface, never the site or other users.",

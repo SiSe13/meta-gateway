@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, Eye, HeartPulse, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../api/client";
 import type { Channel, ChannelKeyTestResult, Credential } from "../api/types";
 import { ModelPicker } from "../components/ModelPicker";
@@ -281,13 +282,14 @@ export function ChannelKeysDrawer({
                   : t("channels.keyTestAll")}
             </Button>
             {failedIds.length > 0 ? (
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
                 className="credential-key-bulk-link"
-                onClick={() => setSelected(new Set(failedIds))}
+                onPress={() => setSelected(new Set(failedIds))}
               >
                 {t("channels.keySelectFailed", { n: failedIds.length })}
-              </button>
+              </HeroButton>
             ) : null}
             {testNotice || deleteNotice ? (
               <span className="muted credential-key-bulk-notice">{deleteNotice ?? testNotice}</span>
@@ -374,21 +376,22 @@ export function ChannelKeysDrawer({
                         {KEY_TIERS.map((option) => {
                           const active = tier === option.value;
                           return (
-                            <button
+                            <HeroButton
                               key={option.value}
                               type="button"
-                              disabled={pending}
+                              variant="ghost"
+                              isDisabled={pending}
                               className={active ? "is-active" : ""}
                               aria-pressed={active}
-                              title={t(option.hint)}
-                              onClick={() => {
+                              {...{ title: t(option.hint) }}
+                              onPress={() => {
                                 if (!active) {
                                   onUpdateKeyPriority(item.id, option.value);
                                 }
                               }}
                             >
                               {t(option.label)}
-                            </button>
+                            </HeroButton>
                           );
                         })}
                       </div>
@@ -406,13 +409,15 @@ export function ChannelKeysDrawer({
                       </label>
                       <span className="credential-key-action-group">
                         {item.has_secret ? (
-                          <button
+                          <HeroButton
                             type="button"
+                            variant="ghost"
+                            isIconOnly
                             className="icon-button credential-key-action credential-key-action-reveal"
                             aria-label={t("channels.apiKeyReveal")}
-                            title={t("channels.apiKeyReveal")}
-                            disabled={pending || reveal.isPending}
-                            onClick={() => {
+                            {...{ title: t("channels.apiKeyReveal") }}
+                            isDisabled={pending || reveal.isPending}
+                            onPress={() => {
                               reveal.reset();
                               setRevealedSecret(null);
                               setRevealing(item);
@@ -423,20 +428,22 @@ export function ChannelKeysDrawer({
                             }}
                           >
                             <Eye size={15} />
-                          </button>
+                          </HeroButton>
                         ) : null}
-                        <button
+                        <HeroButton
                           type="button"
+                          variant="ghost"
+                          isIconOnly
                           className="icon-button credential-key-action credential-key-action-delete"
                           aria-label={t("channels.apiKeyDelete")}
-                          title={t("channels.apiKeyDelete")}
-                          disabled={pending}
-                          onClick={() => {
+                          {...{ title: t("channels.apiKeyDelete") }}
+                          isDisabled={pending}
+                          onPress={() => {
                             setConfirmingDelete({ id: item.id, label });
                           }}
                         >
                           <Trash2 size={15} />
-                        </button>
+                        </HeroButton>
                       </span>
                     </div>
                   </div>
@@ -480,13 +487,14 @@ export function ChannelKeysDrawer({
                         <span>{t("keys.modelAllowlist")}</span>
                         <InfoTip label={t("channels.keyModelsHint")} />
                       </span>
-                      <button
+                      <HeroButton
                         type="button"
+                        variant="ghost"
                         className={`credential-key-model-toggle ${modelsExpanded ? "is-open" : ""}`}
                         aria-label={t("channels.keyModelsToggle")}
                         aria-expanded={modelsExpanded}
                         aria-controls={`credential-key-models-${item.id}`}
-                        onClick={() => toggleModelPicker(item.id)}
+                        onPress={() => toggleModelPicker(item.id)}
                       >
                         <span className="credential-key-model-summary">
                           {selectedModels.length > 0
@@ -500,7 +508,7 @@ export function ChannelKeysDrawer({
                         ) : (
                           <ChevronDown size={16} aria-hidden="true" />
                         )}
-                      </button>
+                      </HeroButton>
                     </div>
                     {modelsExpanded ? (
                       <div

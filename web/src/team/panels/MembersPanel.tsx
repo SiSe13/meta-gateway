@@ -1,4 +1,5 @@
 import { useId, useState } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TeamField as Field } from "../ui";
 import { ActionMenu } from "../../components/ActionMenu";
@@ -104,9 +105,14 @@ export function MembersPanel() {
             <>
               <p>{t("linkOnce")}</p>
               <code>{notice}</code>{" "}
-              <button className="team-button" onClick={() => void copy(notice)}>
+              <HeroButton
+                variant="outline"
+                className="team-button"
+                type="button"
+                onPress={() => void copy(notice)}
+              >
                 {t("copy")}
-              </button>
+              </HeroButton>
               <small>{copyMessage}</small>
             </>
           ) : (
@@ -371,44 +377,68 @@ function BulkBar({
                 </option>
               ))}
             </select>
-            <button
+            <HeroButton
+              variant="outline"
               className="team-button"
-              disabled={busy || !policy}
-              onClick={() => onRun("policy", Number(policy))}
+              type="button"
+              isDisabled={busy || !policy}
+              onPress={() => onRun("policy", Number(policy))}
             >
               {t("applyBulk")}
-            </button>
-            <button className="team-button" disabled={busy} onClick={() => onRun("pause")}>
-              {t("pause")}
-            </button>
-            <button className="team-button" disabled={busy} onClick={() => onRun("resume")}>
-              {t("resume")}
-            </button>
-            <button
+            </HeroButton>
+            <HeroButton
+              variant="outline"
               className="team-button"
-              disabled={busy}
-              onClick={() => onRun("revoke_sessions")}
+              type="button"
+              isDisabled={busy}
+              onPress={() => onRun("pause")}
+            >
+              {t("pause")}
+            </HeroButton>
+            <HeroButton
+              variant="outline"
+              className="team-button"
+              type="button"
+              isDisabled={busy}
+              onPress={() => onRun("resume")}
+            >
+              {t("resume")}
+            </HeroButton>
+            <HeroButton
+              variant="outline"
+              className="team-button"
+              type="button"
+              isDisabled={busy}
+              onPress={() => onRun("revoke_sessions")}
             >
               {t("revokeSessions")}
-            </button>
-            <button
+            </HeroButton>
+            <HeroButton
+              variant="danger-soft"
               className="team-button danger"
-              disabled={busy}
-              onClick={() => {
+              type="button"
+              isDisabled={busy}
+              onPress={() => {
                 if (confirm(t("bulkDeleteWarning", { n: count }))) onRun("delete");
               }}
             >
               {t("delete")}
-            </button>
+            </HeroButton>
           </>
         ) : (
-          <button className="team-button" disabled={busy} onClick={() => onRun("revoke_sessions")}>
+          <HeroButton
+            variant="outline"
+            className="team-button"
+            type="button"
+            isDisabled={busy}
+            onPress={() => onRun("revoke_sessions")}
+          >
             {t("revokeSessions")}
-          </button>
+          </HeroButton>
         )}
-        <button className="team-button quiet" onClick={onClear}>
+        <HeroButton variant="ghost" className="team-button quiet" type="button" onPress={onClear}>
           {t("clearSelection")}
-        </button>
+        </HeroButton>
       </div>
     </div>
   );

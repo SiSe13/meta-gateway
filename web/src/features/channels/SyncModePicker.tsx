@@ -1,4 +1,5 @@
 import { HelpCircle } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useI18n } from "../../i18n";
 
 /** Per-channel model sync mode. Mirrors domain.ModelSyncMode on the backend. */
@@ -58,16 +59,17 @@ export function SyncModePicker({
           {options.map((option) => {
             const active = value === option.mode;
             return (
-              <button
+              <HeroButton
                 key={option.mode}
                 type="button"
-                disabled={disabled}
+                variant="ghost"
+                isDisabled={disabled}
                 className={active ? "is-active" : ""}
                 aria-pressed={active}
-                onClick={() => onChange(option.mode)}
+                onPress={() => onChange(option.mode)}
               >
                 {option.label}
-              </button>
+              </HeroButton>
             );
           })}
         </div>

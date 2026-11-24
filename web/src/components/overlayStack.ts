@@ -70,17 +70,21 @@ export function registerOverlay(
     return 0;
   });
   if (stack.length === 1) {
-    window.addEventListener("keydown", closeTopOverlay);
+    // 在捕获阶段先分发 Escape，避免底层弹层在栈决策前抢先关闭。
+    window.addEventListener("keydown", closeTopOverlay, true);
   }
 
   const unregister = () => {
     const index = stack.indexOf(entry);
     if (index >= 0) stack.splice(index, 1);
     if (stack.length === 0) {
-      window.removeEventListener("keydown", closeTopOverlay);
+      window.removeEventListener("keydown", closeTopOverlay, true);
     }
     if (!stack.some((item) => item.modal) && previousOverflow !== undefined) {
-      document.body.style.overflow = previousOverflow;
+      // HeroUI/React Aria 也管理滚动锁；若它已先恢复原值，不要再写回旧的 hidden。
+      if (document.body.style.overflow === "hidden") {
+        document.body.style.overflow = previousOverflow;
+      }
       previousOverflow = undefined;
     }
   };

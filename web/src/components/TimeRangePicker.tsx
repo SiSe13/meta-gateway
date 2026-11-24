@@ -1,4 +1,5 @@
 import { CalendarRange, RefreshCw } from "lucide-react";
+import { Tabs as HeroTabs } from "@heroui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./ui";
 import { useI18n } from "../i18n";
@@ -179,30 +180,23 @@ export function TimeRangePicker({
   const custom = range.preset === CUSTOM_PRESET;
   return (
     <div className={`time-range${compact ? " is-compact" : ""}`}>
-      <div className="time-range-presets" role="tablist" aria-label={t("timeRange.label")}>
-        {TIME_PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            role="tab"
-            aria-selected={range.preset === p.id}
-            className={range.preset === p.id ? "is-active" : ""}
-            onClick={() => range.setPreset(p.id)}
-          >
-            {t(p.labelKey)}
-          </button>
-        ))}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={custom}
-          className={custom ? "is-active" : ""}
-          onClick={() => range.setPreset(CUSTOM_PRESET)}
-        >
-          <CalendarRange size={12} />
-          {t("timeRange.custom")}
-        </button>
-      </div>
+      <HeroTabs
+        className="hero-tabs time-range-tabs"
+        selectedKey={range.preset}
+        onSelectionChange={(key) => range.setPreset(String(key))}
+      >
+        <HeroTabs.List className="tabs time-range-presets" aria-label={t("timeRange.label")}>
+          {TIME_PRESETS.map((p) => (
+            <HeroTabs.Tab id={p.id} key={p.id}>
+              {t(p.labelKey)}
+            </HeroTabs.Tab>
+          ))}
+          <HeroTabs.Tab id={CUSTOM_PRESET}>
+            <CalendarRange size={12} />
+            {t("timeRange.custom")}
+          </HeroTabs.Tab>
+        </HeroTabs.List>
+      </HeroTabs>
       {custom ? (
         <div className="time-range-custom">
           <label>

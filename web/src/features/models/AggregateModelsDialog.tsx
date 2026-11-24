@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { Check, Layers, Trash2, X } from "lucide-react";
 import { api } from "../../api/client";
 import type { ModelAggregate } from "../../api/types";
@@ -182,17 +183,18 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
                         <span className="mono">{model}</span>
                       </label>
                       {checked ? (
-                        <button
+                        <HeroButton
+                          variant="ghost"
                           type="button"
                           className="unify-covered-toggle"
-                          onClick={() => setExpanded(isOpen ? null : model)}
+                          onPress={() => setExpanded(isOpen ? null : model)}
                         >
                           {(picked[model] ?? []).length > 0
                             ? t("modelsPage.aggregates.channelCount", {
                                 n: (picked[model] ?? []).length,
                               })
                             : t("modelsPage.aggregates.allChannels")}
-                        </button>
+                        </HeroButton>
                       ) : null}
                       {checked && isOpen && channels.data ? (
                         <div className="aggregate-channels">
@@ -245,13 +247,14 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
                     ) : null}
                   </div>
                   {agg.note ? <span className="muted">{agg.note}</span> : null}
-                  <button
+                  <HeroButton
+                    variant="ghost"
                     type="button"
                     className="unify-covered-toggle"
-                    onClick={() => setConfirmRemove(agg)}
+                    onPress={() => setConfirmRemove(agg)}
                   >
                     <Trash2 size={12} /> {t("common.delete")}
-                  </button>
+                  </HeroButton>
                 </div>
               ))}
             </div>
@@ -292,13 +295,14 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
           }
         >
           <p>{t("modelsPage.aggregates.removeBody")}</p>
-          <button
+          <HeroButton
+            variant="ghost"
             type="button"
             className="unify-covered-toggle"
-            onClick={() => setConfirmRemove(null)}
+            onPress={() => setConfirmRemove(null)}
           >
             <X size={12} /> {t("common.close")}
-          </button>
+          </HeroButton>
         </Dialog>
       ) : null}
     </Dialog>

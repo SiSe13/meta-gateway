@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,10 +39,11 @@ const SetupWizard = lazy(() =>
 import { channelHealthState } from "./features/channelHealth";
 import { KatanaCanvas } from "./components/KatanaCanvas";
 import { createEdgeSparkHost } from "./lib/katanafx";
-import { DAILY_REVEAL_MS } from "./lib/entranceMotion";
 import { useHiddenPlugins } from "./lib/pluginNav";
 import {
+  CHROME_NAV_GROUPS,
   CHROME_NAV_ITEMS,
+  chromeNavGroupForLocation,
   STAFF_ONLY_PATHS,
   canAccessNav,
   type ChromeNavItem,
@@ -66,6 +68,9 @@ import { PRELOAD_EXHAUSTED_EVENT } from "./lib/preloadRecovery";
 
 const Channels = lazy(() =>
   import("./features/Channels").then((module) => ({ default: module.Channels })),
+);
+const Backups = lazy(() =>
+  import("./features/Backups").then((module) => ({ default: module.Backups })),
 );
 const ChannelModels = lazy(() =>
   import("./features/ChannelModels").then((module) => ({ default: module.ChannelModels })),
@@ -95,8 +100,6 @@ const StandaloneAdmin = lazy(() =>
   import("./team/StandaloneAdmin").then((module) => ({ default: module.StandaloneAdmin })),
 );
 const UsersLayout = UsersBoards.UsersLayout;
-
-type TransitionPhase = "idle" | "fading" | "sealing" | "revealing" | "sheathing";
 
 type AuthorizedSession = {
   token: string;
@@ -142,23 +145,7 @@ function GatewayApp() {
   useEffect(() => {
     if (currencySettings.data) setCurrency(currencySettings.data);
   }, [currencySettings.data]);
-  const [transitionPhase, setTransitionPhase] = useState<TransitionPhase>("idle");
   const [bootstrapSites, setBootstrapSites] = useState<Site[]>();
-  const timers = useRef<number[]>([]);
-
-  const clearTransitionTimers = useCallback(() => {
-    for (const timer of timers.current) window.clearTimeout(timer);
-    timers.current = [];
-  }, []);
-  const schedule = useCallback((callback: () => void, delay: number) => {
-    const timer = window.setTimeout(() => {
-      timers.current = timers.current.filter((entry) => entry !== timer);
-      callback();
-    }, delay);
-    timers.current.push(timer);
-  }, []);
-
-  useEffect(() => clearTransitionTimers, [clearTransitionTimers]);
   // The preload recovery reloads the tab once when a chunk went missing after
   // a deploy. If that did not help, this tab is genuinely holding an old
   // build: say so instead of leaving a blank page or a console error.
@@ -181,26 +168,16 @@ function GatewayApp() {
 
   const authorize = useCallback(
     (token: string, remember: boolean, sites: Site[], account?: AccountSession) => {
-      if (transitionPhase !== "idle") return;
-      clearTransitionTimers();
       setBootstrapSites(sites);
-      // Authentication is never held by a visual timer. Replay owns the brand sequence.
       adoptSession({ token: token.trim(), remember, sites, account });
-      setTransitionPhase("revealing");
-      schedule(
-        () => setTransitionPhase("idle"),
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : DAILY_REVEAL_MS,
-      );
     },
-    [adoptSession, schedule, transitionPhase, clearTransitionTimers],
+    [adoptSession],
   );
 
   const handleDisconnect = useCallback(() => {
-    clearTransitionTimers();
     setBootstrapSites(undefined);
-    setTransitionPhase("idle");
     disconnect();
-  }, [clearTransitionTimers, disconnect]);
+  }, [disconnect]);
 
   return (
     <>
@@ -209,23 +186,15 @@ function GatewayApp() {
           <StandaloneAdmin request={adminRequest} onDisconnect={handleDisconnect} />
         </Suspense>
       ) : client ? (
-        <div
-          className={`authenticated-stage${transitionPhase === "revealing" ? " is-revealing" : ""}`}
-          style={{ animationDuration: `${DAILY_REVEAL_MS}ms` }}
-        >
+        <div className="authenticated-stage">
           <Authenticated
             clientKey={client}
             initialSites={bootstrapSites}
-            entranceActive={transitionPhase !== "idle"}
             onUnauthorized={handleDisconnect}
           />
         </div>
       ) : (
-        <Connect
-          onAuthorized={authorize}
-          transitioning={transitionPhase !== "idle"}
-          transitionPhase={transitionPhase}
-        />
+        <Connect onAuthorized={authorize} />
       )}
     </>
   );
@@ -233,12 +202,8 @@ function GatewayApp() {
 
 function Connect({
   onAuthorized,
-  transitioning,
-  transitionPhase,
 }: {
   onAuthorized: (token: string, remember: boolean, sites: Site[], account?: AccountSession) => void;
-  transitioning: boolean;
-  transitionPhase: TransitionPhase;
 }) {
   const { t, locale } = useI18n();
   const { connectMember } = useSession();
@@ -491,14 +456,13 @@ function Connect({
   return (
     <LoginShell
       rootRef={loginRef}
-      className={transitionPhase === "sealing" ? "is-leaving" : undefined}
       atmosphereStyle={
         bgUrl ? { backgroundImage: "url(" + JSON.stringify(bgUrl) + ")" } : undefined
       }
       effects={
         <KatanaCanvas
-          charging={isFocused || pending || transitioning}
-          chargeProgress={pending || transitioning ? 1 : 0.65}
+          charging={isFocused || pending}
+          chargeProgress={pending ? 1 : 0.65}
           motionTarget={loginRef}
         />
       }
@@ -544,17 +508,21 @@ function Connect({
                     }}
                   />
                   <div className="bg-row">
-                    <button
+                    <HeroButton
+                      type="button"
+                      variant="primary"
                       className="is-primary"
-                      onClick={() => bgInputRef.current && applyBg(bgInputRef.current.value)}
+                      onPress={() => bgInputRef.current && applyBg(bgInputRef.current.value)}
                     >
                       {t("app.connect.bgApply")}
-                    </button>
+                    </HeroButton>
                     <label className="bg-upload-btn">
                       <input type="file" accept="image/*" hidden onChange={onBgFile} />
                       {t("app.connect.bgUpload")}
                     </label>
-                    <button onClick={() => applyBg("")}>{t("app.connect.bgClear")}</button>
+                    <HeroButton type="button" variant="ghost" onPress={() => applyBg("")}>
+                      {t("app.connect.bgClear")}
+                    </HeroButton>
                   </div>
                 </div>,
                 document.body,
@@ -604,16 +572,17 @@ function Connect({
             <div className="login-other-list">
               {/* Registration is the same flow as arriving through an invite link:
 						    only where the code came from differs. */}
-              <button
+              <HeroButton
                 type="button"
+                variant="ghost"
                 className="login-other-item"
-                disabled={pending || transitioning}
-                onClick={() => setManualCode(true)}
+                isDisabled={pending}
+                onPress={() => setManualCode(true)}
               >
                 <Ticket size={16} />
                 <span>{t("login.register")}</span>
                 <ChevronRight size={15} />
-              </button>
+              </HeroButton>
               {providers.map((provider) => (
                 <a
                   key={provider.id}
@@ -626,15 +595,16 @@ function Connect({
                 </a>
               ))}
             </div>
-            <button
+            <HeroButton
               type="button"
+              variant="ghost"
               className="login-back"
-              disabled={pending || transitioning}
-              onClick={() => setOtherOpen(false)}
+              isDisabled={pending}
+              onPress={() => setOtherOpen(false)}
             >
               <ArrowLeft size={14} />
               {t("login.backToSignIn")}
-            </button>
+            </HeroButton>
             <p className="login-private">
               <ShieldCheck size={13} />
               {t("login.private")}
@@ -653,7 +623,7 @@ function Connect({
                 <h2 id="login-card-title">{t("login.welcome")}</h2>
                 <p>{t("login.hint")}</p>
               </div>
-              <form onSubmit={submit} aria-busy={pending || transitioning}>
+              <form onSubmit={submit} aria-busy={pending}>
                 <Field label={t("app.connect.username")}>
                   <input
                     autoFocus
@@ -663,7 +633,7 @@ function Connect({
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     autoComplete="username"
-                    disabled={pending || transitioning}
+                    disabled={pending}
                     required
                   />
                 </Field>
@@ -675,7 +645,7 @@ function Connect({
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
                     autoComplete="current-password"
-                    disabled={pending || transitioning}
+                    disabled={pending}
                     required
                   />
                 </Field>
@@ -692,7 +662,7 @@ function Connect({
                       onBlur={() => setIsFocused(false)}
                       autoComplete="one-time-code"
                       placeholder="123456"
-                      disabled={pending || transitioning}
+                      disabled={pending}
                       required
                     />
                   </Field>
@@ -702,7 +672,7 @@ function Connect({
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    disabled={pending || transitioning}
+                    disabled={pending}
                   />
                   <span>{t("app.connect.remember")}</span>
                 </label>
@@ -713,15 +683,13 @@ function Connect({
                 )}
                 <Button
                   type="submit"
-                  disabled={pending || transitioning || !username.trim() || !password}
+                  disabled={pending || !username.trim() || !password}
                   className="login-submit"
                   ref={loginButtonRef}
                 >
                   <span className="btn-content">
                     <ArrowRight size={16} />
-                    {pending || transitioning
-                      ? t("app.connect.connecting")
-                      : t("app.connect.submit")}
+                    {pending ? t("app.connect.connecting") : t("app.connect.submit")}
                   </span>
                 </Button>
               </form>
@@ -737,15 +705,16 @@ function Connect({
             {/* The upgrade entry belongs on the sign-in card, not behind "more
 				    options": this is the one page an operator lands on after updating,
 				    and it disappears by itself once the gateway has an owner account. */}
-            <button
+            <HeroButton
               type="button"
+              variant="ghost"
               className="login-card-peek"
-              disabled={pending || transitioning}
-              onClick={() => setOtherOpen(true)}
+              isDisabled={pending}
+              onPress={() => setOtherOpen(true)}
             >
               <span>{t("login.moreWays")}</span>
               <ChevronRight size={14} />
-            </button>
+            </HeroButton>
           </>
         )}
       </div>
@@ -760,16 +729,17 @@ function Connect({
           the stack grew 49px taller than the card and the tab hung past the
           card's bottom edge onto the upgrade row. */}
       {!accepting && !otherOpen && upgradeLogin ? (
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           className="login-upgrade"
-          disabled={pending || transitioning}
-          onClick={() => setUpgradeHelp(true)}
+          isDisabled={pending}
+          onPress={() => setUpgradeHelp(true)}
         >
           <HelpCircle size={14} />
           <span>{t("login.upgradeEntry")}</span>
           <ChevronRight size={13} />
-        </button>
+        </HeroButton>
       ) : null}
       {upgradeHelp ? (
         <Dialog title={t("login.upgradeHelp")} onClose={() => setUpgradeHelp(false)}>
@@ -785,7 +755,7 @@ function Connect({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                disabled={pending || transitioning}
+                disabled={pending}
               />
             </Field>
             {needTOTP ? (
@@ -797,12 +767,12 @@ function Connect({
                   value={totpCode}
                   onChange={(event) => setTotpCode(event.target.value)}
                   required
-                  disabled={pending || transitioning}
+                  disabled={pending}
                 />
               </Field>
             ) : null}
             {error ? <p role="alert">{error}</p> : null}
-            <Button type="submit" disabled={!password || pending || transitioning}>
+            <Button type="submit" disabled={!password || pending}>
               {t("operator.legacyLogin")}
             </Button>
           </form>
@@ -815,12 +785,10 @@ function Connect({
 function Authenticated({
   clientKey,
   initialSites,
-  entranceActive,
   onUnauthorized,
 }: {
   clientKey: object;
   initialSites?: Site[];
-  entranceActive: boolean;
   onUnauthorized: () => void;
 }) {
   const { client, role } = useSession();
@@ -853,7 +821,7 @@ function Authenticated({
         </Button>
       </div>
     );
-  return <AuthenticatedShell onUnauthorized={onUnauthorized} entranceActive={entranceActive} />;
+  return <AuthenticatedShell onUnauthorized={onUnauthorized} />;
 }
 /**
  * Keeps a member out of the gateway's own pages.
@@ -874,13 +842,7 @@ function RouteGuard({ role, pathname }: { role: ConsoleRole; pathname: string })
   return null;
 }
 
-function AuthenticatedShell({
-  onUnauthorized,
-  entranceActive,
-}: {
-  onUnauthorized: () => void;
-  entranceActive: boolean;
-}) {
+function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) {
   const { t } = useI18n();
   const { addons } = useModules();
   // Which chrome entries the operator keeps (Settings → Appearance: the top
@@ -969,13 +931,6 @@ function AuthenticatedShell({
     navigate("/setup", { replace: true });
   }, [channelStats.isSuccess, channelStats.data, location.pathname, location.search, navigate]);
 
-  const [routeAnim, setRouteAnim] = useState(0);
-  useEffect(() => {
-    setRouteAnim(0);
-    const frame = window.requestAnimationFrame(() => setRouteAnim(1));
-    return () => window.cancelAnimationFrame(frame);
-  }, [location.pathname]);
-
   // Same persisted custom background as the login page, applied to the console.
   const [consoleBg] = useState<string>(() => {
     try {
@@ -1004,7 +959,7 @@ function AuthenticatedShell({
         // still run); only the sidebar row goes away.
         !hiddenPlugins.has(m.id),
     )
-    .map((m) => ({ to: m.open_path!, label: m.name, icon: Puzzle }));
+    .map((m) => ({ to: m.open_path!, label: m.name, icon: Puzzle, group: "backup" as const }));
 
   // The multi-user area is gated by the operating mode (see lib/topBar.ts):
   // absence is the default on a personal gateway, and pinning the entry in the
@@ -1012,54 +967,32 @@ function AuthenticatedShell({
   const modeHidden = new Set(modeHiddenNav(operatingMode.data?.mode));
   const pinnedNav = new Set(chrome.pinnedNav);
   const modeHidesNav = (path: string) => modeHidden.has(path) && !pinnedNav.has(path);
+  const registeredNav = CHROME_NAV_ITEMS.filter(allowedFor).map((item) => ({
+    to: item.path,
+    label: t(item.labelKey),
+    icon: item.icon,
+    group: item.group,
+  }));
+  const paletteNav = [...registeredNav.filter((item) => !modeHidesNav(item.to)), ...enabledPlugins];
 
-  const mainNav = [
-    ...CHROME_NAV_ITEMS.filter(
-      (item) => item.group === "primary" && !modeHidesNav(item.path) && allowedFor(item),
-    ).map((item) => ({
-      to: item.path,
-      label: t(item.labelKey),
-      icon: item.icon,
-    })),
-    ...enabledPlugins,
-  ];
-  const settingsNav = (() => {
-    const item = CHROME_NAV_ITEMS.find((entry) => entry.group === "settings");
-    // A member has no settings page to open; their own account page is in
-    // the main entries (/account), which is where their preferences live.
-    if (!item || !allowedFor(item)) return null;
-    return { to: item.path, label: t(item.labelKey), icon: item.icon };
-  })();
-
-  // The command palette lists every page, hidden entries included: hiding an
-  // entry is a display choice, never a way to make a page unreachable.
-  const paletteNav = [...mainNav, ...(settingsNav ? [settingsNav] : [])];
-
-  // What the chrome renders: the same entries minus the ones switched off in
-  // Settings → Appearance. Routes stay mounted either way, so a hidden page is
-  // still one ⌘K away — and one click from the panel.
+  // 顶栏工作区和侧栏入口共用导航注册表，并按角色、运行模式和外观偏好过滤。
   const hidden = new Set(chrome.hiddenNav);
-  const primaryNav = mainNav.filter((item) => !hidden.has(item.to));
-
-  const corePaths = ["/", "/channels", "/models", "/keys"];
-  const activityPaths = ["/workbench", "/logs", "/checkins"];
+  const availableNav = [...registeredNav, ...enabledPlugins].filter(
+    (item) => !modeHidesNav(item.to) && !hidden.has(item.to),
+  );
+  const activeTopNavigation = chromeNavGroupForLocation(location.pathname, location.search);
+  const activeGroup = CHROME_NAV_GROUPS.find((item) => item.id === activeTopNavigation)!;
+  const topNavigation = CHROME_NAV_GROUPS.flatMap((group) => {
+    const first = availableNav.find((item) => item.group === group.id);
+    if (!first) return [];
+    return [{ id: group.id, label: t(group.labelKey), to: first.to }];
+  });
   const navSections = [
     {
-      label: t("shell.section.gateway"),
-      items: primaryNav.filter((item) => corePaths.includes(item.to)),
-    },
-    {
-      label: t("shell.section.activity"),
-      items: primaryNav.filter((item) => activityPaths.includes(item.to)),
-    },
-    {
-      label: t("shell.section.manage"),
-      items: [
-        ...primaryNav.filter(
-          (item) => !corePaths.includes(item.to) && !activityPaths.includes(item.to),
-        ),
-        ...(settingsNav && !hidden.has(settingsNav.to) ? [settingsNav] : []),
-      ],
+      label: t(activeGroup.labelKey),
+      items: availableNav
+        .filter((item) => item.group === activeTopNavigation)
+        .map(({ to, label, icon }) => ({ to, label, icon })),
     },
   ];
   return (
@@ -1071,6 +1004,11 @@ function AuthenticatedShell({
       <ConsoleShell
         appearance={appearance}
         sections={navSections}
+        topNavigation={topNavigation}
+        activeTopNavigation={activeTopNavigation}
+        onSelectTopNavigation={(to) => navigate(to)}
+        showAdminAccount={role === null || role === "owner"}
+        appearanceHiddenNav={modeHiddenNav(operatingMode.data?.mode)}
         version={gatewayVersion}
         theme={theme}
         onThemeChange={changeTheme}
@@ -1083,7 +1021,6 @@ function AuthenticatedShell({
             : undefined
         }
         background={consoleBg}
-        entering={Boolean(routeAnim)}
       >
         <RouteGuard role={effectiveRole} pathname={location.pathname} />
         <Suspense fallback={<Loading />}>
@@ -1091,6 +1028,7 @@ function AuthenticatedShell({
             <Route index element={<Dashboard />} />
             <Route path="setup" element={<SetupWizard />} />
             <Route path="channels" element={<Channels />} />
+            <Route path="backups" element={<Backups />} />
             <Route path="models/channel/:channelId" element={<ChannelModels />} />
             <Route path="models" element={<Models />} />
             <Route path="keys" element={<Keys />} />
@@ -1101,8 +1039,8 @@ function AuthenticatedShell({
               element={role === null ? <Navigate to="/settings" replace /> : <AccountPage />}
             />
             <Route path="users" element={<UsersLayout request={usersRequest} />}>
-              <Route index element={<Navigate to="overview" replace />} />
-              <Route path="overview" element={<UsersBoards.OverviewPanel />} />
+              <Route index element={<Navigate to="members" replace />} />
+              <Route path="overview" element={<Navigate to="/users/members" replace />} />
               <Route path="members" element={<UsersBoards.MembersPanel />} />
               <Route path="policies" element={<UsersBoards.PoliciesPanel />} />
               <Route path="quotas" element={<UsersBoards.QuotasPanel />} />
@@ -1140,7 +1078,7 @@ function AuthenticatedShell({
         </Suspense>
       </ConsoleShell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} nav={paletteNav} />
-      <GuidedTour enabled={!entranceActive && isStaff(role) && operatorPromptReady} />
+      <GuidedTour enabled={isStaff(role) && operatorPromptReady} />
     </>
   );
 }

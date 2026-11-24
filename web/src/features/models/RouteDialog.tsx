@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import type { ModelMatchMode, Route, RoutingCandidate } from "../../api/types";
 import { api } from "../../api/client";
 import { Button, Dialog, ErrorState, Field, InfoTip } from "../../components/ui";
@@ -234,13 +235,15 @@ export function RouteDialog({
           />
         </Field>
       </div>
-      <button
+      <HeroButton
+        variant="ghost"
         type="button"
         className={`advanced-toggle${advanced ? " is-open" : ""}`}
-        onClick={() => setAdvanced((current) => !current)}
+        aria-expanded={advanced}
+        onPress={() => setAdvanced((current) => !current)}
       >
         {advanced ? t("modelsPage.hideOverrides") : t("modelsPage.showOverrides")}
-      </button>
+      </HeroButton>
       {advanced ? (
         <section className="advanced-fields">
           <div className="ops-panel-context">

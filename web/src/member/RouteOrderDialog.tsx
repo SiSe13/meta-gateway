@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button as HeroButton } from "@heroui/react";
 import { ChevronDown, ChevronUp, GripVertical, RotateCcw } from "lucide-react";
 import { Button, Dialog, Loading } from "../components/ui";
 import { accountRequest } from "../team/transport";
@@ -222,24 +223,28 @@ export function RouteOrderDialog({
                 <span>{t("participate")}</span>
               </label>
               <span className="route-order-moves">
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
+                  isIconOnly
                   className="icon-button"
-                  disabled={busy || index === 0}
+                  isDisabled={busy || index === 0}
                   aria-label={`${t("moveUp")} · ${row.channel}`}
-                  onClick={() => move(index, index - 1)}
+                  onPress={() => move(index, index - 1)}
                 >
                   <ChevronUp size={14} />
-                </button>
-                <button
+                </HeroButton>
+                <HeroButton
                   type="button"
+                  variant="ghost"
+                  isIconOnly
                   className="icon-button"
-                  disabled={busy || index === rows.length - 1}
+                  isDisabled={busy || index === rows.length - 1}
                   aria-label={`${t("moveDown")} · ${row.channel}`}
-                  onClick={() => move(index, index + 1)}
+                  onPress={() => move(index, index + 1)}
                 >
                   <ChevronDown size={14} />
-                </button>
+                </HeroButton>
               </span>
             </li>
           ))}

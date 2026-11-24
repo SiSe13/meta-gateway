@@ -1,17 +1,14 @@
 /* Workspace composition. Navigation, shared controls and business styles have separate owners. */
 .channels-workspace { display: block; }
 /* ---- Time range control (shared by the overview and log workspaces) ----
-   Radii come from `--radius-sm`, never hardcoded: in classic that token is 0,
-   which is what the control's neighbours (`.chart-detail-pill`,
-   `.chart-back-button`, `.button`) use, so hardcoded 9/7/8px made the picker
-   the only rounded thing in the chart header. Modern keeps its rounded
-   control language through the same token. */
+   `--radius-sm` keeps the picker aligned with its chart-header neighbours
+   across the shared MetaAPI appearance. */
 .time-range { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
-.time-range-presets { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-subtle); }
-.time-range-presets button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: 500 11px var(--font); cursor: pointer; white-space: nowrap; }
-.time-range-presets button:hover { color: var(--ink); }
-.time-range-presets button.is-active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm, 0 1px 2px #171d2e0f); }
-.time-range.is-compact .time-range-presets button { padding: 4px 7px; font-size: var(--text-xs); }
+.time-range-tabs .time-range-presets { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; width: auto; max-width: 100%; margin: 0; padding: 3px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-subtle); }
+.time-range-tabs .time-range-presets [role="tab"] { display: inline-flex; align-items: center; gap: 5px; min-height: 0; padding: 5px 9px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font: 500 11px var(--font); white-space: nowrap; }
+.time-range-tabs .time-range-presets [role="tab"]:hover { color: var(--ink); }
+.time-range-tabs .time-range-presets [role="tab"][aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm, 0 1px 2px #171d2e0f); }
+.time-range.is-compact .time-range-tabs .time-range-presets [role="tab"] { padding: 4px 7px; font-size: var(--text-xs); }
 .time-range-custom { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; }
 .time-range-custom label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
 .time-range-custom input[type="datetime-local"] { min-height: 30px; height: 30px; padding: 0 8px; font: 11px var(--font); border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); }
@@ -33,9 +30,9 @@
 .logs-overview-actions { display: inline-flex; align-items: center; gap: 8px; }
 .log-quick-filters { padding: 0 17px 15px; border-bottom: 1px solid var(--line); font-size: 11px; }
 .log-quick-filters .check { font-size: 11px; color: var(--muted); }
-.theme-modern .logs-split .log-filter-bar { border: 0; flex-wrap: wrap; }
-.theme-modern .logs-split .log-filter-bar > select { max-width: 200px; }
-.theme-modern .logs-split .log-filter-bar .log-search-input { flex: 1 1 250px; min-width: 160px; }
+.theme-metapi .logs-split .log-filter-bar { border: 0; flex-wrap: wrap; }
+.theme-metapi .logs-split .log-filter-bar > select { max-width: 200px; }
+.theme-metapi .logs-split .log-filter-bar .log-search-input { flex: 1 1 250px; min-width: 160px; }
 .log-exact-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; padding: 7px 0 0; }
 .log-exact-filters[hidden] { display: none; }
 .log-exact-filters input { width: 100%; }
@@ -61,7 +58,7 @@
 .route-policy-disclosure > summary { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; color: var(--muted); font-size: 12px; list-style: none; cursor: pointer; }
 .route-policy-disclosure > summary::-webkit-details-marker { display: none; }
 .route-policy-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
-.theme-modern .route-policy-disclosure .routing-policy-card { margin: 0; border-radius: 0; }
+.theme-metapi .route-policy-disclosure .routing-policy-card { margin: 0; border-radius: 0; }
 .member-section-heading { display: flex; align-items: center; gap: 9px; margin: 16px 0 10px; }
 .member-section-heading button { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--ink); font: 600 14px var(--font); cursor: pointer; }
 /* The routing list's toolbar: which group you are looking at on the left, what
@@ -73,90 +70,90 @@
 .member-group-toolbar .bar-spacer { flex: 1 1 auto; }
 .member-group-toolbar > .member-group-tabs { display: flex; min-width: 0; }
 .member-group-toolbar .member-group-tablist { flex: 1 1 auto; height: 100%; align-items: center; padding-bottom: 0; }
-.theme-modern .models-advanced { margin-top: 0; }
-.theme-modern .models-advanced-bar { justify-content: flex-end; margin-bottom: 4px; padding: 0; }
-.theme-modern .models-catalog > .model-changes { padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
-.theme-modern .models-split { display: grid; grid-template-columns: minmax(285px, .39fr) minmax(0, 1fr); gap: 20px; align-items: start; }
-.theme-modern .models-split > .model-directory { background: color-mix(in srgb, var(--surface) 72%, var(--bg)); max-height: calc(100dvh - 250px); min-height: 430px; position: sticky; top: 86px; }
-.theme-modern .model-directory .models-simple-toolbar { display: flex; flex-wrap: wrap; padding: 12px; gap: 5px; }
-.theme-modern .model-directory .models-simple-toolbar .models-search { flex: 1 1 160px; width: auto; min-width: 0; }
+.theme-metapi .models-advanced { margin-top: 0; }
+.theme-metapi .models-advanced-bar { justify-content: flex-end; margin-bottom: 4px; padding: 0; }
+.theme-metapi .models-catalog > .model-changes { padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.theme-metapi .models-split { display: grid; grid-template-columns: minmax(285px, .39fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.theme-metapi .models-split > .model-directory { background: color-mix(in srgb, var(--surface) 72%, var(--bg)); max-height: calc(100dvh - 250px); min-height: 430px; position: sticky; top: 86px; }
+.theme-metapi .model-directory .models-simple-toolbar { display: flex; flex-wrap: wrap; padding: 12px; gap: 5px; }
+.theme-metapi .model-directory .models-simple-toolbar .models-search { flex: 1 1 160px; width: auto; min-width: 0; }
 .models-filter-options { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; width: 100%; padding-top: 8px; }
 .models-filter-options[hidden] { display: none; }
 .model-directory .models-plan-picker { display: grid; gap: 4px; min-width: 0; }
 /* A read-only directory has name + actions, not the operator's status cell. */
-.theme-modern .table-wrap[data-columns="2"] .model-directory-table tr {
+.theme-metapi .table-wrap[data-columns="2"] .model-directory-table tr {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 @media (max-width: 600px) {
-  .theme-modern .table-wrap[data-columns="2"] .model-directory-table tr {
+  .theme-metapi .table-wrap[data-columns="2"] .model-directory-table tr {
     grid-template-columns: minmax(0, 1fr);
   }
-  .theme-modern .table-wrap[data-columns="2"] .workspace-row-actions {
+  .theme-metapi .table-wrap[data-columns="2"] .workspace-row-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
   }
 }
-.theme-modern .model-directory .models-simple-toolbar .models-filter-options select { width: 100%; min-width: 0; flex: none; font-size: 11px; }
+.theme-metapi .model-directory .models-simple-toolbar .models-filter-options select { width: 100%; min-width: 0; flex: none; font-size: 11px; }
 .models-filter-options select:nth-child(2) { grid-column: 1/-1; grid-row: 2; }
-.theme-modern .model-directory-table { display: block; min-width: 0 !important; }
-.theme-modern .model-directory-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.theme-modern .model-directory-table tbody { display: grid; gap: 5px; padding: 9px; }
-.theme-modern .model-directory-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; border-radius: 10px; border: 1px solid transparent; box-shadow: none; }
-.theme-modern .model-directory-table.is-bulk tr { grid-template-columns: auto minmax(0, 1fr) auto auto; }
-.theme-modern .model-directory-table tr.is-selected { background: var(--surface); border-color: var(--line); box-shadow: 0 2px 5px #18213407; }
-.theme-modern .model-directory-table td { display: block; min-width: 0; width: auto; padding: 11px 4px; border: 0; }
-.theme-modern .model-directory-table td.model-row-name { padding-left: 11px; }
-.theme-modern .model-directory-table td.model-row-upstream { display: none; }
-.theme-modern .model-directory-table .model-upstream-header { display: none; }
-.theme-modern .model-directory-table .model-row-name strong { font-size: 13px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.theme-modern .model-directory-table .model-nav-provider { margin: 5px 0; font: 12px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
-.theme-modern .model-directory-table .model-row-status .badge { font-size: var(--text-xs); padding: 3px 5px; }
-.theme-modern .model-directory .list-shell-footer { padding: 12px; background: transparent; }
-.theme-modern .model-directory .pagination-bar { flex-wrap: wrap; gap: 9px; }
-.theme-modern .model-directory .pagination-page-size { display: none; }
-.theme-modern .models-split > .ops-detail-card .detail-head > div:first-child { display: block; }
-.theme-modern .models-split > .ops-detail-card .detail-kicker { display: none; }
-.theme-modern .models-split > .ops-detail-card .detail-head h2 { font-size: 21px; }
-.theme-modern .models-split > .ops-detail-card .detail-head small { font: 12px/1.65 var(--font); }
-.theme-modern .ops-list-panel { padding: 0; max-height: none; overflow: hidden; }
-.theme-modern .ops-list-panel > .panel-header { padding: 19px 20px; margin: 0; border-bottom: 1px solid var(--line); }
-.theme-modern .ops-list-panel > .models-simple-toolbar { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 8px; }
-.theme-modern .ops-list-panel .empty-hero { margin: 28px; }
-.theme-modern .ops-detail-card.is-compact { max-height: none; padding: 24px; }
-.theme-modern .ops-canvas { gap: 20px; }
-.theme-modern .ops-canvas > .telemetry-strip { margin-bottom: 4px; }
-.theme-modern .directory-search { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px; height: 36px; box-shadow: inset 0 1px 2px #171d2e05; }
-.theme-modern .directory-search input { min-height: 0; height: 100%; padding: 0; box-shadow: none; background: transparent; font-size: 12px; }
-.theme-modern .detail-meta { margin-bottom: 26px; }
-.theme-modern .detail-meta .badge { width: fit-content; }
-.theme-modern .ops-detail-card .detail-section { margin-top: 24px; border: 0; }
-.theme-modern .detail-pricing { background: var(--surface-subtle); border: 0; border-radius: 11px; }
-.theme-modern .capability-chip, .theme-modern .model-meta-badge { border: 0; border-radius: 4px; font: 500 var(--text-xs)/1.3 var(--font); padding: 2px 5px; background: var(--surface-subtle); color: var(--muted); box-shadow: none; }
-.theme-modern .capability-stack { gap: 4px; }
-.theme-modern .detail-actions { padding-top: 18px; border-top: 1px solid var(--line); }
-.theme-modern .detail-actions .button { flex: 0 0 auto; }
-.theme-modern .channel-model-list { border: 0; border-radius: 10px; background: var(--surface-subtle); padding: 6px; }
-.theme-modern .channel-model-list > * { padding: 8px 10px; border: 0; font-size: 11px; }
-.theme-modern .routing-policy-card { background: var(--surface); border: 0; border-radius: 11px; padding: 14px; }
-.theme-modern .routing-policy-card .routing-policy-summary + .routing-policy-summary { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
-.theme-modern .routing-policy-title { font-size: 12px; color: var(--ink-soft); }
-.theme-modern .routing-signal, .theme-modern .routing-policy-source, .theme-modern .routing-policy-value small { background: transparent; border: 0; padding: 0 3px; font: 10px var(--font); }
-.theme-modern .single-mode-banner { border: 1px solid var(--primary-hairline); border-radius: 11px; background: var(--primary-soft); padding: 15px; margin: 16px 0; }
-.theme-modern .single-mode-banner strong { font-size: 12px; }
-.theme-modern .single-mode-banner small { font-size: var(--text-xs); line-height: 1.7; }
-.theme-modern .member-row { border-bottom: 1px solid var(--line-light); padding: 16px 0; }
-.theme-modern .member-controls { gap: 5px; }
-.theme-modern .member-group-tabs { border: 0; }
-.theme-modern .member-group-hint { margin: 10px 0 0; color: var(--muted); font: var(--text-xs)/1.7 var(--font); }
-.theme-modern .models-advanced-bar { gap: 10px; margin-bottom: 12px; }
-.theme-modern .routing-reorder-hint { font-size: var(--text-xs); color: var(--muted); }
-.theme-modern .diagnostic-disclosure { margin: 0; padding: 12px 0; border: 0; border-radius: 0; background: transparent; font-size: 11px; }
-.theme-modern .log-filter-bar { background: transparent; border: 0; border-radius: 0; border-bottom: 1px solid var(--line); margin: 0; padding: 16px; gap: 9px; }
-.theme-modern .log-filter-bar input, .theme-modern .log-filter-bar select { min-height: 34px; height: 34px; font: 11px var(--font); background: var(--surface); }
-.theme-modern .log-row-clickable > td { padding-top: 14px; padding-bottom: 14px; }
-.theme-modern .log-status-line .badge { background: transparent; border: 0; padding: 0; }
-.theme-modern .log-latency-bar { height: 3px; border-radius: 2px; background: var(--surface-hover); }
-.theme-modern .cockpit-panel { border-radius: 16px; }
+.theme-metapi .model-directory-table { display: block; min-width: 0 !important; }
+.theme-metapi .model-directory-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.theme-metapi .model-directory-table tbody { display: grid; gap: 5px; padding: 9px; }
+.theme-metapi .model-directory-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; border-radius: 10px; border: 1px solid transparent; box-shadow: none; }
+.theme-metapi .model-directory-table.is-bulk tr { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.theme-metapi .model-directory-table tr.is-selected { background: var(--surface); border-color: var(--line); box-shadow: 0 2px 5px #18213407; }
+.theme-metapi .model-directory-table td { display: block; min-width: 0; width: auto; padding: 11px 4px; border: 0; }
+.theme-metapi .model-directory-table td.model-row-name { padding-left: 11px; }
+.theme-metapi .model-directory-table td.model-row-upstream { display: none; }
+.theme-metapi .model-directory-table .model-upstream-header { display: none; }
+.theme-metapi .model-directory-table .model-row-name strong { font-size: 13px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-metapi .model-directory-table .model-nav-provider { margin: 5px 0; font: 12px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.theme-metapi .model-directory-table .model-row-status .badge { font-size: var(--text-xs); padding: 3px 5px; }
+.theme-metapi .model-directory .list-shell-footer { padding: 12px; background: transparent; }
+.theme-metapi .model-directory .pagination-bar { flex-wrap: wrap; gap: 9px; }
+.theme-metapi .model-directory .pagination-page-size { display: none; }
+.theme-metapi .models-split > .ops-detail-card .detail-head > div:first-child { display: block; }
+.theme-metapi .models-split > .ops-detail-card .detail-kicker { display: none; }
+.theme-metapi .models-split > .ops-detail-card .detail-head h2 { font-size: 21px; }
+.theme-metapi .models-split > .ops-detail-card .detail-head small { font: 12px/1.65 var(--font); }
+.theme-metapi .ops-list-panel { padding: 0; max-height: none; overflow: hidden; }
+.theme-metapi .ops-list-panel > .panel-header { padding: 19px 20px; margin: 0; border-bottom: 1px solid var(--line); }
+.theme-metapi .ops-list-panel > .models-simple-toolbar { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 8px; }
+.theme-metapi .ops-list-panel .empty-hero { margin: 28px; }
+.theme-metapi .ops-detail-card.is-compact { max-height: none; padding: 24px; }
+.theme-metapi .ops-canvas { gap: 20px; }
+.theme-metapi .ops-canvas > .telemetry-strip { margin-bottom: 4px; }
+.theme-metapi .directory-search { background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px; height: 36px; box-shadow: inset 0 1px 2px #171d2e05; }
+.theme-metapi .directory-search input { min-height: 0; height: 100%; padding: 0; box-shadow: none; background: transparent; font-size: 12px; }
+.theme-metapi .detail-meta { margin-bottom: 26px; }
+.theme-metapi .detail-meta .badge { width: fit-content; }
+.theme-metapi .ops-detail-card .detail-section { margin-top: 24px; border: 0; }
+.theme-metapi .detail-pricing { background: var(--surface-subtle); border: 0; border-radius: 11px; }
+.theme-metapi .capability-chip, .theme-metapi .model-meta-badge { border: 0; border-radius: 4px; font: 500 var(--text-xs)/1.3 var(--font); padding: 2px 5px; background: var(--surface-subtle); color: var(--muted); box-shadow: none; }
+.theme-metapi .capability-stack { gap: 4px; }
+.theme-metapi .detail-actions { padding-top: 18px; border-top: 1px solid var(--line); }
+.theme-metapi .detail-actions .button { flex: 0 0 auto; }
+.theme-metapi .channel-model-list { border: 0; border-radius: 10px; background: var(--surface-subtle); padding: 6px; }
+.theme-metapi .channel-model-list > * { padding: 8px 10px; border: 0; font-size: 11px; }
+.theme-metapi .routing-policy-card { background: var(--surface); border: 0; border-radius: 11px; padding: 14px; }
+.theme-metapi .routing-policy-card .routing-policy-summary + .routing-policy-summary { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.theme-metapi .routing-policy-title { font-size: 12px; color: var(--ink-soft); }
+.theme-metapi .routing-signal, .theme-metapi .routing-policy-source, .theme-metapi .routing-policy-value small { background: transparent; border: 0; padding: 0 3px; font: 10px var(--font); }
+.theme-metapi .single-mode-banner { border: 1px solid var(--primary-hairline); border-radius: 11px; background: var(--primary-soft); padding: 15px; margin: 16px 0; }
+.theme-metapi .single-mode-banner strong { font-size: 12px; }
+.theme-metapi .single-mode-banner small { font-size: var(--text-xs); line-height: 1.7; }
+.theme-metapi .member-row { border-bottom: 1px solid var(--line-light); padding: 16px 0; }
+.theme-metapi .member-controls { gap: 5px; }
+.theme-metapi .member-group-tabs { border: 0; }
+.theme-metapi .member-group-hint { margin: 10px 0 0; color: var(--muted); font: var(--text-xs)/1.7 var(--font); }
+.theme-metapi .models-advanced-bar { gap: 10px; margin-bottom: 12px; }
+.theme-metapi .routing-reorder-hint { font-size: var(--text-xs); color: var(--muted); }
+.theme-metapi .diagnostic-disclosure { margin: 0; padding: 12px 0; border: 0; border-radius: 0; background: transparent; font-size: 11px; }
+.theme-metapi .log-filter-bar { background: transparent; border: 0; border-radius: 0; border-bottom: 1px solid var(--line); margin: 0; padding: 16px; gap: 9px; }
+.theme-metapi .log-filter-bar input, .theme-metapi .log-filter-bar select { min-height: 34px; height: 34px; font: 11px var(--font); background: var(--surface); }
+.theme-metapi .log-row-clickable > td { padding-top: 14px; padding-bottom: 14px; }
+.theme-metapi .log-status-line .badge { background: transparent; border: 0; padding: 0; }
+.theme-metapi .log-latency-bar { height: 3px; border-radius: 2px; background: var(--surface-hover); }
+.theme-metapi .cockpit-panel { border-radius: 16px; }
 /* Overview: the window control lives in the chart panel header, flush with the
    window readout it explains, instead of owning a bar above the fold. */
 .cockpit-chart-header .chart-header-tools { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-left: auto; }
@@ -167,22 +164,22 @@
 .cockpit-chart-title strong { white-space: nowrap; }
 .chart-window-caption { margin-left: auto; font: 11px var(--font); color: var(--muted); font-variant-numeric: tabular-nums; }
 .model-rank-meta strong.is-warn { color: var(--danger, #b42318); }
-.theme-modern .cockpit-panel-header, .theme-modern .cockpit-chart-header { padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); background: transparent; }
-.theme-modern .cockpit-panel-header::before, .theme-modern .cockpit-chart-header::before { display: none; }
-.theme-modern .cockpit-panel h2, .theme-modern .cockpit-panel strong { letter-spacing: -.015em; }
-.theme-modern .endpoint-strip { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
-.theme-modern .endpoint-strip-label { font: 11px var(--font); letter-spacing: 0; text-transform: none; }
-.theme-modern .endpoint-strip code { font-size: 12px; }
-.theme-modern .settings-section-card, .theme-modern .runtime-panel { border-radius: 16px; box-shadow: var(--shadow-sm); }
+.theme-metapi .cockpit-panel-header, .theme-metapi .cockpit-chart-header { padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid var(--line); background: transparent; }
+.theme-metapi .cockpit-panel-header::before, .theme-metapi .cockpit-chart-header::before { display: none; }
+.theme-metapi .cockpit-panel h2, .theme-metapi .cockpit-panel strong { letter-spacing: -.015em; }
+.theme-metapi .endpoint-strip { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.theme-metapi .endpoint-strip-label { font: 11px var(--font); letter-spacing: 0; text-transform: none; }
+.theme-metapi .endpoint-strip code { font-size: 12px; }
+.theme-metapi .settings-section-card, .theme-metapi .runtime-panel { border-radius: 16px; box-shadow: var(--shadow-sm); }
 /* Mode switch card (Settings → Runtime parameters). One select and one save
    button: the group header names the feature, so the card itself only has to
    show which mode is live. */
 .runtime-mode-select { max-width: 320px; }
-.theme-modern .setting-row { border-color: var(--line-light); }
-.theme-modern .ops-page-tabs, .theme-modern .runtime-subnav { border: 0; background: var(--surface-subtle); border-radius: 11px; padding: 5px; }
-.theme-modern .runtime-subnav button, .theme-modern .runtime-subnav a { border-radius: 8px; font: 12px var(--font); }
-.theme-modern .workbench-grid { gap: 24px; }
-.theme-modern .workbench-preview { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-subtle); }
+.theme-metapi .setting-row { border-color: var(--line-light); }
+.theme-metapi .ops-page-tabs, .theme-metapi .runtime-subnav { border: 0; background: var(--surface-subtle); border-radius: 11px; padding: 5px; }
+.theme-metapi .runtime-subnav button, .theme-metapi .runtime-subnav a { border-radius: 8px; font: 12px var(--font); }
+.theme-metapi .workbench-grid { gap: 24px; }
+.theme-metapi .workbench-preview { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-subtle); }
 .console-atmosphere:after { content: ""; position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 44%, transparent); }
 @media (max-width: 820px) {
   /* Tablets and phones: the band wraps to two columns. Its breakpoint is a little
@@ -198,34 +195,33 @@
   .logs-overview .telemetry-strip.is-compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .logs-overview .telemetry-segment-value { font-size: 23px; }
   .logs-overview .telemetry-segment-head { font-size: var(--text-xs); }
-  .theme-modern .logs-split .log-filter-bar > select { max-width: none; }
-  .theme-modern .logs-split .log-filter-bar .log-search-input { width: 100%; min-width: 0; }
+  .theme-metapi .logs-split .log-filter-bar > select { max-width: none; }
+  .theme-metapi .logs-split .log-filter-bar .log-search-input { width: 100%; min-width: 0; }
   .log-exact-filters { grid-column: 1/-1; }
-  .theme-modern .models-split { grid-template-columns: 1fr; }
+  .theme-metapi .models-split { grid-template-columns: 1fr; }
   /* The directory is the whole page on a phone: the 330px cap left it a ~123px
      scroll window with barely one row visible. Let it grow to its content, and
      drop the inner scroll region — the page scrolls instead, so the footer
      (pagination) stays reachable. */
-  .theme-modern .models-split > .model-directory { position: static; min-height: 0; max-height: none; }
-  .theme-modern .models-split .list-shell-body { overflow: visible; }
+  .theme-metapi .models-split > .model-directory { position: static; min-height: 0; max-height: none; }
+  .theme-metapi .models-split .list-shell-body { overflow: visible; }
   .models-workspace-actions { flex-wrap: wrap; justify-content: flex-start; }
   .workspace-filter-row { padding: 14px; }
   .workspace-filter-row .directory-search { flex: 1 1 100%; width: 100%; }
   .workspace-filter-row select { flex: 1; width: 0; max-width: none; }
   .workspace-list-caption { display: none; }
-  .theme-modern .ops-detail-card.is-compact { padding: 20px; }
-  .theme-modern .directory-search { width: 100%; }
-  .theme-modern .log-filter-bar { display: grid; grid-template-columns: 1fr 1fr; padding: 14px; }
-  .theme-modern .log-filter-bar .log-search-input { grid-column: 1/-1; width: 100%; min-width: 0; }
-  .theme-modern .log-filter-bar > select { grid-column: 1/-1; width: 100%; }
-  .theme-modern .log-filter-bar .button { width: 100%; }
+  .theme-metapi .ops-detail-card.is-compact { padding: 20px; }
+  .theme-metapi .directory-search { width: 100%; }
+  .theme-metapi .log-filter-bar { display: grid; grid-template-columns: 1fr 1fr; padding: 14px; }
+  .theme-metapi .log-filter-bar .log-search-input { grid-column: 1/-1; width: 100%; min-width: 0; }
+  .theme-metapi .log-filter-bar > select { grid-column: 1/-1; width: 100%; }
+  .theme-metapi .log-filter-bar .button { width: 100%; }
 }
 
 /* ------------------------------------------------------- workbench playground --
    A conversation, so the thread scrolls and the composer stays put. Every
-   colour is a token, which is what keeps this surface correct under both
-   appearances and all six palettes without a classic compat block: the radii
-   come from --radius (0px in classic) and the accents from the palette layer. */
+   colour and radius comes from shared tokens, so this surface follows the
+   selected scheme and palette without a compatibility block. */
 .pg-pickers { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 .pg-params { margin: 12px 0 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-subtle); }
 .pg-params > summary { min-height: 40px; padding: 10px 12px; color: var(--ink-soft); cursor: pointer; font-size: 12px; font-weight: 650; }
@@ -280,11 +276,11 @@
   .pg-thread { max-height: none; }
 }
 
-/* The modern layer flattens every meta badge to a quiet chip; the compat shim
+/* The MetaAPI layer flattens every meta badge to a quiet chip; the compat shim
    keeps a warning tint because it changes where the request is sent, not just
-   how the model is described. Specificity has to beat `.theme-modern
+   how the model is described. Specificity has to beat `.theme-metapi
    .model-meta-badge`, hence the modifier class in the selector. */
-.theme-modern .model-meta-badge.is-shim {
+.theme-metapi .model-meta-badge.is-shim {
   color: var(--warning);
   background: color-mix(in srgb, var(--warning) 12%, var(--surface-subtle));
 }
@@ -372,14 +368,14 @@
 }
 /* Modern dresses rows as cards, so the marker is a dashed outline rather than
    the inset bar: the bar would sit inside the card's rounded corner. */
-.theme-modern .model-directory-table tr.is-plugin-model {
+.theme-metapi .model-directory-table tr.is-plugin-model {
   border-color: var(--line-strong);
   border-style: dashed;
 }
-.theme-modern .is-plugin-model td:first-child {
+.theme-metapi .is-plugin-model td:first-child {
   box-shadow: none;
 }
-.theme-modern .plugin-model-owner {
+.theme-metapi .plugin-model-owner {
   color: var(--muted);
 }
 
@@ -459,15 +455,8 @@
   cursor: pointer;
 }
 .model-chip button:hover { background: var(--surface-hover); color: var(--ink); }
-/* The "add a model" control.
-   Three things made this look broken:
-     1. the class was named .model-group-picker, which the model page already
-        uses for a vertical flex container (hence the misaligned text);
-     2. .field select { width: 100% } stretched it across the whole row; and
-     3. the classic theme's `.field select { max-width: 100% }` out-ranks any
-        two-class selector, so the width had to be raised past it.
-   The four-class form below is deliberate: it is the shortest selector that
-   beats :root[data-appearance="classic"] .field select. */
+/* The group row has several controls; keep this selector more specific than
+   `.field select` so the add-model picker stays compact. */
 .field .model-groups .model-group-models select.model-group-add {
   flex: 0 0 auto;
   width: auto;
@@ -652,11 +641,11 @@
    model healthy" from "the site reports it down", which the neutral
    .model-meta-badge base cannot do. Success/danger tokens are used instead of
    reusing .is-shim, whose meaning is image-edit forwarding, not availability. */
-.theme-modern .model-meta-badge.is-probe-ok {
+.theme-metapi .model-meta-badge.is-probe-ok {
   color: var(--success);
   background: color-mix(in srgb, var(--success) 12%, var(--surface-subtle));
 }
-.theme-modern .model-meta-badge.is-probe-low {
+.theme-metapi .model-meta-badge.is-probe-low {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 12%, var(--surface-subtle));
 }
@@ -1161,7 +1150,7 @@
 .pricing-rules li { margin-block: 8px; line-height: 1.65; }
 
 /* Directory actions are now a detail chevron, not a second row of buttons. */
-.theme-modern .models-split .table-wrap[data-columns="2"] .model-directory-table tr {
+.theme-metapi .models-split .table-wrap[data-columns="2"] .model-directory-table tr {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 

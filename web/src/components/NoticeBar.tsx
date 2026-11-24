@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Info, TriangleAlert, X } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 
 /**
  * A single line of the operator's or the deployment's own voice, sitting above
@@ -45,14 +46,14 @@ export function NoticeBar({
       </div>
       {action ? <div className="notice-bar-action">{action}</div> : null}
       {onDismiss ? (
-        <button
-          type="button"
+        <HeroButton
+          variant="ghost"
           className="notice-bar-dismiss"
           aria-label="dismiss"
-          onClick={onDismiss}
+          onPress={onDismiss}
         >
           <X size={13} />
-        </button>
+        </HeroButton>
       ) : null}
     </div>
   );

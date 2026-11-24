@@ -1,5 +1,6 @@
 import { ChevronDown, ExternalLink, FlaskConical, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
+import { Button as HeroButton } from "@heroui/react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -557,36 +558,39 @@ export function EditChannelDialog({
               <h3>{t("channels.modelsSection")}</h3>
               <span className="detail-section-count">{editModels.length}</span>
               <div className="detail-section-actions">
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
                   className="detail-section-expand connection-manage-button"
-                  onClick={() => setTestOpen(true)}
-                  disabled={editModels.length === 0}
-                  title={t("channels.testActionHint")}
+                  onPress={() => setTestOpen(true)}
+                  isDisabled={editModels.length === 0}
+                  {...{ title: t("channels.testActionHint") }}
                 >
                   <FlaskConical size={12} />
                   {t("channels.testAction")}
-                </button>
+                </HeroButton>
                 {onRefreshModels ? (
-                  <button
+                  <HeroButton
                     type="button"
+                    variant="ghost"
                     className="detail-section-expand connection-manage-button"
-                    onClick={onRefreshModels}
-                    disabled={pending || refreshingModels}
-                    title={t("channels.fetchModels")}
+                    onPress={onRefreshModels}
+                    isDisabled={pending || refreshingModels}
+                    {...{ title: t("channels.fetchModels") }}
                   >
                     <RefreshCw size={12} className={refreshingModels ? "spin" : undefined} />
                     {t("channels.fetchModels")}
-                  </button>
+                  </HeroButton>
                 ) : null}
-                <button
+                <HeroButton
                   type="button"
+                  variant="ghost"
                   className="detail-section-expand connection-manage-button connection-manage-button-models"
-                  onClick={onManageModels}
+                  onPress={onManageModels}
                 >
                   <ExternalLink size={12} />
                   {t("channels.modelsManage")}
-                </button>
+                </HeroButton>
               </div>
             </div>
             <SyncModePicker
@@ -622,11 +626,12 @@ export function EditChannelDialog({
           </section>
 
           <div className="advanced-section-divider">
-            <button
+            <HeroButton
               type="button"
+              variant="ghost"
               className={`advanced-toggle${showAdvanced ? " is-open" : ""}`}
-              onClick={toggleAdvanced}
-              title={advancedConfigured.join(" · ") || undefined}
+              onPress={toggleAdvanced}
+              {...{ title: advancedConfigured.join(" · ") || undefined }}
             >
               <ChevronDown size={13} />
               {showAdvanced
@@ -634,7 +639,7 @@ export function EditChannelDialog({
                 : advancedConfigured.length > 0
                   ? t("channels.showAdvancedWithCount", { n: advancedConfigured.length })
                   : t("channels.showAdvanced")}
-            </button>
+            </HeroButton>
           </div>
           {showAdvanced ? (
             <div className="advanced-fields">
@@ -1034,18 +1039,19 @@ export function EditChannelDialog({
                             })}
                       </span>
                     </div>
-                    <button
+                    <HeroButton
                       type="button"
+                      variant="ghost"
                       className={`advanced-toggle${showEndpointMap ? " is-open" : ""}`}
                       aria-expanded={showEndpointMap}
-                      disabled={pending}
-                      onClick={() => setShowEndpointMap((open) => !open)}
+                      isDisabled={pending}
+                      onPress={() => setShowEndpointMap((open) => !open)}
                     >
                       <ChevronDown size={13} />
                       {showEndpointMap
                         ? t("channels.endpointMapCollapse")
                         : t("channels.endpointMapConfigure")}
-                    </button>
+                    </HeroButton>
                     {showEndpointMap ? (
                       <EndpointMapEditor
                         value={{ pathOverride, pathMap, requestMap, responseMap }}

@@ -1,4 +1,5 @@
 import { useI18n } from "../../i18n";
+import { Button as HeroButton } from "@heroui/react";
 
 /** Compact family chips, shared by both catalogue roles. */
 export function ModelFamilyFilters({
@@ -14,14 +15,15 @@ export function ModelFamilyFilters({
   return (
     <div className="model-family-filters" role="group" aria-label={t("modelsPage.groupFilter")}>
       {["", ...groups].map((group) => (
-        <button
+        <HeroButton
           type="button"
+          variant="ghost"
           key={group}
           aria-pressed={value === group}
-          onClick={() => onChange(group)}
+          onPress={() => onChange(group)}
         >
           {group || t("modelsPage.allGroups")}
-        </button>
+        </HeroButton>
       ))}
     </div>
   );

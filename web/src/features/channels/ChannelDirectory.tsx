@@ -1,4 +1,5 @@
 import { Boxes, Plus, Search } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import type { ChannelOverview, Site } from "../../api/types";
 import type { ActionMenuItem } from "../../components/ActionMenu";
 import { ActionMenu } from "../../components/ActionMenu";
@@ -472,12 +473,13 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
               <ul className="model-match-list">
                 {modelMatches.map((match) => (
                   <li key={match.channelId}>
-                    <button
+                    <HeroButton
                       type="button"
+                      variant="ghost"
                       className={`model-match-row${
                         selected?.channel.id === match.channelId ? " is-selected" : ""
                       }`}
-                      onClick={() => {
+                      onPress={() => {
                         selectRow(match.channelId);
                         setInspectorOpen(true);
                       }}
@@ -491,7 +493,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                       <span className="muted model-match-source">
                         {t(`channels.modelMatchSource.${match.source}`)}
                       </span>
-                    </button>
+                    </HeroButton>
                   </li>
                 ))}
               </ul>

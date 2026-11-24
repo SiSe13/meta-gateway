@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, ErrorState, Field, Panel } from "../components/ui";
+import { LoaderCircle } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
+import { ErrorState, Field, Panel } from "../components/ui";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 import { teamError, type TeamText } from "./text";
 import type { OAuthSettings, Policy, TeamRequest } from "./types";
@@ -129,9 +131,17 @@ export function OAuthPanel({
         title={t("oauth")}
         titleHelp={t("oauthHint")}
         actions={
-          <Button loading={busy} disabled={busy} onClick={() => void save()}>
+          <HeroButton
+            type="button"
+            variant="primary"
+            className="button button-primary"
+            isDisabled={busy}
+            isPending={busy}
+            onPress={() => void save()}
+          >
+            {busy ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : null}
             {t("save")}
-          </Button>
+          </HeroButton>
         }
       >
         {error ? (
@@ -188,9 +198,11 @@ export function OAuthPanel({
 
               <div className="team-callback">
                 <code>{provider.callback_url}</code>
-                <Button
-                  variant="quiet"
-                  onClick={() => {
+                <HeroButton
+                  type="button"
+                  variant="ghost"
+                  className="button button-quiet"
+                  onPress={() => {
                     void navigator.clipboard
                       .writeText(provider.callback_url)
                       .then(() => {
@@ -201,7 +213,7 @@ export function OAuthPanel({
                   }}
                 >
                   {copied === provider.id ? t("copied") : t("copy")}
-                </Button>
+                </HeroButton>
               </div>
               <p className="panel-hint">{t("oauthCallbackHint")}</p>
 

@@ -58,7 +58,6 @@
 .console-action-divider { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
 .console-update { display: flex; align-items: center; gap: 4px; color: var(--primary-active); text-decoration: none; font-size: 11px; padding: 5px 9px; background: var(--primary-soft); border-radius: 20px; }
 .console-content { width: 100%; flex: 1; min-width: 0; max-width: 1760px; margin: 0 auto; padding: 32px 38px 24px; }
-.console-content.route-enter { animation: workspace-arrive var(--dur-slow) var(--ease-out) both; }
 .console-page-foot { display: flex; align-items: center; gap: 12px; padding: 16px 38px 24px; color: var(--muted); font-size: 11px; }
 .console-page-foot > span:first-child { color: var(--muted); font-weight: 550; }
 .console-foot-dot { width: 4px; height: 4px; background: var(--accent); border-radius: 50%; margin-left: auto; }
@@ -69,7 +68,6 @@
 .console-shell.is-collapsed .console-brand { padding-left: 4px; }
 .console-shell.is-collapsed .console-search, .console-shell.is-collapsed .console-nav-link { justify-content: center; padding-left: 0; padding-right: 0; }
 .console-shell.is-collapsed .console-sidebar-meta { justify-content: center; }
-@keyframes workspace-arrive { from { opacity: .8; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 @media (min-width: 761px) and (max-height: 780px) {
   .console-navigation { gap: 10px; }
   .console-nav-link { min-height: 32px; padding-top: 5px; padding-bottom: 5px; }
@@ -99,5 +97,5 @@
   .console-nav-drawer .console-nav-caption { padding-bottom: 10px; }
   .console-nav-drawer .console-nav-link { font-size: 14px; min-height: 44px; }
 }
-@media (prefers-reduced-motion: reduce) { .console-content.route-enter { animation: none; } .console-main, .console-sidebar, .console-nav-link { transition: none; } ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .console-main, .console-sidebar, .console-nav-link { transition: none; } ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
 @media (prefers-reduced-transparency: reduce) { .console-sidebar, .console-topbar { background: var(--surface); backdrop-filter: none; } }

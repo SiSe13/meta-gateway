@@ -1,15 +1,20 @@
 import { Check, Download, Languages, Moon, RotateCcw, Search, Sun } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Button as HeroButton, Switch as HeroSwitch } from "@heroui/react";
 import { api } from "../api/client";
 import { Button, Field } from "../components/ui";
 import { formatErrorMessage } from "../formatError";
 import { setCurrency } from "../lib/format";
 import { useOptionalSession } from "../session";
-import { APPEARANCES, useAppearance } from "../appearance";
+import {
+  useAppearance,
+  type BackgroundStyle,
+  type CardStyle,
+  type PageDensity,
+} from "../appearance";
 import { useI18n } from "../i18n";
 import { PALETTES } from "../palettes";
-import { UI_THEMES } from "../themes/registry";
 import { CHROME_NAV_ITEMS, canAccessNav } from "../lib/chromeNav";
 import {
   TOP_BAR_CONTROLS,
@@ -29,6 +34,94 @@ const CONTROL_ICONS: Record<TopBarControlId, ReactNode> = {
   language: <Languages size={16} />,
 };
 
+const BACKGROUND_STYLES: { id: BackgroundStyle; nameKey: string }[] = [
+  { id: "paper", nameKey: "appearance.background.paper" },
+  { id: "mist", nameKey: "appearance.background.mist" },
+  { id: "warm", nameKey: "appearance.background.warm" },
+];
+
+const CARD_STYLES: { id: CardStyle; nameKey: string }[] = [
+  { id: "raised", nameKey: "appearance.cards.raised" },
+  { id: "outlined", nameKey: "appearance.cards.outlined" },
+  { id: "flat", nameKey: "appearance.cards.flat" },
+];
+
+const PAGE_DENSITIES: { id: PageDensity; nameKey: string }[] = [
+  { id: "comfortable", nameKey: "appearance.density.comfortable" },
+  { id: "standard", nameKey: "appearance.density.standard" },
+  { id: "compact", nameKey: "appearance.density.compact" },
+];
+
+function AppearanceChoiceGroup<T extends string>({
+  title,
+  kind,
+  value,
+  options,
+  label,
+  onSelect,
+}: {
+  title: string;
+  kind: "background" | "cards" | "density";
+  value: T;
+  options: { id: T; nameKey: string }[];
+  label: (key: string) => string;
+  onSelect: (value: T) => void;
+}) {
+  return (
+    <fieldset className="appearance-section appearance-divider-section">
+      <legend>{title}</legend>
+      <div className={`appearance-option-grid appearance-option-grid--${kind}`}>
+        {options.map((option) => (
+          <HeroButton
+            key={option.id}
+            type="button"
+            variant="ghost"
+            className="appearance-option"
+            data-option-group={kind}
+            data-option-value={option.id}
+            aria-pressed={value === option.id}
+            onPress={() => onSelect(option.id)}
+          >
+            {kind === "background" ? (
+              <span
+                className="appearance-option-preview appearance-background-preview"
+                data-background={option.id}
+                aria-hidden="true"
+              />
+            ) : kind === "cards" ? (
+              <span
+                className="appearance-option-preview appearance-card-preview"
+                data-card-style={option.id}
+                aria-hidden="true"
+              >
+                <i />
+                <i />
+                <i />
+              </span>
+            ) : (
+              <span
+                className="appearance-option-preview appearance-density-preview"
+                data-density={option.id}
+                aria-hidden="true"
+              >
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
+            <span className="appearance-option-label">{label(option.nameKey)}</span>
+            {value === option.id ? (
+              <span className="appearance-option-selected" aria-hidden="true">
+                <Check size={13} />
+              </span>
+            ) : null}
+          </HeroButton>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 function ChromeEntryToggle({
   icon,
   label,
@@ -43,7 +136,13 @@ function ChromeEntryToggle({
   onToggle: () => void;
 }) {
   return (
-    <button type="button" className="topbar-toggle" aria-pressed={on} onClick={onToggle}>
+    <HeroButton
+      type="button"
+      variant="ghost"
+      className="topbar-toggle"
+      aria-pressed={on}
+      onPress={onToggle}
+    >
       <span className="topbar-toggle-icon" aria-hidden="true">
         {icon}
       </span>
@@ -51,17 +150,35 @@ function ChromeEntryToggle({
         <strong>{label}</strong>
         {hint ? <small>{hint}</small> : null}
       </span>
-      <span className="topbar-toggle-state" aria-hidden="true">
-        {on ? <Check size={14} /> : null}
+      <span className="appearance-switch-track" aria-hidden="true">
+        <span />
       </span>
-    </button>
+    </HeroButton>
   );
 }
 
-export function AppearancePanel({ modeHiddenNav = [] }: { modeHiddenNav?: string[] }) {
+export function AppearancePanel({
+  modeHiddenNav = [],
+  showCurrency = true,
+}: {
+  modeHiddenNav?: string[];
+  /** 头像抽屉可收起货币设置，保留其他外观能力。 */
+  showCurrency?: boolean;
+}) {
   const session = useOptionalSession();
   const { t } = useI18n();
-  const { appearance, scheme, palette, setAppearance, setScheme, setPalette } = useAppearance();
+  const {
+    scheme,
+    palette,
+    background,
+    cardStyle,
+    density,
+    setScheme,
+    setPalette,
+    setBackground,
+    setCardStyle,
+    setDensity,
+  } = useAppearance();
   const chrome = useChromePrefs();
   const hiddenNav = new Set(chrome.hiddenNav);
   const pinnedNav = new Set(chrome.pinnedNav);
@@ -69,120 +186,78 @@ export function AppearancePanel({ modeHiddenNav = [] }: { modeHiddenNav?: string
   // personal). The caller knows the mode and passes the resulting list, so this
   // panel needs no session of its own.
   const modeHidden = new Set(modeHiddenNav);
+  const resetAppearance = () => {
+    setScheme("light");
+    setPalette("default");
+    setBackground("paper");
+    setCardStyle("raised");
+    setDensity("standard");
+    resetChromePrefs();
+  };
   return (
-    <section className="appearance-panel">
-      <fieldset className="appearance-section">
-        <legend>{t("appearance.styles")}</legend>
-        <p className="appearance-description">{t("appearance.description")}</p>
-        <div className="appearance-cards">
-          {APPEARANCES.map((style) => (
-            <label
-              key={style}
-              className={`appearance-card${appearance === style ? " is-selected" : ""}`}
-            >
-              <input
-                type="radio"
-                name="appearance"
-                value={style}
-                checked={appearance === style}
-                onChange={() => setAppearance(style)}
-              />
-              <span
-                className="appearance-preview"
-                data-appearance={style}
-                data-scheme={scheme}
-                aria-hidden="true"
-              >
-                <span className="appearance-mini-sidebar">
-                  <b>MG</b>
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </span>
-                <span className="appearance-mini-content">
-                  <span className="appearance-mini-header">
-                    <b>Meta Gateway</b>
-                    <i />
-                  </span>
-                  <span className="appearance-mini-title" />
-                  <span className="appearance-mini-metrics">
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span className="appearance-mini-chart">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                </span>
-              </span>
-              <span className="appearance-card-copy">
-                <strong>{t(UI_THEMES[style].nameKey)}</strong>
-                <span className="appearance-selected" aria-hidden="true">
-                  {appearance === style ? <Check size={15} /> : null}
-                </span>
-                <span>{t(UI_THEMES[style].descriptionKey)}</span>
-                <small>
-                  {t("appearance.bundled")} · {UI_THEMES[style].version}
-                </small>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset className="appearance-section appearance-mode-section">
+    <section className="appearance-panel appearance-panel--drawer">
+      <fieldset className="appearance-section appearance-divider-section">
         <legend>{t("appearance.mode")}</legend>
-        <p className="appearance-description">{t("appearance.modeHint")}</p>
-        <div className="appearance-modes">
-          <button
-            type="button"
-            aria-pressed={scheme === "light"}
-            onClick={() => setScheme("light")}
+        <div className="appearance-scheme-control">
+          <Sun size={17} aria-hidden="true" />
+          <HeroSwitch
+            isSelected={scheme === "dark"}
+            aria-label={t("appearance.mode")}
+            onChange={(selected) => setScheme(selected ? "dark" : "light")}
           >
-            <Sun size={18} />
-            {t("appearance.light")}
-            {scheme === "light" ? <Check size={14} /> : null}
-          </button>
-          <button type="button" aria-pressed={scheme === "dark"} onClick={() => setScheme("dark")}>
-            <Moon size={18} />
-            {t("appearance.dark")}
-            {scheme === "dark" ? <Check size={14} /> : null}
-          </button>
+            <HeroSwitch.Content className="appearance-switch">
+              <span />
+            </HeroSwitch.Content>
+          </HeroSwitch>
+          <Moon size={17} aria-hidden="true" />
         </div>
       </fieldset>
-      <fieldset className="appearance-section appearance-mode-section">
+      <AppearanceChoiceGroup
+        title={t("appearance.background.title")}
+        kind="background"
+        value={background}
+        options={BACKGROUND_STYLES}
+        label={t}
+        onSelect={setBackground}
+      />
+      <fieldset className="appearance-section appearance-divider-section">
         <legend>{t("appearance.palette")}</legend>
-        <p className="appearance-description">{t("appearance.paletteHint")}</p>
         <div className="palette-picker">
           {PALETTES.map((option) => (
-            <button
+            <HeroButton
               key={option.id}
               type="button"
+              variant="ghost"
               className="palette-swatch"
               data-palette={option.id}
               aria-pressed={palette === option.id}
-              onClick={() => setPalette(option.id)}
+              onPress={() => setPalette(option.id)}
             >
               <span className="palette-swatch-chip" aria-hidden="true" />
               <span className="palette-swatch-name">{t(option.nameKey)}</span>
               {palette === option.id ? <Check size={14} /> : null}
-            </button>
+            </HeroButton>
           ))}
         </div>
       </fieldset>
-      <fieldset className="appearance-section">
-        <legend>{t("appearance.currency")}</legend>
-        <p className="appearance-description">{t("appearance.currencyHint")}</p>
-        <CurrencySettings />
-      </fieldset>
-      <fieldset className="appearance-section appearance-topbar-section">
+      <AppearanceChoiceGroup
+        title={t("appearance.cards.title")}
+        kind="cards"
+        value={cardStyle}
+        options={CARD_STYLES}
+        label={t}
+        onSelect={setCardStyle}
+      />
+      <AppearanceChoiceGroup
+        title={t("appearance.density.title")}
+        kind="density"
+        value={density}
+        options={PAGE_DENSITIES}
+        label={t}
+        onSelect={setDensity}
+      />
+      <fieldset className="appearance-section appearance-divider-section appearance-topbar-section">
         <legend>{t("appearance.chrome.title")}</legend>
-        <p className="appearance-description">{t("appearance.chrome.hint")}</p>
         <div className="chrome-pref-group">
           <h4 className="chrome-pref-heading">{t("appearance.chrome.groupBar")}</h4>
           <div className="topbar-picker">
@@ -223,12 +298,20 @@ export function AppearancePanel({ modeHiddenNav = [] }: { modeHiddenNav?: string
             )}
           </div>
         </div>
-        <button type="button" className="chrome-pref-reset" onClick={resetChromePrefs}>
+      </fieldset>
+      {showCurrency ? (
+        <details className="appearance-currency-section">
+          <summary>{t("appearance.currency")}</summary>
+          <p className="appearance-description">{t("appearance.currencyHint")}</p>
+          <CurrencySettings />
+        </details>
+      ) : null}
+      <div className="appearance-panel-footer">
+        <HeroButton type="button" variant="outline" onPress={resetAppearance}>
           <RotateCcw size={14} />
           {t("appearance.chrome.reset")}
-        </button>
-      </fieldset>
-      <p className="appearance-local-note">{t("appearance.localHint")}</p>
+        </HeroButton>
+      </div>
     </section>
   );
 }

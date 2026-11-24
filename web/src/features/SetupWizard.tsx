@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { ModePanel } from "../team/ModePanel";
 import { ApiError, api } from "../api/client";
 import type { CreatedDownstreamKey, ImportResult } from "../api/types";
@@ -21,6 +22,8 @@ const STEPS = [
   "wizard.stepKey",
   "wizard.stepDone",
 ] as const;
+
+const tabRoleProps = { role: "tab" };
 
 /**
  * First-run setup page (/setup): the decision-making counterpart to the
@@ -256,9 +259,9 @@ export function SetupWizard() {
       <div className="setup-wizard-card">
         <div className="setup-wizard-head">
           <strong>{t("wizard.title")}</strong>
-          <button type="button" className="setup-wizard-skip" onClick={finish}>
+          <HeroButton type="button" className="setup-wizard-skip" onPress={finish}>
             {t("wizard.skip")}
-          </button>
+          </HeroButton>
         </div>
         <p className="setup-wizard-subtitle">{t("wizard.subtitle")}</p>
         <div className="setup-wizard-dots" aria-hidden>
@@ -333,24 +336,24 @@ export function SetupWizard() {
             <h2>{t("wizard.connTitle")}</h2>
             <p className="setup-wizard-desc">{t("wizard.connDesc")}</p>
             <div className="setup-wizard-tabs" role="tablist">
-              <button
+              <HeroButton
                 type="button"
-                role="tab"
+                {...tabRoleProps}
                 aria-selected={connTab === "manual"}
                 className={connTab === "manual" ? "is-active" : ""}
-                onClick={() => setConnTab("manual")}
+                onPress={() => setConnTab("manual")}
               >
                 {t("wizard.manualTab")}
-              </button>
-              <button
+              </HeroButton>
+              <HeroButton
                 type="button"
-                role="tab"
+                {...tabRoleProps}
                 aria-selected={connTab === "aah"}
                 className={connTab === "aah" ? "is-active" : ""}
-                onClick={() => setConnTab("aah")}
+                onPress={() => setConnTab("aah")}
               >
                 {t("wizard.importTab")}
-              </button>
+              </HeroButton>
             </div>
             {connTab === "manual" ? (
               <>
@@ -416,22 +419,22 @@ export function SetupWizard() {
                   role="group"
                   aria-label={t("wizard.importTab")}
                 >
-                  <button
+                  <HeroButton
                     type="button"
                     aria-pressed={importMode === "file"}
                     className={importMode === "file" ? "is-active" : ""}
-                    onClick={() => setImportMode("file")}
+                    onPress={() => setImportMode("file")}
                   >
                     {t("wizard.importFromFile")}
-                  </button>
-                  <button
+                  </HeroButton>
+                  <HeroButton
                     type="button"
                     aria-pressed={importMode === "webdav"}
                     className={importMode === "webdav" ? "is-active" : ""}
-                    onClick={() => setImportMode("webdav")}
+                    onPress={() => setImportMode("webdav")}
                   >
                     {t("wizard.importFromWebdav")}
-                  </button>
+                  </HeroButton>
                 </div>
 
                 {importMode === "file" ? (
@@ -610,10 +613,10 @@ export function SetupWizard() {
                 <div className="setup-wizard-curl">
                   <div className="setup-wizard-curl-head">
                     <span>Bearer</span>
-                    <button type="button" onClick={copyKey}>
+                    <HeroButton type="button" onPress={copyKey}>
                       <Copy size={12} />
                       {keyCopied ? t("setup.copied") : t("setup.copy")}
-                    </button>
+                    </HeroButton>
                   </div>
                   <code>{createdKey.token}</code>
                 </div>
@@ -657,10 +660,10 @@ export function SetupWizard() {
             <div className="setup-wizard-curl">
               <div className="setup-wizard-curl-head">
                 <span>curl</span>
-                <button type="button" onClick={copyCurl}>
+                <HeroButton type="button" onPress={copyCurl}>
                   <Copy size={12} />
                   {copied ? t("setup.copied") : t("setup.copy")}
-                </button>
+                </HeroButton>
               </div>
               <pre>{curl}</pre>
             </div>

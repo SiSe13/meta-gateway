@@ -1,4 +1,5 @@
 import { Play, Search, Square } from "lucide-react";
+import { Button as HeroButton } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
@@ -424,14 +425,15 @@ export function ProbeDialog({ onClose }: { onClose: () => void }) {
             {selectionMatchesSchedule ? (
               <span className="muted">{t("modelsPage.probe.scheduleScopeMatches")}</span>
             ) : (
-              <button
+              <HeroButton
+                variant="ghost"
                 type="button"
                 className="unify-covered-toggle"
-                disabled={!scheduleReady || running || schedule.isPending}
-                onClick={saveScope}
+                isDisabled={!scheduleReady || running || schedule.isPending}
+                onPress={saveScope}
               >
                 {t("modelsPage.probe.scheduleUseSelection")}
-              </button>
+              </HeroButton>
             )}
           </div>
           <p className="field-hint">{t("modelsPage.probe.scheduleHint")}</p>
@@ -560,11 +562,12 @@ function PickList({
       </div>
 
       <div className="probe-picker-actions">
-        <button
+        <HeroButton
+          variant="ghost"
           type="button"
           className="unify-covered-toggle"
-          disabled={disabled || visible.length === 0}
-          onClick={() =>
+          isDisabled={disabled || visible.length === 0}
+          onPress={() =>
             onChange(
               allVisibleSelected
                 ? selected.filter((item) => !visible.some((option) => option.value === item))
@@ -580,15 +583,16 @@ function PickList({
           {allVisibleSelected
             ? t("modelsPage.probe.clearVisible")
             : t("modelsPage.probe.selectVisible")}
-        </button>
-        <button
+        </HeroButton>
+        <HeroButton
+          variant="ghost"
           type="button"
           className="unify-covered-toggle"
-          disabled={disabled || selected.length === 0}
-          onClick={() => onChange([])}
+          isDisabled={disabled || selected.length === 0}
+          onPress={() => onChange([])}
         >
           {t("modelsPage.probe.clearAll")}
-        </button>
+        </HeroButton>
       </div>
 
       <div className="probe-picker-list">
