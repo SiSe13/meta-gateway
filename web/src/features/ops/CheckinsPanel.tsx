@@ -14,6 +14,7 @@ import {
   type SchedulePresetId,
 } from "../../lib/schedulePresets";
 import { PaginationBar } from "../../components/PaginationBar";
+import { UiDatePicker } from "../../components/UiDatePicker";
 import {
   Button,
   ConfirmDialog,
@@ -209,11 +210,10 @@ export function CheckinsPanel() {
                   </option>
                 ))}
               </select>
-              <input
-                type="date"
-                aria-label={t("ops.checkin.dateFilter")}
+              <UiDatePicker
+                ariaLabel={t("ops.checkin.dateFilter")}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={setDate}
               />
               <select
                 aria-label={t("ops.statusFilter")}

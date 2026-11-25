@@ -348,7 +348,7 @@ func (s *UsageStore) Series(scope UsageScope, since, until time.Time, buckets in
 	}
 
 	where := []string{"created_at >= ?", "created_at <= ?"}
-	args := []any{startUnix, int64(sec), sqliteUTC(start), sqliteUTC(until)}
+	args := []any{startUnix, int64(sec), sqliteUTC(since), sqliteUTC(until)}
 	if clauses, scopeArgs := scope.clauses(); len(clauses) > 0 {
 		where = append(where, clauses...)
 		args = append(args, scopeArgs...)

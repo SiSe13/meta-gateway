@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -79,6 +80,39 @@ var domainWhitelist = map[string]string{
 	"new.sharedchat.cc": "openai-compatible",
 }
 
+// providerDomains 将足够明确的官方 API 主机名映射到连接类型。
+var providerDomains = map[string]string{
+	"api.anthropic.com":                 "anthropic",
+	"generativelanguage.googleapis.com": "gemini",
+	"api.deepseek.com":                  "deepseek",
+	"api.moonshot.cn":                   "moonshot",
+	"open.bigmodel.cn":                  "zhipu",
+	"dashscope.aliyuncs.com":            "qwen",
+	"api.siliconflow.cn":                "siliconflow",
+	"api.minimaxi.com":                  "minimax",
+	"api.stepfun.com":                   "stepfun",
+	"api.lingyiwanwu.com":               "lingyiwanwu",
+	"api.baichuan-ai.com":               "baichuan",
+	"spark-api-open.xf-yun.com":         "spark",
+	"api.hunyuan.cloud.tencent.com":     "hunyuan",
+	"qianfan.baidubce.com":              "qianfan",
+	"openrouter.ai":                     "openrouter",
+	"api.groq.com":                      "groq",
+	"api.x.ai":                          "xai",
+	"api.mistral.ai":                    "mistral",
+	"api.perplexity.ai":                 "perplexity",
+	"api.typesafe.ai":                   "typesafe",
+}
+
+// relayDomains 用中转品牌域名识别其协议配置；匹配只作用于完整域名段。
+var relayDomains = map[string]string{
+	"anyrouter": "new-api",
+	"donehub":   "new-api",
+	"onehub":    "new-api",
+	"veloera":   "new-api",
+	"sub2api":   "sub2api",
+}
+
 // compatHeaderRegex builds a case-insensitive regex from a compat user-id
 // header name (AAH COMPAT_USER_ID_HEADER_MESSAGE_RULES): the header name with
 // dashes relaxed to [-_ ]?, matched against the /api/user/self error message.
@@ -101,6 +135,12 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 		return &Result{}, nil
 	}
 	result := &Result{}
+	if family, siteType, ok := detectURLType(baseURL); ok {
+		result.Family = family
+		result.SiteType = siteType
+		result.Evidence = "url-pattern"
+		return result, nil
+	}
 
 	// ① Domain whitelist.
 	if family, ok := domainWhitelist[domainOf(baseURL)]; ok {
@@ -210,6 +250,34 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 	}
 
 	return result, nil
+}
+
+// detectURLType 先用官方主机名和明确的品牌域名识别连接类型。
+func detectURLType(rawURL string) (string, string, bool) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" {
+		return "", "", false
+	}
+	host := strings.ToLower(strings.TrimSuffix(parsed.Hostname(), "."))
+	path := strings.ToLower(strings.TrimRight(parsed.EscapedPath(), "/"))
+	// 这些官方入口提供 Anthropic Messages 兼容协议，路径比供应商主机名更具体。
+	if strings.Contains(path, "/anthropic") && (host == "api.deepseek.com" || host == "api.moonshot.cn" || host == "api.minimaxi.com" || host == "dashscope.aliyuncs.com" || host == "open.bigmodel.cn") {
+		return "anthropic", "ANTHROPIC", true
+	}
+	if family, ok := providerDomains[host]; ok {
+		return family, strings.ToUpper(family), true
+	}
+	if strings.HasSuffix(host, ".volces.com") && strings.Contains(host, "ark-") {
+		return "doubao", "DOUBAO", true
+	}
+	for brand, family := range relayDomains {
+		for _, label := range strings.Split(host, ".") {
+			if label == brand || strings.HasPrefix(label, brand+"-") {
+				return family, strings.ToUpper(strings.ReplaceAll(family, "-", "_")), true
+			}
+		}
+	}
+	return "", "", false
 }
 
 func domainOf(u string) string {

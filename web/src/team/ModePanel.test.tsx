@@ -43,6 +43,7 @@ describe("operating mode", () => {
     // existing — that gate is what used to force a second account for the
     // operator, under a name they could not even reuse.
     const select = await screen.findByLabelText("Operating mode");
+    expect(select).toHaveValue("personal");
     expect(select.querySelector('option[value="team"]')).not.toBeDisabled();
     expect(
       screen.getByText(/creates the owner from the deployment administrator/i),

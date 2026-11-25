@@ -65,7 +65,7 @@ export function UsersLayout({ request }: { request: TeamRequest }) {
       show_routing: true,
     },
   };
-  // Before team mode is enabled, member and policy endpoints are intentionally
+  // Before team mode is enabled, member and group endpoints are intentionally
   // not mounted. The owner can still enable the module here without restoring
   // an Overview item to the left navigation.
   if (!enabled) {
@@ -90,6 +90,7 @@ export function UsersLayout({ request }: { request: TeamRequest }) {
       className="team-surface"
       title={t("team")}
       description={t("teamDescription")}
+      hideHeading
     >
       <Outlet
         context={

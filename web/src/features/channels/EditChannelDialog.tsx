@@ -2,7 +2,6 @@ import { ChevronDown, ExternalLink, FlaskConical, RefreshCw } from "lucide-react
 import { useMemo } from "react";
 import { Button as HeroButton } from "@heroui/react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type { Channel, RouteOverview, Site } from "../../api/types";
@@ -10,9 +9,6 @@ import { parseCredentialMeta } from "../credentialMeta";
 import { Drawer } from "../../components/Drawer";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { Button, ErrorState, Field, InfoTip } from "../../components/ui";
-import { useAdminMutation } from "../../hooks/useAdminMutation";
-import { useAutomationMaster } from "../../hooks/useAutomationMaster";
-import { useToast } from "../../toast";
 import { useI18n } from "../../i18n";
 import { formatCost, formatTokens } from "../../lib/format";
 import {
@@ -43,7 +39,6 @@ export function EditChannelDialog({
   credentials,
   credential,
   userCredential,
-  checkinSupported,
   pending,
   error,
   onClose,
@@ -84,7 +79,6 @@ export function EditChannelDialog({
     checkin_enabled: boolean;
     meta_json?: string;
   };
-  checkinSupported?: boolean;
   pending: boolean;
   error: unknown;
   onClose: () => void;
@@ -136,15 +130,12 @@ export function EditChannelDialog({
     usage_limit_tokens?: number;
     userToken: string;
     userCookie: string;
-    /** New-API family numeric user id (`New-Api-User`). Empty = unknown. */
-    userID: string;
     apiKey: string;
   }) => void;
   onManageModels?: () => void;
   onManageKeys?: () => void;
 }) {
   const { t } = useI18n();
-  const toast = useToast();
   const inheritedBase = !value.base_url.trim();
   const initialBase = value.base_url || site?.base_url || "";
   const [name, setName] = useState(value.name);
@@ -243,34 +234,9 @@ export function EditChannelDialog({
     seededCredentialId.current = userCredential.id;
     setUserToken(userCredential.has_secret ? SECRET_MASK : "");
     setUserCookie(userCredential.has_cookie ? SECRET_MASK : "");
-    setCheckinOn(userCredential.checkin_enabled);
-    setUserID(String(parseCredentialMeta(userCredential.meta_json).platform_user_id ?? ""));
   }, [userCredential]);
-  // New-API family numeric user id. It is derivable from the account token
-  // (/api/user/self) but a fork may gate that endpoint behind the very header
-  // derived from this id, so it has to be enterable by hand.
-  const [userID, setUserID] = useState(
-    userCredential?.meta_json
-      ? String(parseCredentialMeta(userCredential.meta_json).platform_user_id ?? "")
-      : "",
-  );
-  // Keep the scheduled-switch in sync when the overview credential loads.
-  const [checkinOn, setCheckinOn] = useState(userCredential?.checkin_enabled ?? false);
-  // Keep the in-dialog switch in sync when the overview credential loads.
-  useEffect(() => {
-    if (userCredential?.id != null) {
-      setCheckinOn(userCredential.checkin_enabled);
-    }
-  }, [userCredential?.id, userCredential?.checkin_enabled]);
-  // The credential fields live behind "Show advanced". A connection that has a
-  // user credential but no user id cannot check in, and the badge that says so
-  // must lead somewhere visible: open the section automatically. Only once —
-  // an operator who collapses it again keeps it collapsed.
-  //
-  // The section holds what actually changes forwarding (payload rules, header
-  // overrides, retry, the endpoint mapping), so "collapsed" must not read as
-  // "nothing configured": the toggle carries a configured-count badge, and a
-  // channel that already has such values opens the section on first view.
+  // The section holds the settings that change forwarding. Check-in credentials
+  // and scheduling are configured in their own focused dialog.
   const advancedConfigured = [
     priority !== 0 || weight !== 100 ? t("channels.advRouting") : "",
     maxReasoningEffort ? t("channels.maxReasoningEffort") : "",
@@ -290,7 +256,6 @@ export function EditChannelDialog({
     userCredential?.has_secret || userCredential?.has_cookie || userCredential?.id
       ? t("channels.advUserCredential")
       : "",
-    checkinOn ? t("channels.checkinSection") : "",
   ].filter(Boolean);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(
     () => readAdvancedOpen() ?? advancedConfigured.length > 0,
@@ -301,26 +266,7 @@ export function EditChannelDialog({
       return !open;
     });
   const [testOpen, setTestOpen] = useState(false);
-  const userIDInvalid = userID !== "" && !/^[0-9]+$/.test(userID);
-  const userIDMissing = Boolean(userCredential?.id) && userID === "";
-  const autoOpenedForMissingUserID = useRef(false);
-  useEffect(() => {
-    if (autoOpenedForMissingUserID.current || !userIDMissing) return;
-    autoOpenedForMissingUserID.current = true;
-    setShowAdvanced(true);
-  }, [userIDMissing]);
-  // The numeric New-API user id only means something for New-API family sites
-  // (the "both" surface), or when one is already stored and must stay editable.
-  const userIDPersistable =
-    Boolean(userCredential?.id) ||
-    (userToken !== "" && userToken !== SECRET_MASK) ||
-    (userCookie !== "" && userCookie !== SECRET_MASK);
-  const showUserIDField =
-    authFields === "both" || Boolean(userCredential?.meta_json?.includes("platform_user_id"));
-  // A typed id with nothing to attach it to would be dropped on save; say so
-  // instead of losing it silently.
-  const userIDNeedsCredential = showUserIDField && !userIDPersistable && userID !== "";
-  const canSubmit = Boolean(name.trim() && baseUrl.trim()) && !userIDInvalid;
+  const canSubmit = Boolean(name.trim() && baseUrl.trim());
   const apiKeys = credentials.filter((item) => item.kind === "api_key");
   const service = api(useSession().client!);
   const discovered = useQuery({
@@ -328,22 +274,6 @@ export function EditChannelDialog({
     queryFn: ({ signal }) => service.discoveredModels(value.id, signal),
   });
   const editModels = discovered.data ?? [];
-  const checkinMaster = useAutomationMaster("checkin_enabled");
-  const toggleCheckin = useAdminMutation({
-    mutationFn: async (next: boolean) => {
-      if (!userCredential?.id) {
-        throw new Error(t("channels.checkinNeedsUserCredential"));
-      }
-      const result = await service.setCheckin(userCredential.id, next);
-      // "Scheduled" while the console's scheduler is off means never checked in:
-      // turn the master on too, and say so.
-      if (next && (await checkinMaster.enable())) {
-        toast.push({ tone: "success", message: t("channels.checkinMasterAutoOn") });
-      }
-      return result;
-    },
-    invalidateKeys: [["credentials"], ["channel-overviews"], ["runtime-settings"]],
-  });
   const aliasOf = (realModel: string) =>
     routeOverviews?.find((overview) => {
       const onChannel = (overview.members ?? []).some(
@@ -435,7 +365,6 @@ export function EditChannelDialog({
                   usage_limit_tokens: usageLimitTokens,
                   userToken,
                   userCookie,
-                  userID,
                   apiKey: "",
                 })
               }
@@ -691,83 +620,7 @@ export function EditChannelDialog({
                       />
                     </Field>
                   ) : null}
-                  {showUserIDField ? (
-                    // Sits with the credential it is stored on: the numeric id
-                    // lives in the user credential's meta_json.
-                    <Field
-                      label={t("channels.userID")}
-                      hint={
-                        userIDNeedsCredential
-                          ? t("channels.userIDNeedsCredentialHint")
-                          : userIDMissing
-                            ? t("channels.userIDNeededHint")
-                            : t("channels.userIDHint")
-                      }
-                      className={userIDInvalid ? "is-invalid" : undefined}
-                    >
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={userID}
-                        onChange={(e) => setUserID(e.target.value.trim())}
-                        placeholder={t("channels.userIDPlaceholder")}
-                        disabled={pending}
-                      />
-                      {userIDInvalid ? (
-                        <p className="ua-preset-error">{t("channels.userIDInvalid")}</p>
-                      ) : null}
-                      {userIDNeedsCredential ? (
-                        <p className="ua-preset-error">{t("channels.userIDNeedsCredential")}</p>
-                      ) : null}
-                    </Field>
-                  ) : null}
                 </div>
-              ) : null}
-              {/* Check-in acts on the user credential, so it lives with the
-                credential fields instead of as a standalone section in the main
-                form. It only exists for site families that actually expose a
-                check-in API — the backend profile says so per channel via
-                checkin_supported, so a provider without one now shows nothing
-                at all rather than a permanent explanatory block. */}
-              {checkinSupported ? (
-                <section
-                  className="detail-section connection-subpanel"
-                  aria-label={t("channels.checkinSection")}
-                >
-                  <div className="detail-section-head">
-                    <h3>{t("channels.checkinSection")}</h3>
-                    <Link className="detail-section-expand" to="/checkins">
-                      {t("channels.checkinLogs")}
-                    </Link>
-                  </div>
-                  {!userCredential?.id ? (
-                    <p className="detail-section-empty is-quiet">
-                      {t("channels.checkinNeedsUserCredential")}
-                    </p>
-                  ) : (
-                    <>
-                      <label className="check is-spaced">
-                        <input
-                          type="checkbox"
-                          checked={checkinOn}
-                          disabled={pending || toggleCheckin.isPending}
-                          onChange={(e) => {
-                            const next = e.target.checked;
-                            setCheckinOn(next);
-                            toggleCheckin.mutate(next);
-                          }}
-                        />
-                        <span>{t("channels.checkinEnable")}</span>
-                      </label>
-                      <p className="detail-section-empty is-quiet">
-                        {checkinOn
-                          ? t("channels.checkinScheduledHint")
-                          : t("channels.checkinOffHint")}
-                      </p>
-                    </>
-                  )}
-                  {toggleCheckin.isError ? <ErrorState error={toggleCheckin.error} /> : null}
-                </section>
               ) : null}
               <div className="form-grid">
                 <Field label={t("common.priority")} hint={t("channels.priorityHint")}>

@@ -161,17 +161,35 @@ describe("scheduled check-in panel", () => {
   it("filters logs by site, local date, and translated status", async () => {
     const { logQueries } = setup(settings({}));
     const siteFilter = await screen.findByLabelText("站点筛选");
-    const dateFilter = screen.getByLabelText("签到日期") as HTMLInputElement;
+    const dateGroup = screen.getByRole("group", { name: "签到日期" });
     const statusFilter = screen.getByLabelText("状态筛选");
 
-    expect(dateFilter.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    for (const [segmentType, value] of [
+      ["month", "10"],
+      ["day", "15"],
+      ["year", "2026"],
+    ] as [string, string][]) {
+      const segment = dateGroup.querySelector<HTMLElement>(`[data-type="${segmentType}"]`);
+      expect(segment).not.toBeNull();
+      segment!.focus();
+      for (const digit of value) {
+        fireEvent(
+          segment!,
+          new InputEvent("beforeinput", {
+            bubbles: true,
+            cancelable: true,
+            inputType: "insertText",
+            data: digit,
+          }),
+        );
+      }
+    }
     expect(screen.getByRole("option", { name: "成功" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "失败" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "已跳过" })).toBeInTheDocument();
     expect(await screen.findByRole("option", { name: "示例站点" })).toBeInTheDocument();
 
     fireEvent.change(siteFilter, { target: { value: "7" } });
-    fireEvent.change(dateFilter, { target: { value: "2026-10-15" } });
     fireEvent.change(statusFilter, { target: { value: "failed" } });
 
     await waitFor(() => {

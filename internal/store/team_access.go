@@ -14,33 +14,52 @@ func (s *DownstreamKeyStore) ResolveTeamAccess(key *domain.DownstreamKey) (*doma
 	if key.UserID == 0 {
 		return nil, nil
 	}
-	var models, members string
-	var all, canRoute int
-	var canConfigure bool
+	var canRoute int
+	var canConfigure int
 	var preferencesJSON string
 	a := &domain.TeamAccess{UserID: key.UserID, MemberIDs: make(map[int64]bool)}
-	err := s.db.QueryRow(`SELECT p.models_json, p.members_json, p.all_models, p.rpm, p.allow_routing,p.allow_request_preferences,u.preferences_json,u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost
-		FROM team_users u JOIN team_policies p ON p.id=u.policy_id JOIN team_settings s ON s.id=1
+	err := s.db.QueryRow(`SELECT u.rpm,u.allow_routing,u.allow_request_preferences,u.preferences_json,u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost
+		FROM team_users u JOIN team_settings s ON s.id=1
 		WHERE u.id=? AND u.status='active' AND s.mode='team'`, key.UserID).
-		Scan(&models, &members, &all, &a.RPM, &canRoute, &canConfigure, &preferencesJSON, &a.QuotaTotalTokens, &a.QuotaUsedTokens, &a.QuotaTotalCost, &a.QuotaUsedCost)
+		Scan(&a.RPM, &canRoute, &canConfigure, &preferencesJSON, &a.QuotaTotalTokens, &a.QuotaUsedTokens, &a.QuotaTotalCost, &a.QuotaUsedCost)
 	if err != nil {
 		return nil, errors.New("team access unavailable")
 	}
-	var ids []int64
-	if json.Unmarshal([]byte(models), &a.Models) != nil || json.Unmarshal([]byte(members), &ids) != nil {
+	a.AllowRouting = canRoute != 0
+	a.AllowRequestPreferences = canConfigure != 0
+	// 多个授权分组采用并集：任一分组允许的模型或渠道即属于账户权限。
+	rows, err := s.db.Query(`SELECT p.models_json,p.members_json,p.all_models FROM team_policies p
+		JOIN team_user_policies up ON up.policy_id=p.id WHERE up.user_id=? ORDER BY p.id`, key.UserID)
+	if err != nil {
 		return nil, errors.New("invalid team policy")
 	}
-	a.AllModels = all != 0
-	if canConfigure {
+	for rows.Next() {
+		var models, members string
+		var all int
+		var groupModels []string
+		var ids []int64
+		if rows.Scan(&models, &members, &all) != nil || json.Unmarshal([]byte(models), &groupModels) != nil || json.Unmarshal([]byte(members), &ids) != nil {
+			rows.Close()
+			return nil, errors.New("invalid team policy")
+		}
+		a.AllModels = a.AllModels || all != 0
+		a.Models = append(a.Models, groupModels...)
+		for _, id := range ids {
+			a.MemberIDs[id] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, errors.New("invalid team policy")
+	}
+	rows.Close()
+	if canConfigure != 0 {
 		var preferences domain.UserRequestPreferences
 		if json.Unmarshal([]byte(preferencesJSON), &preferences) != nil || !preferences.Valid() {
 			return nil, errors.New("invalid user request preferences")
 		}
 		a.DisableFailover = preferences.Failover == "off"
 		a.RetryLimit = preferences.MaxRetries
-	}
-	for _, id := range ids {
-		a.MemberIDs[id] = true
 	}
 	planID := key.TeamPlanID
 	implicit := planID == 0

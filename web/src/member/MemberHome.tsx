@@ -59,10 +59,10 @@ export function MemberHome() {
         <p className="member-home-meta">
           <span className="member-home-chip">{data.branding.name}</span>
           <span className="member-home-chip">
-            {t("member.home.planLabel")} · {data.policy.name}
+            {t("authorizationGroups")} · {data.policies.map((policy) => policy.name).join(", ")}
           </span>
           <span className="member-home-chip">
-            {t("member.home.limits", { rpm: data.policy.rpm, keys: data.policy.max_keys })}
+            {t("member.home.limits", { rpm: data.user.rpm, keys: data.user.max_keys })}
           </span>
         </p>
         <div className="member-home-endpoint">

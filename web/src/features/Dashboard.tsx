@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button as HeroButton } from "@heroui/react";
@@ -35,7 +35,6 @@ import { HourlyTrafficChart } from "../components/charts";
 import { Button, Page, Panel } from "../components/ui";
 import { formatCost, formatLatency, formatTokens, relativeTime } from "../lib/format";
 import { channelHealthState } from "./channelHealth";
-import { DashboardAura } from "../components/DashboardAura";
 import { MemberHome } from "../member/MemberHome";
 import { SiteNewsPanel } from "./SiteNewsPanel";
 
@@ -324,6 +323,7 @@ export function DashboardView({
   const rangeSummary = useQuery({
     queryKey: ["usage-summary", "range", { since: range.since, until: range.until }],
     queryFn: ({ signal }) => source.summary({ since: range.since, until: range.until }, signal),
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   });
   // The equal-length window immediately before, for an honest trend badge.
@@ -338,6 +338,7 @@ export function DashboardView({
         signal,
       );
     },
+    placeholderData: keepPreviousData,
     refetchInterval: 60_000,
   });
   const zoomSummary = useQuery({
@@ -356,12 +357,14 @@ export function DashboardView({
       zoom
         ? source.series({ since: zoom.since, until: zoom.until, buckets: 12 }, signal)
         : source.series({ since: range.since, until: range.until, buckets: 48 }, signal),
+    placeholderData: keepPreviousData,
     refetchInterval: zoom ? false : 30_000,
   });
   const topModels = useQuery({
     queryKey: ["usage-top-models", { since: range.since, until: range.until }],
     queryFn: ({ signal }) =>
       source.topModels({ since: range.since, until: range.until, limit: 6 }, signal),
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
   });
   const channels = useQuery({
@@ -376,6 +379,7 @@ export function DashboardView({
     queryKey: ["proxy-logs", { limit: 8, since: range.since, until: range.until }],
     queryFn: ({ signal }) =>
       source.recent({ limit: 8, since: range.since, until: range.until }, signal),
+    placeholderData: keepPreviousData,
     refetchInterval: 15_000,
   });
 
@@ -456,7 +460,6 @@ export function DashboardView({
       // promise it: the panel is not its to show (see DashboardCapabilities).
       description={caps.channels ? t("dashboard.description") : t("dashboard.descriptionMember")}
     >
-      <DashboardAura />
       <div className="cockpit-stack">
         {/* The member's own band answers "where do I connect, what is left, what
             next" in one place; the endpoint strip below it is the operator's

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/lan/meta-gateway/internal/checkin"
@@ -501,6 +502,18 @@ func (h *CheckinHandler) listLogs(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	since, ok := optionalCheckinTimeQuery(w, query.Get("since"), "since")
+	if !ok {
+		return
+	}
+	until, ok := optionalCheckinTimeQuery(w, query.Get("until"), "until")
+	if !ok {
+		return
+	}
+	if since != nil && until != nil && !since.Before(*until) {
+		writeError(w, http.StatusBadRequest, "since must be before until")
+		return
+	}
 	status := query.Get("status")
 	if status != "" && status != checkin.StatusSuccess && status != checkin.StatusFailed && status != checkin.StatusSkipped {
 		writeError(w, http.StatusBadRequest, "invalid status")
@@ -516,6 +529,8 @@ func (h *CheckinHandler) listLogs(w http.ResponseWriter, r *http.Request) {
 		SiteID:       siteID,
 		Status:       status,
 		Source:       source,
+		Since:        since,
+		Until:        until,
 		Limit:        limit,
 	})
 	if err != nil {
@@ -523,6 +538,20 @@ func (h *CheckinHandler) listLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, logs)
+}
+
+// optionalCheckinTimeQuery 将可选的 RFC3339 查询值解析为 UTC 时间。
+func optionalCheckinTimeQuery(w http.ResponseWriter, raw, name string) (*time.Time, bool) {
+	if raw == "" {
+		return nil, true
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, raw)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, name+" must be an RFC3339 timestamp")
+		return nil, false
+	}
+	parsed = parsed.UTC()
+	return &parsed, true
 }
 
 func (h *CheckinHandler) setCredentialEnabled(w http.ResponseWriter, r *http.Request) {

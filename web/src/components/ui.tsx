@@ -130,6 +130,7 @@ export function Page({
   as: Tag = "main",
   title,
   description,
+  hideHeading = false,
   actions,
   children,
   className = "",
@@ -137,6 +138,7 @@ export function Page({
   as?: "main" | "section";
   title: string;
   description: string;
+  hideHeading?: boolean;
   actions?: ReactNode;
   className?: string;
   children: ReactNode;
@@ -145,11 +147,13 @@ export function Page({
   return (
     <PageActionHost.Provider value={actionHost}>
       <Tag className={`page ${className}`.trim()}>
-        <header className="page-header">
-          <div className="page-heading">
-            <h1>{title}</h1>
-            <p>{description}</p>
-          </div>
+        <header className={`page-header${hideHeading ? " page-header--actions-only" : ""}`}>
+          {hideHeading ? null : (
+            <div className="page-heading">
+              <h1>{title}</h1>
+              <p>{description}</p>
+            </div>
+          )}
           <div className="toolbar page-actions" ref={setActionHost}>
             {actions}
           </div>
@@ -288,15 +292,21 @@ export function Dialog({
   children,
   onClose,
   actions,
+  className,
+  closeAction,
   danger = false,
   busy = false,
+  preventBackdropDismiss = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   actions?: ReactNode;
+  className?: string;
+  closeAction?: ReactNode;
   danger?: boolean;
   busy?: boolean;
+  preventBackdropDismiss?: boolean;
 }) {
   const { t } = useI18n();
   const titleId = useId();
@@ -324,12 +334,12 @@ export function Dialog({
       <HeroModal.Backdrop
         ref={dialogRef}
         className="dialog-backdrop"
-        isDismissable={!busy}
+        isDismissable={!busy && !preventBackdropDismiss}
         isKeyboardDismissDisabled
       >
         <HeroModal.Container>
           <HeroModal.Dialog
-            className="dialog"
+            className={["dialog", className].filter(Boolean).join(" ")}
             aria-labelledby={titleId}
             aria-busy={busy || undefined}
           >
@@ -338,9 +348,11 @@ export function Dialog({
                 {danger && <AlertTriangle size={18} />}
                 <HeroModal.Heading id={titleId}>{title}</HeroModal.Heading>
               </div>
-              <IconButton label={t("common.close")} onClick={state.close} disabled={busy}>
-                <X size={18} />
-              </IconButton>
+              {closeAction ?? (
+                <IconButton label={t("common.close")} onClick={state.close} disabled={busy}>
+                  <X size={18} />
+                </IconButton>
+              )}
             </HeroModal.Header>
             <HeroModal.Body className="dialog-body">
               <fieldset className="overlay-fields" disabled={busy}>
@@ -673,14 +685,17 @@ export function Tabs({
   items,
   active,
   onChange,
+  className = "",
 }: {
   items: Array<{ value: string; label: string; icon?: ReactNode }>;
   active: string;
   onChange: (value: string) => void;
+  className?: string;
 }) {
   return (
     <HeroTabs
-      className="hero-tabs"
+      className={`hero-tabs ${className}`.trim()}
+      orientation="horizontal"
       selectedKey={active}
       onSelectionChange={(key) => onChange(String(key))}
     >

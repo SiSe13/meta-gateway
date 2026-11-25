@@ -19,15 +19,15 @@ export function ConsoleShell({
   activeTopNavigation = "",
   onSelectTopNavigation = () => {},
   showAdminAccount = false,
+  showMemberAccount = false,
+  onOpenAdminAccount = () => {},
   appearanceHiddenNav = [],
   version,
   theme,
   onThemeChange,
-  onSearch,
   onDisconnect,
   health,
   update,
-  background,
   appearance = "metapi",
 }: {
   children: ReactNode;
@@ -37,30 +37,20 @@ export function ConsoleShell({
   activeTopNavigation?: string;
   onSelectTopNavigation?: (to: string) => void;
   showAdminAccount?: boolean;
+  showMemberAccount?: boolean;
+  onOpenAdminAccount?: () => void;
   appearanceHiddenNav?: string[];
   version: string;
   theme: "light" | "dark";
   onThemeChange: () => void;
-  onSearch: () => void;
   onDisconnect: () => void;
   health: { healthy: number; total: number; loading: boolean; available?: boolean };
   update?: UpdateCheckStatus;
-  background?: string;
 }) {
   const { t } = useI18n();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const currentSection = sections.find((section) =>
-    section.items.some((item) => {
-      const path = item.to.split("?", 1)[0] ?? "/";
-      return path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
-    }),
-  );
-  const current = currentSection?.items.find((item) => {
-    const path = item.to.split("?", 1)[0] ?? "/";
-    return path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
-  });
   const Chrome = UI_THEMES[appearance].Chrome;
   const tone =
     health.total === 0
@@ -74,6 +64,10 @@ export function ConsoleShell({
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname, location.search]);
+
+  const observationView =
+    location.pathname === "/channels" &&
+    new URLSearchParams(location.search).get("view") === "observations";
 
   // 桌面端在顶栏切换工作区，移动端在抽屉顶部提供同一组入口。
   const mobileTopNavigation = (
@@ -102,7 +96,6 @@ export function ConsoleShell({
           .filter((section) => section.items.length)
           .map((section) => (
             <div className="console-nav-group" key={section.label}>
-              <span className="console-nav-caption">{section.label}</span>
               {section.items.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -127,24 +120,21 @@ export function ConsoleShell({
 
   return (
     <div
-      className={`console-shell theme-shell theme-${appearance}${collapsed ? " is-collapsed" : ""}`}
+      className={`console-shell theme-shell theme-${appearance}${collapsed ? " is-collapsed" : ""}${observationView ? " is-observation-view" : ""}`}
     >
-      <div
-        className="console-atmosphere"
-        aria-hidden="true"
-        style={background ? { backgroundImage: `url("${background}")` } : undefined}
-      />
+      <div className="console-atmosphere" aria-hidden="true" />
       <Chrome
         navigation={navigation()}
         topNavigation={topNavigation}
         activeTopNavigation={activeTopNavigation}
         showAdminAccount={showAdminAccount}
+        showMemberAccount={showMemberAccount}
+        onOpenAdminAccount={onOpenAdminAccount}
         appearanceHiddenNav={appearanceHiddenNav}
         sections={sections}
         version={version}
         theme={theme}
         onThemeChange={onThemeChange}
-        onSearch={onSearch}
         onDisconnect={onDisconnect}
         health={health}
         tone={tone}
@@ -153,8 +143,6 @@ export function ConsoleShell({
         onCollapse={() => setCollapsed(!collapsed)}
         onOpenNav={() => setMobileOpen(true)}
         onSelectTopNavigation={onSelectTopNavigation}
-        sectionLabel={currentSection?.label ?? t("shell.workspace")}
-        pageLabel={current?.label ?? t("shell.workspace")}
       />
       <div className="console-main">
         <div className="console-content" id="console-workspace">

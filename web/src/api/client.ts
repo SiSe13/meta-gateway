@@ -985,7 +985,10 @@ export const api = (client: ApiClient) => ({
       }>;
     }>("/admin/channels/account/probe-all"),
   finance: (signal?: AbortSignal) =>
-    client.get<{ items: FinanceItem[] }>("/admin/channels/account/finance", signal),
+    client.get<{ items: FinanceItem[]; refreshing?: boolean }>(
+      "/admin/channels/account/finance",
+      signal,
+    ),
   modelBlocks: (signal?: AbortSignal) =>
     client.get<{
       items: Array<{

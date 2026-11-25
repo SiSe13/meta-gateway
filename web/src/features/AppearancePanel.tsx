@@ -1,7 +1,7 @@
-import { Check, Download, Languages, Moon, RotateCcw, Search, Sun } from "lucide-react";
+import { Check, Download, Languages, Moon, RotateCcw, Sun } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Button as HeroButton, Switch as HeroSwitch } from "@heroui/react";
+import { Button as HeroButton } from "@heroui/react";
 import { api } from "../api/client";
 import { Button, Field } from "../components/ui";
 import { formatErrorMessage } from "../formatError";
@@ -28,7 +28,6 @@ import {
 // One glyph per entry, so the picker reads as a picture of the chrome it is
 // configuring rather than a list of ids.
 const CONTROL_ICONS: Record<TopBarControlId, ReactNode> = {
-  search: <Search size={16} />,
   update: <Download size={16} />,
   theme: <Moon size={16} />,
   language: <Languages size={16} />,
@@ -200,15 +199,16 @@ export function AppearancePanel({
         <legend>{t("appearance.mode")}</legend>
         <div className="appearance-scheme-control">
           <Sun size={17} aria-hidden="true" />
-          <HeroSwitch
-            isSelected={scheme === "dark"}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={scheme === "dark"}
             aria-label={t("appearance.mode")}
-            onChange={(selected) => setScheme(selected ? "dark" : "light")}
+            className="appearance-switch"
+            onClick={() => setScheme(scheme === "dark" ? "light" : "dark")}
           >
-            <HeroSwitch.Content className="appearance-switch">
-              <span />
-            </HeroSwitch.Content>
-          </HeroSwitch>
+            <span />
+          </button>
           <Moon size={17} aria-hidden="true" />
         </div>
       </fieldset>

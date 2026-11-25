@@ -40,9 +40,17 @@ describe("chrome preferences", () => {
 
   it("restores every entry on reset", () => {
     setNavVisible("/workbench", false);
-    setTopBarControl("search", false);
+    setTopBarControl("theme", false);
     resetChromePrefs();
     expect(readChromePrefs()).toEqual(defaultChromePrefs());
+  });
+
+  it("ignores the retired search control from saved preferences", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      `{"controls":{"search":false,"update":false},"hiddenNav":[]}`,
+    );
+    expect(readChromePrefs().controls).toEqual({ update: false, theme: true, language: true });
   });
 
   it("ignores a hand-edited value instead of throwing", () => {
@@ -79,7 +87,6 @@ describe("chrome preferences", () => {
     const prefs = readChromePrefs();
     expect(prefs.hiddenNav).toEqual(["/checkins"]);
     expect(prefs.controls).toEqual({
-      search: true,
       update: true,
       theme: false,
       language: true,

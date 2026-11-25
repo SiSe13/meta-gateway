@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode, Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import { BrandMark } from "./BrandMark";
 
 /**
@@ -12,7 +12,7 @@ import { BrandMark } from "./BrandMark";
  * and the controls in the top-right corner.
  *
  * This component is visual only. The unified console owns authentication,
- * TOTP, background preferences and the same entrance sequence for every role.
+ * TOTP and the same entrance sequence for every role.
  */
 export function LoginShell({
   tools,
@@ -26,9 +26,8 @@ export function LoginShell({
   rootRef,
   className,
   effects,
-  atmosphereStyle,
 }: {
-  /** Top-right controls (language, theme, background). */
+  /** Top-right controls (language and theme). */
   tools?: ReactNode;
   /** The small label above the headline, e.g. "Workspace". */
   edition: string;
@@ -47,12 +46,10 @@ export function LoginShell({
   className?: string;
   /** Decoration painted above the atmosphere — the console's canvas. */
   effects?: ReactNode;
-  /** Inline style for the atmosphere (the console's background image). */
-  atmosphereStyle?: CSSProperties;
 }) {
   return (
     <div ref={rootRef} className={"login-page login-motion" + (className ? " " + className : "")}>
-      <div className="login-atmosphere" aria-hidden="true" style={atmosphereStyle} />
+      <div className="login-atmosphere" aria-hidden="true" />
       {effects}
       <div className="login-light-ribbons" aria-hidden="true">
         <i />

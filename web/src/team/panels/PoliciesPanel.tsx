@@ -15,28 +15,17 @@ import { useTeamMutation } from "../useTeamMutation";
 import { useUsers } from "../UsersContext";
 import type { Candidate, Policy } from "../types";
 
-/** A brand new policy's defaults, matching what the server accepts. */
+/** 新建授权分组的默认值，与服务端校验保持一致。 */
 const EMPTY_POLICY: Policy = {
   id: 0,
   name: "",
   models: [],
   member_ids: [],
   all_models: false,
-  max_keys: 5,
-  rpm: 60,
-  allow_routing: false,
-  allow_request_preferences: false,
+  user_count: 0,
 };
-
 /**
- * Access policies: which models a member may call, which upstream members back
- * them, and the per-account limits (keys, requests per minute).
- *
- * A policy is the unit the operator assigns to a member, so this board is where
- * "what is this person allowed to do" is decided — the members board only picks
- * which policy applies. It reads as one panel of policies (the create action in
- * the panel header), and the editor is the console's own dialog rather than the
- * module's private one.
+ * 授权分组保存可调用模型与渠道范围；账户限制在成员详情中配置。
  */
 export function PoliciesPanel() {
   const { request, locale, t } = useUsers();
@@ -62,17 +51,17 @@ export function PoliciesPanel() {
         actions={<Button onClick={() => setEditing({ ...EMPTY_POLICY })}>{t("newPolicy")}</Button>}
       >
         <DataTable
-          headers={[t("name"), t("candidates"), t("maxKeys"), t("routing"), ""]}
+          headers={[t("name"), t("modelScope"), t("routeGrants"), t("assignedUsers"), ""]}
           empty={!policies.data?.length}
         >
           {policies.data?.map((p) => (
             <tr key={p.id}>
               <td>{p.name}</td>
-              <td>{p.member_ids.length}</td>
-              <td>{p.max_keys}</td>
               <td>
-                <StatusBadge value={p.allow_routing} />
+                {p.all_models ? t("allModelsShort") : `${p.models.length}${t("modelCountUnit")}`}
               </td>
+              <td>{`${p.member_ids.length}${t("routeGrantUnit")}`}</td>
+              <td>{`${p.user_count}${t("userCountUnit")}`}</td>
               <td className="row-actions">
                 <ActionMenu
                   compact
@@ -83,8 +72,7 @@ export function PoliciesPanel() {
                       label: t("edit"),
                       onSelect: () => setEditing(structuredClone(p)),
                     },
-                    // Policy #1 is the shipped default every member starts on;
-                    // deleting it would leave accounts pointing at nothing.
+                    // 默认授权分组供新成员使用；删除后会让账户失去默认分组。
                     ...(p.id === 1
                       ? []
                       : [
@@ -132,46 +120,6 @@ export function PoliciesPanel() {
                 onChange={(e) => setEditing({ ...editing, name: e.target.value })}
               />
             </Field>
-            <div className="meta-form">
-              <Field label={t("maxKeys")}>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  required
-                  value={editing.max_keys}
-                  onChange={(e) => setEditing({ ...editing, max_keys: Number(e.target.value) })}
-                />
-              </Field>
-              <Field label={t("rpm")}>
-                <input
-                  type="number"
-                  min={1}
-                  max={100000}
-                  required
-                  value={editing.rpm}
-                  onChange={(e) => setEditing({ ...editing, rpm: Number(e.target.value) })}
-                />
-              </Field>
-            </div>
-            <label className="check marginless">
-              <input
-                type="checkbox"
-                checked={editing.allow_routing}
-                onChange={(e) => setEditing({ ...editing, allow_routing: e.target.checked })}
-              />
-              <span>{t("routing")}</span>
-            </label>
-            <label className="check marginless">
-              <input
-                type="checkbox"
-                checked={editing.allow_request_preferences}
-                onChange={(e) =>
-                  setEditing({ ...editing, allow_request_preferences: e.target.checked })
-                }
-              />
-              <span>{t("allowRequestControls")}</span>
-            </label>
             <label className="check marginless">
               <input
                 type="checkbox"

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { ModelPicker } from "../../components/ModelPicker";
-import { SearchableSelect } from "../../components/SearchableSelect";
+import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
 import { Button, Dialog, ErrorState, Field, InfoTip } from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { PROVIDER_BASE_URLS } from "../../connectionTypes";
@@ -47,11 +47,13 @@ const PROTOCOL_TARGETS: Record<string, string> = {
 };
 
 export function AddChannelDialog({
+  existingGroups = [],
   pending,
   error,
   onClose,
   onSave,
 }: {
+  existingGroups?: string[];
   pending: boolean;
   error: unknown;
   onClose: () => void;
@@ -64,12 +66,16 @@ export function AddChannelDialog({
   const [baseUrl, setBaseUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [typeHint, setTypeHint] = useState("openai-compatible");
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
   // Whether the operator has stated the type themselves. Auto-detection only
   // fills the field while it is still untouched: the detector is a heuristic
   // (it reported `new-api` for Zhipu's URL on a bare `user-self-401` response),
   // so letting it overwrite an explicit pick silently reverted "智谱 GLM" back to
   // "New API" on blur — taking the correct preset base URL with it.
-  const [typeTouched, setTypeTouched] = useState(false);
+  // Use a ref so an in-flight URL detection sees a manual selection made after
+  // blur. A state value captured by the promise callback can be stale and let
+  // the heuristic overwrite the operator's choice.
+  const typeTouched = useRef(false);
   const [groupName, setGroupName] = useState("default");
   const [showAdvanced, setShowAdvanced] = useState(false);
   // The endpoint the gateway would actually call for this base URL AND type.
@@ -99,6 +105,9 @@ export function AddChannelDialog({
 
   const canSubmit = Boolean(baseUrl.trim() && secret.trim());
   const canFetchModels = canSubmit && !pending && !fetchingModels;
+  const groupOptions: SelectOption[] = Array.from(
+    new Set(["default", ...existingGroups.map((group) => group.trim()).filter(Boolean)]),
+  ).map((group) => ({ value: group, label: group, group: "existing" }));
 
   // Re-resolved whenever either half of the answer changes: the base URL and
   // the type are separate questions, and the preview is the join of the two.
@@ -200,9 +209,11 @@ export function AddChannelDialog({
 
   return (
     <Dialog
+      className="channels-add-dialog"
       title={t("channels.add")}
       onClose={onClose}
       busy={pending}
+      preventBackdropDismiss={typePickerOpen}
       actions={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
@@ -247,7 +258,7 @@ export function AddChannelDialog({
                 .then((detected) => {
                   // Never clobber an explicit choice: the operator picked a
                   // provider, and this heuristic has no authority over that.
-                  if (typeTouched) return;
+                  if (typeTouched.current) return;
                   if (detected.family && TYPE_OPTIONS.some((o) => o.value === detected.family)) {
                     setTypeHint(detected.family);
                     // Detection just changed which protocol the channel speaks.
@@ -326,19 +337,27 @@ export function AddChannelDialog({
                 return current;
               });
               setTypeHint(provider);
-              setTypeTouched(true);
+              typeTouched.current = true;
               refreshEndpointPreview(baseUrl, provider);
             }}
             disabled={pending}
             allowCustom
             placeholder={t("common.type")}
+            onOpenChange={setTypePickerOpen}
           />
         </Field>
         <Field label={t("channels.group")} hint={t("channels.groupHint")}>
-          <input
+          <SearchableSelect
+            options={groupOptions}
+            groups={["existing"]}
             value={groupName}
-            onChange={(event) => setGroupName(event.target.value)}
+            onChange={setGroupName}
             disabled={pending}
+            allowCustom
+            placeholder={t("channels.group")}
+            customLabel={t("channels.groupCustom")}
+            customPlaceholder={t("channels.groupCustomPlaceholder")}
+            ariaLabel={t("channels.group")}
           />
         </Field>
         <Field label={t("common.secret")} hint={secretHint || undefined}>

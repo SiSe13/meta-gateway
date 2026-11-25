@@ -43,6 +43,7 @@ export function SearchableSelect({
   disabled,
   groups,
   ariaLabel,
+  onOpenChange,
 }: {
   options: SelectOption[];
   value: string;
@@ -62,6 +63,8 @@ export function SearchableSelect({
    * a labelled form field ("Backend · OpenAI" never says it picks a model).
    */
   ariaLabel?: string;
+  /** Lets an owning modal treat the portaled picker as an active child overlay. */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { t } = useI18n();
   const listId = useId();
@@ -75,6 +78,7 @@ export function SearchableSelect({
   // and strand the IME (the "typing Chinese freezes the type picker" bug).
   const [searchVisible, setSearchVisible] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -109,18 +113,34 @@ export function SearchableSelect({
     setOpen(true);
   };
 
+  useLayoutEffect(() => {
+    // A portaled list rendered under body is outside HeroUI's modal focus scope
+    // and becomes inert. Portal into the active dialog so pointer selection and
+    // wheel scrolling are handled by the list instead of the modal backdrop.
+    const dialog = rootRef.current?.closest<HTMLElement>(
+      '[role="dialog"], [role="alertdialog"], .dialog, .drawer',
+    );
+    setPortalContainer(dialog ?? document.body);
+  }, []);
+
   const placePanel = () => {
     const anchor = triggerRef.current?.getBoundingClientRect();
     if (!anchor || !panelRef.current) return;
     const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
     const width = Math.min(Math.max(anchor.width, 240), viewportWidth - 16);
     const maxHeight = Math.min(400, window.innerHeight - 16);
-    const height = Math.min(panelRef.current.scrollHeight || 300, maxHeight);
+    // Constrain the flex panel to its measured content height. A max-height on
+    // its own does not create a scrollport, so the wheel can bubble to the
+    // dialog behind the portal and dismiss the picker while the list stays put.
+    const contentHeight =
+      panelRef.current.scrollHeight || panelRef.current.getBoundingClientRect().height || 300;
+    const height = Math.min(contentHeight, maxHeight);
     let top = anchor.bottom + 8;
     if (top + height > window.innerHeight - 8) top = anchor.top - height - 8;
     setPanelStyle({
       position: "fixed",
       width,
+      height,
       maxHeight,
       left: Math.max(8, Math.min(anchor.left, viewportWidth - width - 8)),
       top: Math.max(8, Math.min(top, window.innerHeight - height - 8)),
@@ -149,6 +169,10 @@ export function SearchableSelect({
       !options.some((option) => option.value === value && option.value !== "__custom__"));
 
   useEffect(() => {
+    onOpenChange?.(open);
+  }, [onOpenChange, open]);
+
+  useEffect(() => {
     if (!open) return;
     const unregister = registerOverlay(
       () => {
@@ -158,9 +182,10 @@ export function SearchableSelect({
       { modal: false, transient: true, element: panelRef.current },
     );
     const onPointerDown = (event: PointerEvent) => {
+      const path = event.composedPath();
       if (
-        rootRef.current?.contains(event.target as Node) ||
-        panelRef.current?.contains(event.target as Node)
+        (rootRef.current && path.includes(rootRef.current)) ||
+        (panelRef.current && path.includes(panelRef.current))
       )
         return;
       setOpen(false);
@@ -169,9 +194,12 @@ export function SearchableSelect({
       // Scrolls inside the open panel must not dismiss it (mouse wheel over
       // the option list otherwise closes the dropdown mid-selection).
       const target = event.target as Node | null;
+      const path = event.composedPath();
       if (
-        target instanceof Node &&
-        (rootRef.current?.contains(target) || panelRef.current?.contains(target))
+        (target instanceof Node &&
+          (rootRef.current?.contains(target) || panelRef.current?.contains(target))) ||
+        (rootRef.current && path.includes(rootRef.current)) ||
+        (panelRef.current && path.includes(panelRef.current))
       )
         return;
       if (event.type === "resize") {
@@ -451,7 +479,7 @@ export function SearchableSelect({
                 ) : null}
               </div>
             </div>,
-            document.body,
+            portalContainer ?? document.body,
           )
         : null}
     </div>

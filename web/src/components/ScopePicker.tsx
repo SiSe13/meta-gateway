@@ -40,7 +40,9 @@ export function ScopePicker({
   const rootRef = useRef<HTMLDivElement>(null);
   const [panelStyle, setPanelStyle] = useState<CSSProperties | null>(null);
   const selectedSet = new Set(value);
-  const display = value.length > 0 ? value.join(", ") : "relay";
+  const display = (value.length > 0 ? value : ["relay"])
+    .map((scope) => t(`keys.scope.${scope}`))
+    .join("、");
 
   const openPanel = () => {
     const trigger = rootRef.current?.querySelector<HTMLElement>(".scope-picker-trigger");

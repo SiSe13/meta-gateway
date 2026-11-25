@@ -132,7 +132,7 @@ func TestTeamCreditCodeRedemption(t *testing.T) {
 	alice := e.member("alice", "member")
 
 	_, shared := mintCodes(t, e, map[string]any{"kind": "credit", "count": 1, "quota_tokens": 1000, "max_uses": 5})
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "P", Models: []string{}, MemberIDs: []int64{}, MaxKeys: 5, RPM: 120}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "P", Models: []string{}, MemberIDs: []int64{}}, 200)
 
 	raw := alice.request("POST", "/me/redeem", map[string]any{"code": shared[0]}, 200)
 	var first struct {
@@ -245,7 +245,7 @@ func TestTeamMemberAdministration(t *testing.T) {
 	b2.login("direct", made.Password)
 
 	// Bulk policy change applies to every selected account.
-	policiesRaw := e.admin("POST", "/admin/team/policies", TeamPolicy{Name: "Bulk", Models: []string{}, MemberIDs: []int64{}, MaxKeys: 3, RPM: 30}, 200)
+	policiesRaw := e.admin("POST", "/admin/team/policies", TeamPolicy{Name: "Bulk", Models: []string{}, MemberIDs: []int64{}}, 200)
 	var bulk TeamPolicy
 	json.Unmarshal(policiesRaw, &bulk)
 	e.admin("POST", "/admin/team/users/bulk", map[string]any{"ids": []int64{directID, takenID}, "action": "policy", "policy_id": bulk.ID}, 200)
@@ -369,7 +369,7 @@ func TestTeamAccountQuotaBlocksRelay(t *testing.T) {
 	channel, _ := e.db.Channel.Create(&domain.Channel{SiteID: &site, CredentialID: &cred, Name: "up", BaseURL: upstream.URL, TypeHint: "openai", Status: domain.StatusEnabled})
 	route, _ := e.db.Route.Create(&domain.Route{ModelPattern: "quota-model", Enabled: true})
 	member, _ := e.db.RouteMember.Create(&domain.RouteMember{RouteID: route, ChannelID: channel, Priority: 10, Weight: 100, Enabled: true})
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Q", Models: []string{"quota-model"}, MemberIDs: []int64{member}, MaxKeys: 5, RPM: 120}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Q", Models: []string{"quota-model"}, MemberIDs: []int64{member}}, 200)
 	alice := e.member("alice", "member")
 	_, token := alice.key("app")
 
@@ -419,7 +419,7 @@ func TestMoneyQuotaRefusesRelayAtEveryLevel(t *testing.T) {
 	if err := e.db.ModelMetadata.Upsert(&domain.ModelMetadata{ModelName: "cost-model", PricePromptPer1k: 1, PriceCompletionPer1k: 0}); err != nil {
 		t.Fatal(err)
 	}
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Cost", Models: []string{"cost-model"}, MemberIDs: []int64{member}, MaxKeys: 5, RPM: 120}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Cost", Models: []string{"cost-model"}, MemberIDs: []int64{member}}, 200)
 	alice := e.member("alice", "member")
 
 	// A key-level spend budget: the first call books 1.00 and stops the second.

@@ -1,18 +1,16 @@
 import {
   ChevronDown,
-  Command,
   LogOut,
   Menu,
   Moon,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
-  Search,
   Sun,
   UserRound,
 } from "lucide-react";
-import { useRef, useState } from "react";
-import { useNavigate, NavLink } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button as HeroButton, Dropdown, Label, Separator } from "@heroui/react";
 import { BrandMark } from "../../components/BrandMark";
 import { IconButton } from "../../components/ui";
@@ -23,17 +21,72 @@ import { LanguageSwitcher, useI18n } from "../../i18n";
 import { useTopBarControls } from "../../lib/topBar";
 import type { ThemeChromeProps } from "../types";
 
+type DicebearStyle =
+  | "pixel-art"
+  | "pixel-art-neutral"
+  | "bottts"
+  | "bottts-neutral"
+  | "identicon"
+  | "initials"
+  | "avataaars"
+  | "avataaars-neutral"
+  | "personas"
+  | "lorelei"
+  | "lorelei-neutral"
+  | "fun-emoji";
+type AvatarPreference = { seed: string; style: DicebearStyle };
+
+const DICEBEAR_STYLES: DicebearStyle[] = [
+  "pixel-art",
+  "pixel-art-neutral",
+  "bottts",
+  "bottts-neutral",
+  "identicon",
+  "initials",
+  "avataaars",
+  "avataaars-neutral",
+  "personas",
+  "lorelei",
+  "lorelei-neutral",
+  "fun-emoji",
+];
+
+// 每次进入控制台时生成新的头像种子。
+function createAvatarSeed() {
+  return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `seed-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// 将随机种子映射到头像风格，让头像同时改变种子与画风。
+function pickAvatarStyle(seed: string): DicebearStyle {
+  let hash = 0;
+  for (const char of seed) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  return DICEBEAR_STYLES[Math.abs(hash) % DICEBEAR_STYLES.length] ?? "pixel-art";
+}
+
+function createAvatarPreference(): AvatarPreference {
+  const seed = createAvatarSeed();
+  return { seed, style: pickAvatarStyle(seed) };
+}
+
+// 使用与 MetaAPI 相同的 Dicebear SVG 服务生成头像图像。
+function buildAvatarUrl({ seed, style }: AvatarPreference) {
+  return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+}
+
 /** 用 MetaAPI 式的顶栏与侧栏承载现有导航和工作区控制。 */
 export function MetapiChrome({
   navigation,
   topNavigation,
   activeTopNavigation,
   showAdminAccount,
+  showMemberAccount,
+  onOpenAdminAccount,
   appearanceHiddenNav,
   version,
   theme,
   onThemeChange,
-  onSearch,
   onDisconnect,
   health,
   tone,
@@ -42,15 +95,18 @@ export function MetapiChrome({
   onCollapse,
   onOpenNav,
   onSelectTopNavigation,
-  sectionLabel,
-  pageLabel,
 }: ThemeChromeProps) {
   const { t } = useI18n();
   const topBar = useTopBarControls();
+  const location = useLocation();
   const navigate = useNavigate();
   const [updateOpen, setUpdateOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement>(null);
+  const [avatar] = useState<AvatarPreference>(createAvatarPreference);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const observationView =
+    location.pathname === "/channels" &&
+    new URLSearchParams(location.search).get("view") === "observations";
 
   return (
     <>
@@ -64,16 +120,18 @@ export function MetapiChrome({
             <small>{t("shell.workspace")}</small>
           </span>
         </div>
-        <IconButton
-          className="console-mobile-trigger"
-          label={t("app.nav.open")}
-          onClick={onOpenNav}
-        >
-          <Menu size={19} />
-        </IconButton>
+        {observationView ? null : (
+          <IconButton
+            className="console-mobile-trigger"
+            label={t("app.nav.open")}
+            onClick={onOpenNav}
+          >
+            <Menu size={19} />
+          </IconButton>
+        )}
         <nav className="metapi-top-navigation" aria-label={t("app.topNav.ariaLabel")}>
           {topNavigation.map((item) => (
-            <NavLink
+            <Link
               key={item.id}
               to={item.to}
               className={item.id === activeTopNavigation ? "active" : ""}
@@ -84,13 +142,9 @@ export function MetapiChrome({
               }}
             >
               {item.label}
-            </NavLink>
+            </Link>
           ))}
         </nav>
-        <div className="console-breadcrumb">
-          <span>{sectionLabel}</span>
-          <strong>{pageLabel}</strong>
-        </div>
         <div className="console-global-actions">
           {topBar.update && update ? (
             <HeroButton
@@ -102,15 +156,6 @@ export function MetapiChrome({
               {t("app.updateAvailable", { version: update.latest })}
             </HeroButton>
           ) : null}
-          {topBar.search ? (
-            <IconButton
-              className="console-mobile-search"
-              label={t("command.placeholder")}
-              onClick={onSearch}
-            >
-              <Search size={17} />
-            </IconButton>
-          ) : null}
           {topBar.theme ? (
             <IconButton
               label={t(theme === "dark" ? "app.themeLight" : "app.themeDark")}
@@ -121,25 +166,33 @@ export function MetapiChrome({
           ) : null}
           {topBar.language ? <LanguageSwitcher className="console-language" /> : null}
           <span className="console-action-divider" />
-          <div className="metapi-profile" ref={profileRef}>
+          <div className="metapi-profile">
             <Dropdown>
               <Dropdown.Trigger className="metapi-avatar-trigger" aria-label={t("profile.menu")}>
                 <span className="metapi-avatar">
-                  <UserRound size={17} aria-hidden="true" />
+                  {avatarFailed ? (
+                    <UserRound size={19} aria-hidden="true" />
+                  ) : (
+                    <img
+                      className="metapi-avatar-image"
+                      src={buildAvatarUrl(avatar)}
+                      alt=""
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  )}
                 </span>
                 <ChevronDown size={13} aria-hidden="true" />
               </Dropdown.Trigger>
-              <Dropdown.Popover
-                className="metapi-profile-popover"
-                placement="bottom end"
-                UNSTABLE_portalContainer={profileRef.current ?? undefined}
-              >
+              <Dropdown.Popover className="metapi-profile-popover" placement="bottom end">
                 <Dropdown.Menu
                   aria-label={t("profile.menu")}
                   className="metapi-profile-menu-list"
                   onAction={(key) => {
                     if (key === "appearance") setAppearanceOpen(true);
-                    if (key === "account") navigate("/settings?tab=operator");
+                    if (key === "account") {
+                      if (showAdminAccount) onOpenAdminAccount();
+                      else navigate("/account");
+                    }
                     if (key === "logout") onDisconnect();
                   }}
                 >
@@ -147,10 +200,15 @@ export function MetapiChrome({
                     <Palette size={16} aria-hidden="true" />
                     <Label>{t("profile.appearance")}</Label>
                   </Dropdown.Item>
-                  {showAdminAccount ? (
-                    <Dropdown.Item id="account" textValue={t("profile.adminAccount")}>
+                  {showAdminAccount || showMemberAccount ? (
+                    <Dropdown.Item
+                      id="account"
+                      textValue={t(showAdminAccount ? "profile.adminAccount" : "profile.account")}
+                    >
                       <UserRound size={16} aria-hidden="true" />
-                      <Label>{t("profile.adminAccount")}</Label>
+                      <Label>
+                        {t(showAdminAccount ? "profile.adminAccount" : "profile.account")}
+                      </Label>
                     </Dropdown.Item>
                   ) : null}
                   <Separator className="metapi-profile-divider" />
@@ -167,45 +225,37 @@ export function MetapiChrome({
           <UpdateDialog update={update} onClose={() => setUpdateOpen(false)} />
         ) : null}
       </header>
-      <aside className="console-sidebar metapi-sidebar">
-        <HeroButton
-          variant="ghost"
-          className="console-search"
-          type="button"
-          aria-label={t("command.placeholder")}
-          onPress={onSearch}
-        >
-          <Search size={16} aria-hidden="true" />
-          <span>{t("shell.search")}</span>
-          <kbd>
-            <Command size={11} /> K
-          </kbd>
-        </HeroButton>
-        {navigation}
-        <div className="console-sidebar-foot">
-          {health.available !== false ? (
-            <div className={`console-health is-${tone}`} title={t("dashboard.healthyChannelsHint")}>
-              <span className="console-health-dot" />
-              <div>
-                <span>{t("shell.gatewayStatus")}</span>
-                <strong>
-                  {health.loading ? "—" : `${health.healthy} / ${health.total}`}{" "}
-                  <small>{t("dashboard.healthyChannels")}</small>
-                </strong>
+      {observationView ? null : (
+        <aside className="console-sidebar metapi-sidebar">
+          {navigation}
+          <div className="console-sidebar-foot">
+            {health.available !== false ? (
+              <div
+                className={`console-health is-${tone}`}
+                title={t("dashboard.healthyChannelsHint")}
+              >
+                <span className="console-health-dot" />
+                <div>
+                  <span>{t("shell.gatewayStatus")}</span>
+                  <strong>
+                    {health.loading ? "—" : `${health.healthy} / ${health.total}`}{" "}
+                    <small>{t("dashboard.healthyChannels")}</small>
+                  </strong>
+                </div>
               </div>
+            ) : null}
+            <div className="console-sidebar-meta">
+              <span>{version}</span>
+              <IconButton
+                label={t(collapsed ? "shell.expandNav" : "shell.collapseNav")}
+                onClick={onCollapse}
+              >
+                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+              </IconButton>
             </div>
-          ) : null}
-          <div className="console-sidebar-meta">
-            <span>{version}</span>
-            <IconButton
-              label={t(collapsed ? "shell.expandNav" : "shell.collapseNav")}
-              onClick={onCollapse}
-            >
-              {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </IconButton>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
       {appearanceOpen ? (
         <Drawer
           title={t("profile.appearance")}

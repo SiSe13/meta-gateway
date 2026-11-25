@@ -8,6 +8,7 @@ import {
   Info,
   Plus,
   SlidersHorizontal,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
@@ -25,7 +26,7 @@ import type {
 } from "../api/types";
 import { ActionMenu } from "../components/ActionMenu";
 import { TelemetryStrip } from "../components/TelemetryStrip";
-import { Button, ConfirmDialog, Dialog, Empty, Page, PageActions, Panel } from "../components/ui";
+import { Button, ConfirmDialog, Dialog, Empty, Page, Panel } from "../components/ui";
 import { useAdminMutation } from "../hooks/useAdminMutation";
 import { useToast } from "../toast";
 import { useClientPagination } from "../hooks/useClientPagination";
@@ -104,14 +105,13 @@ export function Models() {
 }
 
 function AdminModels() {
-  const { t } = useI18n();
   const [params] = useSearchParams();
   const modelParam = params.get("model")?.trim() ?? "";
   const channelId = positiveId(params.get("channel_id"));
   const groupParam = params.get("group")?.trim() ?? "";
 
   return (
-    <Page title={t("modelsPage.title")} description={t("modelsPage.description")}>
+    <Page title="" description="" className="models-page">
       <ModelsWorkspace initialModel={modelParam} channelId={channelId} initialGroup={groupParam} />
     </Page>
   );
@@ -744,6 +744,69 @@ function ModelsWorkspace({
       options,
     );
 
+  const directoryHeaderActions = (
+    <div className="models-page-actions">
+      <ActionMenu
+        label={t("modelsPage.tools")}
+        title={t("modelsPage.tools")}
+        items={[
+          {
+            key: "probe",
+            label: t("modelsPage.probe.action"),
+            description: t("modelsPage.probe.actionHint"),
+            icon: <Activity size={14} />,
+            onSelect: () => setProbeOpen(true),
+          },
+          {
+            key: "capabilities",
+            label: t("workbench.cap.title"),
+            description: t("modelsPage.tools.capabilitiesHint"),
+            icon: <SlidersHorizontal size={14} />,
+            onSelect: () => setCapabilitiesOpen(true),
+          },
+          {
+            key: "unify",
+            label: t("modelsPage.unify.action"),
+            description: t("modelsPage.unify.actionHint"),
+            icon: <Combine size={14} />,
+            onSelect: () => setUnifyOpen(true),
+          },
+          {
+            key: "aggregates",
+            label: t("modelsPage.aggregates.action"),
+            description: t("modelsPage.tools.aggregatesHint"),
+            icon: <Layers size={14} />,
+            onSelect: () => setAggregatesOpen(true),
+          },
+          {
+            key: "history",
+            label: t("modelsPage.unify.history.action"),
+            description: t("modelsPage.unify.history.actionHint"),
+            icon: <History size={14} />,
+            onSelect: () => setUnifyHistoryOpen(true),
+          },
+          {
+            key: "upstream-changes",
+            label: t("modelChanges.title"),
+            description: t("modelsPage.tools.changesHint"),
+            icon: <RefreshCw size={14} />,
+            onSelect: () => openChanges(),
+          },
+        ]}
+      />
+      <Button
+        icon={<Plus size={16} />}
+        title={t("modelsPage.addRouteHint")}
+        onClick={() => {
+          save.reset();
+          setEdit({ enabled: true });
+        }}
+      >
+        {t("routing.addRoute")}
+      </Button>
+    </div>
+  );
+
   const total = overviews.data?.length ?? 0;
   const enabledCount = (overviews.data ?? []).filter((o) => o.route.enabled).length;
 
@@ -881,60 +944,6 @@ function ModelsWorkspace({
         </div>
       ) : null}
 
-      <PageActions>
-        <ActionMenu
-          label={t("modelsPage.tools")}
-          items={[
-            {
-              key: "probe",
-              label: t("modelsPage.probe.action"),
-              icon: <Activity size={14} />,
-              onSelect: () => setProbeOpen(true),
-            },
-            {
-              key: "capabilities",
-              label: t("workbench.cap.title"),
-              icon: <SlidersHorizontal size={14} />,
-              onSelect: () => setCapabilitiesOpen(true),
-            },
-
-            {
-              key: "unify",
-              label: t("modelsPage.unify.action"),
-              icon: <Combine size={14} />,
-              onSelect: () => setUnifyOpen(true),
-            },
-            {
-              key: "aggregates",
-              label: t("modelsPage.aggregates.action"),
-              icon: <Layers size={14} />,
-              onSelect: () => setAggregatesOpen(true),
-            },
-            {
-              key: "history",
-              label: t("modelsPage.unify.history.action"),
-              icon: <History size={14} />,
-              onSelect: () => setUnifyHistoryOpen(true),
-            },
-            {
-              key: "upstream-changes",
-              label: t("modelChanges.title"),
-              icon: <RefreshCw size={14} />,
-              onSelect: () => openChanges(),
-            },
-          ]}
-        />
-        <Button
-          icon={<Plus size={16} />}
-          title={t("modelsPage.addRouteHint")}
-          onClick={() => {
-            save.reset();
-            setEdit({ enabled: true });
-          }}
-        >
-          {t("routing.addRoute")}
-        </Button>
-      </PageActions>
       {/* The upstream-change summary sits above the workspace: it is a notice
           about the model list underneath it, and it was a footnote at the
           bottom of the page where nobody saw it before opening the list. */}
@@ -943,6 +952,7 @@ function ModelsWorkspace({
         directory={
           <RouteDirectory
             t={t}
+            headerActions={directoryHeaderActions}
             query={query}
             setQuery={setQuery}
             params={params}
@@ -983,13 +993,16 @@ function ModelsWorkspace({
             modelActions={modelActions}
             modelPins={modelPins}
             pending={{ toggleRoute, del }}
-            resetRouteDraft={() => save.reset()}
-            startNewRoute={() => setEdit({ enabled: true })}
           />
         }
         detail={
           !selectedRoute || !selectedOverview ? (
-            <div className="detail-empty">{t("modelsPage.selectHint")}</div>
+            <div className="detail-empty models-detail-empty">
+              <span className="models-detail-empty-icon" aria-hidden="true">
+                <Sparkles size={20} strokeWidth={1.7} />
+              </span>
+              <p>{t("modelsPage.selectHint")}</p>
+            </div>
           ) : (
             <RouteDetailPanel
               t={t}

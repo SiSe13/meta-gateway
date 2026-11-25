@@ -302,7 +302,10 @@ func TestTeamConcurrentKeyLimitAndInviteSingleUse(t *testing.T) {
 	e := newTeamTestEnv(t)
 	e.enable()
 	b := e.member("alice", "member")
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", MaxKeys: 2, RPM: 60, Models: []string{}, MemberIDs: []int64{}}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", Models: []string{}, MemberIDs: []int64{}}, 200)
+	if _, err := e.db.Exec(`UPDATE team_users SET max_keys=2 WHERE username='alice'`); err != nil {
+		t.Fatal(err)
+	}
 	var successes atomic.Int64
 	var wg sync.WaitGroup
 	for range 8 {
@@ -358,10 +361,13 @@ func TestTeamRoutingGrantRevocationAndUsageOwnership(t *testing.T) {
 	route, _ := e.db.Route.Create(&domain.Route{ModelPattern: "team-model", Enabled: true})
 	am, _ := e.db.RouteMember.Create(&domain.RouteMember{RouteID: route, ChannelID: channel("A", aUp.URL), Priority: 20, Weight: 100, Enabled: true})
 	bm, _ := e.db.RouteMember.Create(&domain.RouteMember{RouteID: route, ChannelID: channel("B", bUp.URL), Priority: 10, Weight: 100, Enabled: true})
-	p := TeamPolicy{ID: 1, Name: "Granted", Models: []string{"team-model"}, MemberIDs: []int64{am, bm}, MaxKeys: 5, RPM: 120, AllowRouting: true}
+	p := TeamPolicy{ID: 1, Name: "Granted", Models: []string{"team-model"}, MemberIDs: []int64{am, bm}}
 	e.admin("PUT", "/admin/team/policies/1", p, 200)
 	alice := e.member("alice", "member")
 	bob := e.member("bob", "member")
+	if _, err := e.db.Exec(`UPDATE team_users SET allow_routing=1 WHERE username='alice'`); err != nil {
+		t.Fatal(err)
+	}
 	kid, token := alice.key("app")
 	// Arrange the model the way the model page does: the array IS the order.
 	arrange := func(entries ...domain.TeamRouteEntry) {
@@ -522,13 +528,12 @@ func TestTeamPolicyDropsGrantedMembersThatWereDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	policy := func(ids []int64) TeamPolicy {
-		return TeamPolicy{ID: 1, Name: "Granted", Models: []string{"grant-model"}, MemberIDs: ids, MaxKeys: 5, RPM: 60}
+		return TeamPolicy{ID: 1, Name: "Granted", Models: []string{"grant-model"}, MemberIDs: ids}
 	}
 	e.admin("PUT", "/admin/team/policies/1", policy([]int64{member}), 200)
 	if err := e.db.RouteMember.Delete(member); err != nil {
 		t.Fatal(err)
 	}
-
 	var policies []TeamPolicy
 	if err := json.Unmarshal(e.admin("GET", "/admin/team/policies", nil, 200), &policies); err != nil {
 		t.Fatal(err)

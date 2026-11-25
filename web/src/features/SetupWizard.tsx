@@ -3,12 +3,14 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Copy } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
+import { SearchableSelect } from "../components/SearchableSelect";
+import { TYPE_GROUPS, TYPE_OPTIONS } from "./channels/helpers";
 import { ModePanel } from "../team/ModePanel";
 import { ApiError, api } from "../api/client";
 import type { CreatedDownstreamKey, ImportResult } from "../api/types";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
-import { Button, Field } from "../components/ui";
+import { Button, Dialog, Field } from "../components/ui";
 import { isEncryptedBackup, skipReasonKey } from "../lib/aahBackup";
 import { formatErrorMessage } from "../formatError";
 
@@ -24,16 +26,14 @@ const STEPS = [
 ] as const;
 
 const tabRoleProps = { role: "tab" };
+const WIZARD_TYPE_OPTIONS = TYPE_OPTIONS.filter((option) => option.value !== "__custom__");
 
 /**
- * First-run setup page (/setup): the decision-making counterpart to the
- * spotlight tour. Collects the choices that genuinely belong to day one —
- * the default model sync mode, the first upstream connection, the first
- * downstream key — then hands the operator the relay endpoint. Auto-redirect
- * claims every fresh instance (no channels) once; the flag persists in
- * localStorage, ?wizard=1 or /setup revisits it any time.
+ * First-run setup dialog: collects the default sync mode, first upstream site,
+ * and first downstream token, then shows the relay endpoint. The parent opens
+ * it over the current page and persists dismissal in localStorage.
  */
-export function SetupWizard() {
+export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
   const { client } = useSession();
   const s = api(client!);
   const { t, locale } = useI18n();
@@ -44,6 +44,7 @@ export function SetupWizard() {
   const [mode, setMode] = useState<Mode | null>(null);
   const [modeSaved, setModeSaved] = useState(false);
   const [connName, setConnName] = useState("");
+  const [typeHint, setTypeHint] = useState("openai-compatible");
   const [baseUrl, setBaseUrl] = useState("");
   const [secret, setSecret] = useState("");
   const [channelId, setChannelId] = useState<number | null>(null);
@@ -68,7 +69,8 @@ export function SetupWizard() {
 
   const finish = () => {
     localStorage.setItem(DONE_KEY, "1");
-    navigate("/", { replace: true });
+    if (onClose) onClose();
+    else navigate("/", { replace: true });
   };
 
   const saveMode = useMutation({
@@ -90,6 +92,7 @@ export function SetupWizard() {
         name: connName.trim() || undefined,
         base_url: baseUrl.trim(),
         secret: secret.trim(),
+        type_hint: typeHint,
       });
       return res;
     },
@@ -255,424 +258,463 @@ export function SetupWizard() {
   };
 
   return (
-    <div className="setup-wizard">
-      <div className="setup-wizard-card">
-        <div className="setup-wizard-head">
-          <strong>{t("wizard.title")}</strong>
-          <HeroButton type="button" className="setup-wizard-skip" onPress={finish}>
-            {t("wizard.skip")}
-          </HeroButton>
-        </div>
-        <p className="setup-wizard-subtitle">{t("wizard.subtitle")}</p>
-        <div className="setup-wizard-dots" aria-hidden>
-          {STEPS.map((key, dot) => (
-            <span key={key} className={dot <= step ? "is-on" : ""} />
-          ))}
-        </div>
-
-        {error ? <p className="setup-wizard-error">{error}</p> : null}
-
-        {step === 0 ? (
-          <section>
-            <h2>{t("wizard.welcomeTitle")}</h2>
-            <p className="setup-wizard-desc">{t("wizard.welcomeDesc")}</p>
-            <h3>{t("wizard.editionTitle")}</h3>
-            <p className="setup-wizard-desc">{t("wizard.editionHint")}</p>
-            <ModePanel request={(path, init) => client!.request(path, init)} locale={locale} />
-            <h3>{t("wizard.modeTitle")}</h3>
-            <p className="setup-wizard-desc">{t("wizard.modeDesc")}</p>
-            {[
-              {
-                value: "auto" as Mode,
-                label: t("channels.syncModeAuto"),
-                desc: t("wizard.modeAuto"),
-              },
-              {
-                value: "manual" as Mode,
-                label: t("channels.syncModeManual"),
-                desc: t("wizard.modeManual"),
-              },
-            ].map((option) => (
-              <label
-                key={option.value}
-                className={`setup-wizard-option${mode === option.value ? " is-active" : ""}`}
-              >
-                <input
-                  type="radio"
-                  name="wizard-mode"
-                  checked={mode === option.value}
-                  onChange={() => setMode(option.value)}
-                />
-                <span>
-                  <strong>{option.label}</strong>
-                  <small>{option.desc}</small>
-                </span>
-              </label>
+    <Dialog
+      title={t("wizard.title")}
+      onClose={finish}
+      closeAction={
+        <HeroButton type="button" className="setup-wizard-skip" onPress={finish}>
+          {t("wizard.skip")}
+        </HeroButton>
+      }
+      preventBackdropDismiss
+      busy={
+        saveMode.isPending ||
+        createConnection.isPending ||
+        syncModels.isPending ||
+        importBackup.isPending ||
+        webdavTest.isPending ||
+        webdavImport.isPending ||
+        createKey.isPending
+      }
+      className="setup-wizard-dialog"
+    >
+      <div className="setup-wizard">
+        <div className="setup-wizard-card">
+          <p className="setup-wizard-subtitle">{t("wizard.subtitle")}</p>
+          <div className="setup-wizard-dots" aria-hidden>
+            {STEPS.map((key, dot) => (
+              <span key={key} className={dot <= step ? "is-on" : ""} />
             ))}
-            {modeSaved ? (
-              <p className="setup-wizard-ok">
-                <Check size={13} /> {t("wizard.modeSaved")}
-              </p>
-            ) : null}
-            <div className="setup-wizard-actions">
-              <span />
-              <Button
-                disabled={!mode || saveMode.isPending}
-                onClick={() => {
-                  setError("");
-                  saveMode.mutate(undefined, {
-                    onSuccess: () => setStep(1),
-                  });
-                }}
-              >
-                {t("wizard.next")}
-              </Button>
-            </div>
-          </section>
-        ) : null}
+          </div>
 
-        {step === 1 ? (
-          <section>
-            <h2>{t("wizard.connTitle")}</h2>
-            <p className="setup-wizard-desc">{t("wizard.connDesc")}</p>
-            <div className="setup-wizard-tabs" role="tablist">
-              <HeroButton
-                type="button"
-                {...tabRoleProps}
-                aria-selected={connTab === "manual"}
-                className={connTab === "manual" ? "is-active" : ""}
-                onPress={() => setConnTab("manual")}
-              >
-                {t("wizard.manualTab")}
-              </HeroButton>
-              <HeroButton
-                type="button"
-                {...tabRoleProps}
-                aria-selected={connTab === "aah"}
-                className={connTab === "aah" ? "is-active" : ""}
-                onPress={() => setConnTab("aah")}
-              >
-                {t("wizard.importTab")}
-              </HeroButton>
-            </div>
-            {connTab === "manual" ? (
-              <>
-                <Field label={t("wizard.name")}>
-                  <input
-                    value={connName}
-                    onChange={(e) => setConnName(e.target.value)}
-                    disabled={channelId != null}
-                    placeholder="my-upstream"
-                  />
-                </Field>
-                <Field label={t("wizard.baseUrl")}>
-                  <input
-                    required
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    disabled={channelId != null}
-                    placeholder="https://api.example.com"
-                  />
-                </Field>
-                <Field label={t("wizard.secret")}>
-                  <input
-                    required
-                    type="password"
-                    autoComplete="new-password"
-                    value={secret}
-                    onChange={(e) => setSecret(e.target.value)}
-                    disabled={channelId != null}
-                  />
-                </Field>
-                {channelId != null ? (
-                  <p className="setup-wizard-ok">
-                    <Check size={13} /> {t("wizard.connCreated")}
-                  </p>
-                ) : (
-                  <Button
-                    disabled={createConnection.isPending || !baseUrl.trim() || !secret.trim()}
-                    onClick={() => createConnection.mutate()}
-                  >
-                    {createConnection.isPending ? t("common.loading") : t("wizard.createConn")}
-                  </Button>
-                )}
-                {channelId != null && !synced ? (
-                  <Button
-                    variant="secondary"
-                    disabled={syncModels.isPending}
-                    onClick={() => syncModels.mutate()}
-                  >
-                    {syncModels.isPending ? t("wizard.syncing") : t("wizard.trySync")}
-                  </Button>
-                ) : null}
-                {synced ? (
-                  <p className="setup-wizard-ok">
-                    <Check size={13} /> {t("wizard.synced")}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <p className="setup-wizard-desc">{t("wizard.importHint")}</p>
-                <div
-                  className="setup-wizard-tabs is-sub"
-                  role="group"
-                  aria-label={t("wizard.importTab")}
+          {error ? <p className="setup-wizard-error">{error}</p> : null}
+
+          {step === 0 ? (
+            <section>
+              <h2>{t("wizard.welcomeTitle")}</h2>
+              <p className="setup-wizard-desc">{t("wizard.welcomeDesc")}</p>
+              <div className="setup-wizard-mode-intro">
+                <h3>{t("wizard.editionTitle")}</h3>
+                <p className="setup-wizard-desc">{t("wizard.editionHint")}</p>
+              </div>
+              <ModePanel
+                request={(path, init) => client!.request(path, init)}
+                locale={locale}
+                className="runtime-card runtime-card-mode setup-wizard-mode"
+              />
+              <h3>{t("wizard.modeTitle")}</h3>
+              <p className="setup-wizard-desc">{t("wizard.modeDesc")}</p>
+              {[
+                {
+                  value: "auto" as Mode,
+                  label: t("channels.syncModeAuto"),
+                  desc: t("wizard.modeAuto"),
+                },
+                {
+                  value: "manual" as Mode,
+                  label: t("channels.syncModeManual"),
+                  desc: t("wizard.modeManual"),
+                },
+              ].map((option) => (
+                <label
+                  key={option.value}
+                  className={`setup-wizard-option${mode === option.value ? " is-active" : ""}`}
                 >
-                  <HeroButton
-                    type="button"
-                    aria-pressed={importMode === "file"}
-                    className={importMode === "file" ? "is-active" : ""}
-                    onPress={() => setImportMode("file")}
-                  >
-                    {t("wizard.importFromFile")}
-                  </HeroButton>
-                  <HeroButton
-                    type="button"
-                    aria-pressed={importMode === "webdav"}
-                    className={importMode === "webdav" ? "is-active" : ""}
-                    onPress={() => setImportMode("webdav")}
-                  >
-                    {t("wizard.importFromWebdav")}
-                  </HeroButton>
-                </div>
+                  <input
+                    type="radio"
+                    name="wizard-mode"
+                    checked={mode === option.value}
+                    onChange={() => setMode(option.value)}
+                  />
+                  <span>
+                    <strong>{option.label}</strong>
+                    <small>{option.desc}</small>
+                  </span>
+                </label>
+              ))}
+              {modeSaved ? (
+                <p className="setup-wizard-ok">
+                  <Check size={13} /> {t("wizard.modeSaved")}
+                </p>
+              ) : null}
+              <div className="setup-wizard-actions">
+                <span />
+                <Button
+                  disabled={!mode || saveMode.isPending}
+                  onClick={() => {
+                    setError("");
+                    saveMode.mutate(undefined, {
+                      onSuccess: () => setStep(1),
+                    });
+                  }}
+                >
+                  {t("wizard.next")}
+                </Button>
+              </div>
+            </section>
+          ) : null}
 
-                {importMode === "file" ? (
-                  <>
-                    <label className="setup-wizard-file">
-                      <input
-                        type="file"
-                        accept="application/json,.json"
-                        disabled={importBackup.isPending}
-                        onChange={(e) => {
-                          onImportFile(e.target.files?.[0]);
-                          e.currentTarget.value = "";
-                        }}
-                      />
-                      <span>
-                        {importBackup.isPending ? t("common.loading") : t("wizard.pickFile")}
-                      </span>
-                    </label>
-                    {needsUnlock ? (
-                      <Field label={t("exchange.unlockPassword")}>
+          {step === 1 ? (
+            <section>
+              <h2>{t("wizard.connTitle")}</h2>
+              <p className="setup-wizard-desc">{t("wizard.connDesc")}</p>
+              <div className="setup-wizard-tabs" role="tablist">
+                <HeroButton
+                  type="button"
+                  {...tabRoleProps}
+                  aria-selected={connTab === "manual"}
+                  className={connTab === "manual" ? "is-active" : ""}
+                  onPress={() => setConnTab("manual")}
+                >
+                  {t("wizard.manualTab")}
+                </HeroButton>
+                <HeroButton
+                  type="button"
+                  {...tabRoleProps}
+                  aria-selected={connTab === "aah"}
+                  className={connTab === "aah" ? "is-active" : ""}
+                  onPress={() => setConnTab("aah")}
+                >
+                  {t("wizard.importTab")}
+                </HeroButton>
+              </div>
+              {connTab === "manual" ? (
+                <>
+                  <Field label={t("wizard.name")}>
+                    <input
+                      value={connName}
+                      onChange={(e) => setConnName(e.target.value)}
+                      disabled={channelId != null}
+                      placeholder="my-upstream"
+                    />
+                  </Field>
+                  <Field label={t("wizard.connectionType")}>
+                    <SearchableSelect
+                      options={WIZARD_TYPE_OPTIONS}
+                      groups={TYPE_GROUPS}
+                      value={typeHint}
+                      onChange={(next) => setTypeHint(next || "openai-compatible")}
+                      ariaLabel={t("wizard.connectionType")}
+                      placeholder={t("common.type")}
+                      disabled={channelId != null}
+                    />
+                  </Field>
+                  <Field label={t("wizard.baseUrl")}>
+                    <input
+                      required
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      disabled={channelId != null}
+                      placeholder="https://api.example.com"
+                    />
+                  </Field>
+                  <Field label={t("wizard.secret")}>
+                    <input
+                      required
+                      type="password"
+                      autoComplete="new-password"
+                      value={secret}
+                      onChange={(e) => setSecret(e.target.value)}
+                      disabled={channelId != null}
+                    />
+                  </Field>
+                  <div className="setup-wizard-form-actions">
+                    {channelId != null ? (
+                      <p className="setup-wizard-ok">
+                        <Check size={13} /> {t("wizard.connCreated")}
+                      </p>
+                    ) : (
+                      <Button
+                        disabled={createConnection.isPending || !baseUrl.trim() || !secret.trim()}
+                        onClick={() => createConnection.mutate()}
+                      >
+                        {createConnection.isPending ? t("common.loading") : t("wizard.createConn")}
+                      </Button>
+                    )}
+                    {channelId != null && !synced ? (
+                      <Button
+                        variant="secondary"
+                        disabled={syncModels.isPending}
+                        onClick={() => syncModels.mutate()}
+                      >
+                        {syncModels.isPending ? t("wizard.syncing") : t("wizard.trySync")}
+                      </Button>
+                    ) : null}
+                  </div>
+                  {synced ? (
+                    <p className="setup-wizard-ok">
+                      <Check size={13} /> {t("wizard.synced")}
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="setup-wizard-desc">{t("wizard.importHint")}</p>
+                  <div
+                    className="setup-wizard-tabs is-sub"
+                    role="group"
+                    aria-label={t("wizard.importTab")}
+                  >
+                    <HeroButton
+                      type="button"
+                      aria-pressed={importMode === "file"}
+                      className={importMode === "file" ? "is-active" : ""}
+                      onPress={() => setImportMode("file")}
+                    >
+                      {t("wizard.importFromFile")}
+                    </HeroButton>
+                    <HeroButton
+                      type="button"
+                      aria-pressed={importMode === "webdav"}
+                      className={importMode === "webdav" ? "is-active" : ""}
+                      onPress={() => setImportMode("webdav")}
+                    >
+                      {t("wizard.importFromWebdav")}
+                    </HeroButton>
+                  </div>
+
+                  {importMode === "file" ? (
+                    <>
+                      <label className="setup-wizard-file">
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          disabled={importBackup.isPending}
+                          onChange={(e) => {
+                            onImportFile(e.target.files?.[0]);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        <span>
+                          {importBackup.isPending ? t("common.loading") : t("wizard.pickFile")}
+                        </span>
+                      </label>
+                      {needsUnlock ? (
+                        <Field label={t("exchange.unlockPassword")}>
+                          <input
+                            type="password"
+                            autoComplete="off"
+                            value={unlockPassword}
+                            onChange={(e) => setUnlockPassword(e.target.value)}
+                          />
+                        </Field>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <p className="setup-wizard-desc">{t("wizard.webdavHint")}</p>
+                      <Field label={t("wizard.webdavUrl")}>
+                        <input
+                          value={webdav.url}
+                          onChange={(e) => setWebdav((prev) => ({ ...prev, url: e.target.value }))}
+                          placeholder="https://dav.jianguoyun.com/dav/"
+                          autoComplete="off"
+                        />
+                      </Field>
+                      <Field label={t("wizard.webdavUsername")}>
+                        <input
+                          value={webdav.username}
+                          onChange={(e) =>
+                            setWebdav((prev) => ({
+                              ...prev,
+                              username: e.target.value,
+                            }))
+                          }
+                          autoComplete="username"
+                        />
+                      </Field>
+                      <Field
+                        label={t("wizard.webdavPassword")}
+                        hint={t("wizard.webdavPasswordHint")}
+                      >
                         <input
                           type="password"
                           autoComplete="off"
-                          value={unlockPassword}
-                          onChange={(e) => setUnlockPassword(e.target.value)}
+                          value={webdav.password}
+                          onChange={(e) =>
+                            setWebdav((prev) => ({
+                              ...prev,
+                              password: e.target.value,
+                            }))
+                          }
                         />
                       </Field>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <p className="setup-wizard-desc">{t("wizard.webdavHint")}</p>
-                    <Field label={t("wizard.webdavUrl")}>
-                      <input
-                        value={webdav.url}
-                        onChange={(e) => setWebdav((prev) => ({ ...prev, url: e.target.value }))}
-                        placeholder="https://dav.jianguoyun.com/dav/"
-                        autoComplete="off"
-                      />
-                    </Field>
-                    <Field label={t("wizard.webdavUsername")}>
-                      <input
-                        value={webdav.username}
-                        onChange={(e) =>
-                          setWebdav((prev) => ({
-                            ...prev,
-                            username: e.target.value,
-                          }))
-                        }
-                        autoComplete="username"
-                      />
-                    </Field>
-                    <Field label={t("wizard.webdavPassword")} hint={t("wizard.webdavPasswordHint")}>
-                      <input
-                        type="password"
-                        autoComplete="off"
-                        value={webdav.password}
-                        onChange={(e) =>
-                          setWebdav((prev) => ({
-                            ...prev,
-                            password: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <Field
-                      label={t("wizard.webdavBackupPassword")}
-                      hint={t("wizard.webdavBackupPasswordHint")}
-                    >
-                      <input
-                        type="password"
-                        autoComplete="off"
-                        value={webdav.backup_password}
-                        onChange={(e) =>
-                          setWebdav((prev) => ({
-                            ...prev,
-                            backup_password: e.target.value,
-                          }))
-                        }
-                      />
-                    </Field>
-                    <div className="setup-wizard-inline-actions">
-                      <Button
-                        variant="secondary"
-                        disabled={!webdavReady || webdavTest.isPending || webdavImport.isPending}
-                        onClick={() => webdavTest.mutate()}
+                      <Field
+                        label={t("wizard.webdavBackupPassword")}
+                        hint={t("wizard.webdavBackupPasswordHint")}
                       >
-                        {webdavTest.isPending ? t("common.loading") : t("wizard.webdavTest")}
-                      </Button>
-                      <Button
-                        disabled={!webdavReady || webdavTest.isPending || webdavImport.isPending}
-                        onClick={() => webdavImport.mutate()}
-                      >
-                        {webdavImport.isPending ? t("common.loading") : t("wizard.webdavImport")}
-                      </Button>
-                    </div>
-                    {webdavTested && !webdavImport.isSuccess ? (
-                      <p className="setup-wizard-ok">
-                        <Check size={13} /> {t("wizard.webdavTestOk")}
-                      </p>
-                    ) : null}
-                  </>
-                )}
+                        <input
+                          type="password"
+                          autoComplete="off"
+                          value={webdav.backup_password}
+                          onChange={(e) =>
+                            setWebdav((prev) => ({
+                              ...prev,
+                              backup_password: e.target.value,
+                            }))
+                          }
+                        />
+                      </Field>
+                      <div className="setup-wizard-inline-actions">
+                        <Button
+                          variant="secondary"
+                          disabled={!webdavReady || webdavTest.isPending || webdavImport.isPending}
+                          onClick={() => webdavTest.mutate()}
+                        >
+                          {webdavTest.isPending ? t("common.loading") : t("wizard.webdavTest")}
+                        </Button>
+                        <Button
+                          disabled={!webdavReady || webdavTest.isPending || webdavImport.isPending}
+                          onClick={() => webdavImport.mutate()}
+                        >
+                          {webdavImport.isPending ? t("common.loading") : t("wizard.webdavImport")}
+                        </Button>
+                      </div>
+                      {webdavTested && !webdavImport.isSuccess ? (
+                        <p className="setup-wizard-ok">
+                          <Check size={13} /> {t("wizard.webdavTestOk")}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
 
-                {imported ? (
-                  <p className="setup-wizard-ok">
-                    <Check size={13} />{" "}
-                    {importMode === "webdav"
-                      ? t("wizard.webdavDone", {
-                          created: imported.created_count,
-                          updated: imported.updated_count,
-                        })
-                      : t("wizard.importDone", {
-                          created: imported.created_count,
-                          updated: imported.updated_count,
-                        })}
-                  </p>
-                ) : webdavImport.isSuccess ? (
-                  <p className="setup-wizard-ok">
-                    <Check size={13} /> {t("wizard.webdavSaved")}
-                  </p>
-                ) : null}
-
-                {(imported?.skipped?.length ?? 0) > 0 ? (
-                  <div className="setup-wizard-skipped">
-                    <p className="setup-wizard-desc">
-                      {t("wizard.importSkipped", {
-                        n: imported?.skipped?.length ?? 0,
-                      })}
+                  {imported ? (
+                    <p className="setup-wizard-ok">
+                      <Check size={13} />{" "}
+                      {importMode === "webdav"
+                        ? t("wizard.webdavDone", {
+                            created: imported.created_count,
+                            updated: imported.updated_count,
+                          })
+                        : t("wizard.importDone", {
+                            created: imported.created_count,
+                            updated: imported.updated_count,
+                          })}
                     </p>
-                    <ul>
-                      {(imported?.skipped ?? []).slice(0, 5).map((row) => (
-                        <li key={`wiz-skip-${row.index}-${row.reason}`}>
-                          <span>{row.name || `#${row.index + 1}`}</span>
-                          <small>{t(`exchange.skipReason.${skipReasonKey(row.reason)}`)}</small>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </>
-            )}
-            <div className="setup-wizard-actions">
-              <Button variant="secondary" onClick={() => setStep(0)}>
-                {t("wizard.back")}
-              </Button>
-              <Button
-                variant={channelId != null || imported ? "primary" : "secondary"}
-                onClick={() => {
-                  setError("");
-                  setStep(2);
-                }}
-              >
-                {channelId != null || imported ? t("wizard.next") : t("wizard.later")}
-              </Button>
-            </div>
-          </section>
-        ) : null}
+                  ) : webdavImport.isSuccess ? (
+                    <p className="setup-wizard-ok">
+                      <Check size={13} /> {t("wizard.webdavSaved")}
+                    </p>
+                  ) : null}
 
-        {step === 2 ? (
-          <section>
-            <h2>{t("wizard.keyTitle")}</h2>
-            <p className="setup-wizard-desc">{t("wizard.keyDesc")}</p>
-            <Field label={t("wizard.keyName")}>
-              <input
-                value={keyName}
-                onChange={(e) => setKeyName(e.target.value)}
-                placeholder={t("keys.namePlaceholder")}
-              />
-            </Field>
-            {createdKey ? (
-              <>
-                <p className="setup-wizard-ok">
-                  <Check size={13} /> {t("wizard.keyCreated")}
-                </p>
-                <div className="setup-wizard-curl">
-                  <div className="setup-wizard-curl-head">
-                    <span>Bearer</span>
-                    <HeroButton type="button" onPress={copyKey}>
-                      <Copy size={12} />
-                      {keyCopied ? t("setup.copied") : t("setup.copy")}
-                    </HeroButton>
+                  {(imported?.skipped?.length ?? 0) > 0 ? (
+                    <div className="setup-wizard-skipped">
+                      <p className="setup-wizard-desc">
+                        {t("wizard.importSkipped", {
+                          n: imported?.skipped?.length ?? 0,
+                        })}
+                      </p>
+                      <ul>
+                        {(imported?.skipped ?? []).slice(0, 5).map((row) => (
+                          <li key={`wiz-skip-${row.index}-${row.reason}`}>
+                            <span>{row.name || `#${row.index + 1}`}</span>
+                            <small>{t(`exchange.skipReason.${skipReasonKey(row.reason)}`)}</small>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </>
+              )}
+              <div className="setup-wizard-actions">
+                <Button variant="secondary" onClick={() => setStep(0)}>
+                  {t("wizard.back")}
+                </Button>
+                <Button
+                  variant={channelId != null || imported ? "primary" : "secondary"}
+                  onClick={() => {
+                    setError("");
+                    setStep(2);
+                  }}
+                >
+                  {channelId != null || imported ? t("wizard.next") : t("wizard.later")}
+                </Button>
+              </div>
+            </section>
+          ) : null}
+
+          {step === 2 ? (
+            <section className="setup-wizard-key-step">
+              <h2>{t("wizard.keyTitle")}</h2>
+              <p className="setup-wizard-desc">{t("wizard.keyDesc")}</p>
+              <Field label={t("wizard.keyName")}>
+                <input
+                  value={keyName}
+                  onChange={(e) => setKeyName(e.target.value)}
+                  placeholder={t("keys.namePlaceholder")}
+                />
+              </Field>
+              {createdKey ? (
+                <>
+                  <p className="setup-wizard-ok">
+                    <Check size={13} /> {t("wizard.keyCreated")}
+                  </p>
+                  <div className="setup-wizard-curl">
+                    <div className="setup-wizard-curl-head">
+                      <span>Bearer</span>
+                      <HeroButton type="button" onPress={copyKey}>
+                        <Copy size={12} />
+                        {keyCopied ? t("setup.copied") : t("setup.copy")}
+                      </HeroButton>
+                    </div>
+                    <code>{createdKey.token}</code>
                   </div>
-                  <code>{createdKey.token}</code>
+                  <Button
+                    variant="secondary"
+                    disabled={createKey.isPending}
+                    onClick={() => setCreatedKey(null)}
+                  >
+                    {t("wizard.createAnother")}
+                  </Button>
+                </>
+              ) : (
+                <div className="setup-wizard-form-actions">
+                  <Button
+                    disabled={createKey.isPending}
+                    onClick={() => createKey.mutate(keyName.trim() || "default")}
+                  >
+                    {t("wizard.createKey")}
+                  </Button>
                 </div>
+              )}
+              <div className="setup-wizard-actions">
+                <Button variant="secondary" onClick={() => setStep(1)}>
+                  {t("wizard.back")}
+                </Button>
                 <Button
                   variant="secondary"
-                  disabled={createKey.isPending}
-                  onClick={() => setCreatedKey(null)}
+                  onClick={() => {
+                    setError("");
+                    setStep(3);
+                  }}
                 >
-                  {t("wizard.createAnother")}
+                  {createdKey ? t("wizard.next") : t("wizard.later")}
                 </Button>
-              </>
-            ) : (
-              <Button
-                disabled={createKey.isPending}
-                onClick={() => createKey.mutate(keyName.trim() || "default")}
-              >
-                {t("wizard.createKey")}
-              </Button>
-            )}
-            <div className="setup-wizard-actions">
-              <Button variant="secondary" onClick={() => setStep(1)}>
-                {t("wizard.back")}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setError("");
-                  setStep(3);
-                }}
-              >
-                {createdKey ? t("wizard.next") : t("wizard.later")}
-              </Button>
-            </div>
-          </section>
-        ) : null}
-
-        {step === 3 ? (
-          <section>
-            <h2>{t("wizard.doneTitle")}</h2>
-            <p className="setup-wizard-desc">{t("wizard.doneDesc")}</p>
-            <div className="setup-wizard-curl">
-              <div className="setup-wizard-curl-head">
-                <span>curl</span>
-                <HeroButton type="button" onPress={copyCurl}>
-                  <Copy size={12} />
-                  {copied ? t("setup.copied") : t("setup.copy")}
-                </HeroButton>
               </div>
-              <pre>{curl}</pre>
-            </div>
-            <div className="setup-wizard-actions">
-              <Button onClick={finish}>{t("wizard.enter")}</Button>
-            </div>
-          </section>
-        ) : null}
+            </section>
+          ) : null}
+
+          {step === 3 ? (
+            <section>
+              <h2>{t("wizard.doneTitle")}</h2>
+              <p className="setup-wizard-desc">{t("wizard.doneDesc")}</p>
+              <div className="setup-wizard-curl">
+                <div className="setup-wizard-curl-head">
+                  <span>curl</span>
+                  <HeroButton type="button" onPress={copyCurl}>
+                    <Copy size={12} />
+                    {copied ? t("setup.copied") : t("setup.copy")}
+                  </HeroButton>
+                </div>
+                <pre>{curl}</pre>
+              </div>
+              <div className="setup-wizard-actions setup-wizard-finish-actions">
+                <Button onClick={finish}>{t("wizard.enter")}</Button>
+              </div>
+            </section>
+          ) : null}
+        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

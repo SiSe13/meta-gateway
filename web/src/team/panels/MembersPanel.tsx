@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button as HeroButton } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TeamField as Field } from "../ui";
@@ -26,7 +26,7 @@ import type { BulkMemberAction, OAuthBinding, Policy, TeamUser, UserKey } from "
  *
  * The roster is the only board an admin (non-owner) gets, so the owner-only
  * controls are absent here rather than disabled: an admin who cannot change a
- * policy should not be shown a policy picker that does nothing.
+ * group should not be shown a group picker that does nothing.
  */
 export function MembersPanel() {
   const { request, locale, t, owner, settings } = useUsers();
@@ -40,7 +40,7 @@ export function MembersPanel() {
   const [newMember, setNewMember] = useState(false);
   const [importing, setImporting] = useState(false);
   const [quotaFor, setQuotaFor] = useState<TeamUser | null>(null);
-  const [bulkPolicy, setBulkPolicy] = useState("");
+  const [bulkPolicies, setBulkPolicies] = useState<number[]>([]);
   const [copyMessage, setCopyMessage] = useState("");
 
   const users = useQuery({
@@ -73,24 +73,25 @@ export function MembersPanel() {
     }
   }
 
-  async function bulk(action: BulkMemberAction, policyID?: number) {
+  async function bulk(action: BulkMemberAction, policyIDs?: number[]) {
     const ids = [...checked];
     if (!ids.length) return;
     const done = await run("/admin/team/users/bulk", "POST", {
       ids,
       action,
-      ...(policyID ? { policy_id: policyID } : {}),
+      ...(policyIDs ? { policy_ids: policyIDs } : {}),
     });
     if (done === undefined) return;
     setChecked(new Set());
-    setBulkPolicy("");
+    setBulkPolicies([]);
   }
 
   const visibleUsers = (users.data ?? []).filter((u) =>
     `${u.name} ${u.username}`.toLowerCase().includes(search.toLowerCase()),
   );
   const queryError = users.error || policies.error;
-  const policyName = (id: number) => policies.data?.find((p) => p.id === id)?.name ?? `#${id}`;
+  const policyNames = (ids: number[]) =>
+    ids.map((id) => policies.data?.find((p) => p.id === id)?.name ?? `#${id}`).join("、");
 
   return (
     <div>
@@ -140,8 +141,8 @@ export function MembersPanel() {
             policies={policies.data ?? []}
             owner={owner}
             busy={busy}
-            policy={bulkPolicy}
-            onPolicy={setBulkPolicy}
+            policyIDs={bulkPolicies}
+            onPolicyIDs={setBulkPolicies}
             onRun={bulk}
             onClear={() => setChecked(new Set())}
           />
@@ -166,7 +167,7 @@ export function MembersPanel() {
               />,
               t("name"),
               t("role"),
-              t("policy"),
+              t("authorizationGroups"),
               t("status"),
               t("quota"),
               t("keyCount"),
@@ -206,7 +207,7 @@ export function MembersPanel() {
                 <td>
                   <span className={`badge badge-role-${u.role}`}>{t(u.role)}</span>
                 </td>
-                <td>{policyName(u.policy_id)}</td>
+                <td>{policyNames(u.policy_ids)}</td>
                 <td>
                   <StatusBadge value={u.status} />
                 </td>
@@ -249,6 +250,7 @@ export function MembersPanel() {
       </>
       {selected ? (
         <MemberDetail
+          key={selected.id}
           user={selected}
           policies={policies.data ?? []}
           keys={userKeys.data}
@@ -343,8 +345,8 @@ function BulkBar({
   policies,
   owner,
   busy,
-  policy,
-  onPolicy,
+  policyIDs,
+  onPolicyIDs,
   onRun,
   onClear,
 }: {
@@ -352,9 +354,9 @@ function BulkBar({
   policies: Policy[];
   owner: boolean;
   busy: boolean;
-  policy: string;
-  onPolicy: (value: string) => void;
-  onRun: (action: BulkMemberAction, policyID?: number) => void;
+  policyIDs: number[];
+  onPolicyIDs: (value: number[]) => void;
+  onRun: (action: BulkMemberAction, policyIDs?: number[]) => void;
   onClear: () => void;
 }) {
   const { t } = useUsers();
@@ -366,14 +368,16 @@ function BulkBar({
           <>
             <select
               className="team-search"
-              aria-label={t("bulkPolicy")}
-              value={policy}
-              onChange={(e) => onPolicy(e.target.value)}
+              aria-label={t("authorizationGroups")}
+              multiple
+              value={policyIDs.map(String)}
+              onChange={(e) =>
+                onPolicyIDs(Array.from(e.target.selectedOptions, (option) => Number(option.value)))
+              }
             >
-              <option value="">{t("bulkPolicy")}</option>
               {policies.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {t("applyPolicy", { name: p.name })}
+                  {p.name}
                 </option>
               ))}
             </select>
@@ -381,8 +385,8 @@ function BulkBar({
               variant="outline"
               className="team-button"
               type="button"
-              isDisabled={busy || !policy}
-              onPress={() => onRun("policy", Number(policy))}
+              isDisabled={busy || !policyIDs.length}
+              onPress={() => onRun("policy", policyIDs)}
             >
               {t("applyBulk")}
             </HeroButton>
@@ -492,6 +496,8 @@ function MemberDetail({
   onUnlink: (bindingID: number) => void;
 }) {
   const { t } = useUsers();
+  const [policyIDs, setPolicyIDs] = useState(user.policy_ids);
+  useEffect(() => setPolicyIDs(user.policy_ids), [user.id, user.policy_ids]);
   const [quotaTokens, setQuotaTokens] = useState(String(user.quota_total_tokens));
   const [quotaCost, setQuotaCost] = useState(String(user.quota_total_cost));
   const [resetUsed, setResetUsed] = useState(false);
@@ -535,7 +541,15 @@ function MemberDetail({
           const f = new FormData(e.currentTarget);
           onSave({
             name: f.get("name"),
-            policy_id: Number(f.get("policy_id")),
+            ...(owner ? { policy_ids: policyIDs } : {}),
+            ...(owner
+              ? {
+                  max_keys: Number(f.get("max_keys")),
+                  rpm: Number(f.get("rpm")),
+                  allow_routing: f.has("allow_routing"),
+                  allow_request_preferences: f.has("allow_request_preferences"),
+                }
+              : {}),
             status: f.get("status"),
             ...(owner && user.role !== "owner" ? { role: f.get("role") } : {}),
             ...(owner
@@ -552,15 +566,28 @@ function MemberDetail({
           <Field label={t("name")}>
             <input name="name" defaultValue={user.name} required maxLength={80} />
           </Field>
-          <Field label={t("policy")}>
-            <select name="policy_id" defaultValue={user.policy_id}>
-              {policies.map((p) => (
-                <option value={p.id} key={p.id}>
-                  {p.name}
-                </option>
+          {owner && (
+            <fieldset className="team-policy-choices">
+              <legend>{t("authorizationGroups")}</legend>
+              {policies.map((policy) => (
+                <label className="check marginless" key={policy.id}>
+                  <input
+                    type="checkbox"
+                    checked={policyIDs.includes(policy.id)}
+                    disabled={policyIDs.length === 1 && policyIDs.includes(policy.id)}
+                    onChange={(event) =>
+                      setPolicyIDs(
+                        event.target.checked
+                          ? [...policyIDs, policy.id]
+                          : policyIDs.filter((id) => id !== policy.id),
+                      )
+                    }
+                  />
+                  <span>{policy.name}</span>
+                </label>
               ))}
-            </select>
-          </Field>
+            </fieldset>
+          )}
           <Field label={t("status")}>
             <select name="status" defaultValue={user.status} disabled={user.role === "owner"}>
               <option value="active">{t("active")}</option>
@@ -577,6 +604,45 @@ function MemberDetail({
             </Field>
           )}
         </div>
+        {owner && (
+          <section className="drawer-section">
+            <h3>{t("accountLimits")}</h3>
+            <div className="meta-form">
+              <Field label={t("maxKeys")}>
+                <input
+                  name="max_keys"
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue={user.max_keys}
+                  required
+                />
+              </Field>
+              <Field label={t("rpm")}>
+                <input
+                  name="rpm"
+                  type="number"
+                  min={1}
+                  max={100000}
+                  defaultValue={user.rpm}
+                  required
+                />
+              </Field>
+            </div>
+            <label className="check marginless">
+              <input type="checkbox" name="allow_routing" defaultChecked={user.allow_routing} />
+              <span>{t("allowPersonalRouting")}</span>
+            </label>
+            <label className="check marginless">
+              <input
+                type="checkbox"
+                name="allow_request_preferences"
+                defaultChecked={user.allow_request_preferences}
+              />
+              <span>{t("allowRequestControls")}</span>
+            </label>
+          </section>
+        )}
         {owner && (
           <section className="drawer-section">
             <h3>{t("credit")}</h3>

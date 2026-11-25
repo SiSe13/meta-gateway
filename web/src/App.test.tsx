@@ -210,6 +210,21 @@ describe("channel-first shell", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows setup as a blurred global dialog over the console with personal mode selected", async () => {
+    localStorage.setItem("meta-gateway.admin-token", "test-session");
+    vi.stubGlobal("fetch", stubAdminFetch());
+
+    renderApp(["/setup"]);
+
+    expect(
+      await screen.findByRole("heading", { name: "Start with the basics" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Getting started" })).toBeInTheDocument();
+    expect(document.querySelector(".dialog-backdrop")).toBeInTheDocument();
+    expect(document.querySelector(".console-shell")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Operating mode")).toHaveValue("personal");
+  });
+
   it("uses one account form and immediately adopts a member session", async () => {
     const requests: string[] = [];
     vi.stubGlobal(
@@ -248,11 +263,38 @@ describe("channel-first shell", () => {
     expect(fetcher.mock.calls.some(([path]) => String(path) === "/me")).toBe(false);
   });
 
+  it("shows the product logo and alternate sign-in action inside the welcome card", async () => {
+    vi.stubGlobal("fetch", stubAdminFetch());
+    renderApp();
+
+    const moreWays = await screen.findByRole("button", { name: "More sign-in options" });
+    const card = moreWays.closest(".login-card");
+
+    expect(card).not.toBeNull();
+    expect(card?.querySelector(".login-card-mark img")).toHaveAttribute("alt", "Meta Gateway");
+  });
+
+  it("keeps the language switcher and ignores a saved custom login background", () => {
+    localStorage.setItem("mg.login.bg", "https://example.test/old-background.jpg");
+    vi.stubGlobal("fetch", stubAdminFetch());
+    renderApp();
+
+    expect(screen.getByRole("combobox", { name: "Language" })).toBeInTheDocument();
+    expect(document.querySelector(".login-atmosphere")?.getAttribute("style")).toBeNull();
+    expect(document.querySelector(".login-tools input[type=file]")).toBeNull();
+    expect(document.querySelectorAll(".login-tools button")).toHaveLength(1);
+    expect(localStorage.getItem("mg.login.bg")).toBeNull();
+  });
+
   it("lists the configured third-party providers on the second layer", async () => {
     const fetcher = stubAdminFetch({ oauth: [{ id: "linuxdo", label: "Linux.do" }] });
     vi.stubGlobal("fetch", fetcher);
     renderApp();
     fireEvent.click(screen.getByRole("button", { name: "More sign-in options" }));
+    const otherOptions = await screen.findByRole("heading", { name: "Other sign-in options" });
+    expect(
+      otherOptions.closest(".login-card")?.querySelector(".login-card-mark img"),
+    ).toHaveAttribute("alt", "Meta Gateway");
     // The backend has always exposed the configured providers; nothing used to
     // render them, so a member had no button to sign in with one.
     expect(await screen.findByRole("link", { name: /Continue with Linux\.do/ })).toHaveAttribute(
@@ -454,6 +496,22 @@ describe("channel-first shell", () => {
     // 5016ms on 2026-10-08, the latter a timeout). The assertions are about
     // navigation, not speed.
   }, 20000);
+
+  it("keeps a workspace tab available when all of its pages are hidden", async () => {
+    localStorage.setItem("meta-gateway.admin-token", "nav-token");
+    localStorage.setItem(
+      "meta-gateway.topbar-items",
+      JSON.stringify({
+        controls: {},
+        hiddenNav: ["/", "/channels", "/models", "/keys", "/logs", "/checkins"],
+      }),
+    );
+    vi.stubGlobal("fetch", stubAdminFetch());
+
+    renderApp(["/models"]);
+    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Console" })).toBeInTheDocument();
+  });
 
   // The top bar used to carry a check-in shortcut next to the navigation entry
   // pointing at the same page, and needed a switch of its own just to get out

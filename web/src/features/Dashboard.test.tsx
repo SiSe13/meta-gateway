@@ -216,8 +216,17 @@ describe("member overview", () => {
         let body: unknown = [];
         if (path === "/me") {
           body = {
-            user: { id: 7, username: "lan", name: "Lan", role: "member", policy_id: 2 },
-            policy: { id: 2, name: "Standard", all_models: true, max_keys: 10, rpm: 120 },
+            user: {
+              id: 7,
+              username: "lan",
+              name: "Lan",
+              role: "member",
+              policy_id: 2,
+              policy_ids: [2],
+              max_keys: 10,
+              rpm: 120,
+            },
+            policies: [{ id: 2, name: "Standard", all_models: true }],
             branding: { name: "Meta Gateway", api_base_url: "https://gw.example/v1" },
             credit: {
               total: 5000000,

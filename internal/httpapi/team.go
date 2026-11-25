@@ -50,7 +50,12 @@ type TeamUser struct {
 	Name      string `json:"name"`
 	Role      string `json:"role"`
 	Status    string `json:"status"`
-	PolicyID  int64  `json:"policy_id"`
+	PolicyID                int64   `json:"policy_id"`
+	PolicyIDs               []int64 `json:"policy_ids"`
+	MaxKeys                 int     `json:"max_keys"`
+	RPM                     int     `json:"rpm"`
+	AllowRouting            bool    `json:"allow_routing"`
+	AllowRequestPreferences bool `json:"allow_request_preferences"`
 	CreatedAt string `json:"created_at"`
 	KeyCount  int    `json:"key_count"`
 	// The account's own credit pool, granted by the owner or topped up with a
@@ -69,10 +74,7 @@ type TeamPolicy struct {
 	Models                  []string `json:"models"`
 	MemberIDs               []int64  `json:"member_ids"`
 	AllModels               bool     `json:"all_models"`
-	MaxKeys                 int      `json:"max_keys"`
-	RPM                     int      `json:"rpm"`
-	AllowRouting            bool     `json:"allow_routing"`
-	AllowRequestPreferences bool     `json:"allow_request_preferences"`
+	UserCount               int      `json:"user_count"`
 }
 type teamPrincipal struct {
 	User        *TeamUser
@@ -217,12 +219,24 @@ func teamJSON(w http.ResponseWriter, status int, value any) {
 
 const teamUserSelect = `SELECT u.id,u.username,u.name,u.role,u.status,u.policy_id,u.created_at,u.session_version,u.password_hash,
 	u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost,
-	(SELECT count(*) FROM downstream_keys k WHERE k.user_id=u.id AND k.team_deleted_at='') FROM team_users u`
+	(SELECT count(*) FROM downstream_keys k WHERE k.user_id=u.id AND k.team_deleted_at=''),
+	u.max_keys,u.rpm,u.allow_routing,u.allow_request_preferences,
+	COALESCE((SELECT json_group_array(policy_id) FROM (
+		SELECT policy_id FROM team_user_policies WHERE user_id=u.id ORDER BY policy_id
+	)),'[]') FROM team_users u`
 
 func scanTeamUser(row interface{ Scan(...any) error }) (*TeamUser, error) {
 	u := &TeamUser{}
+	var policyIDs string
 	err := row.Scan(&u.ID, &u.Username, &u.Name, &u.Role, &u.Status, &u.PolicyID, &u.CreatedAt, &u.Version, &u.PasswordHash,
-		&u.QuotaTotalTokens, &u.QuotaUsedTokens, &u.QuotaTotalCost, &u.QuotaUsedCost, &u.KeyCount)
+		&u.QuotaTotalTokens, &u.QuotaUsedTokens, &u.QuotaTotalCost, &u.QuotaUsedCost, &u.KeyCount,
+		&u.MaxKeys, &u.RPM, &u.AllowRouting, &u.AllowRequestPreferences, &policyIDs)
+	if err == nil {
+		err = json.Unmarshal([]byte(policyIDs), &u.PolicyIDs)
+	}
+	if u.PolicyIDs == nil {
+		u.PolicyIDs = []int64{}
+	}
 	return u, err
 }
 func (h *TeamHandler) user(id int64) (*TeamUser, error) {

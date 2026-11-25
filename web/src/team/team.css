@@ -230,6 +230,21 @@
   padding: 7px;
   border-bottom: 1px solid var(--team-line);
 }
+.team-policy-choices {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--team-line);
+  border-radius: 8px;
+}
+.team-policy-choices legend {
+  padding: 0 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.team-policy-choices .check { padding: 5px 2px; }
 @media (max-width: 650px) {
   .team-grid {
     grid-template-columns: minmax(0, 1fr);

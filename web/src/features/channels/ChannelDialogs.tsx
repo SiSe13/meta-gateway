@@ -126,6 +126,13 @@ export function ChannelDialogs(props: ChannelDialogsProps) {
     <>
       {addOpen ? (
         <AddChannelDialog
+          existingGroups={Array.from(
+            new Set(
+              overviews
+                .map((row) => row.channel.group_name?.trim())
+                .filter((group): group is string => Boolean(group)),
+            ),
+          ).sort((left, right) => left.localeCompare(right))}
           pending={mutations.createConnection.isPending}
           error={mutations.createConnection.error}
           onClose={() => {
@@ -147,10 +154,6 @@ export function ChannelDialogs(props: ChannelDialogsProps) {
           credentials={credentials}
           credential={credentialForEdit(edit, overviews, relayCredentialFor)}
           userCredential={credentialForEdit(edit, overviews, userCredentialFor)}
-          checkinSupported={
-            (overviews.find((row) => row.channel.id === edit.id) ?? null)?.checkin_supported ??
-            false
-          }
           pending={
             mutations.saveEdit.isPending ||
             mutations.setCredentialStatus.isPending ||

@@ -2,6 +2,7 @@ import { CalendarRange, RefreshCw } from "lucide-react";
 import { Tabs as HeroTabs } from "@heroui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./ui";
+import { UiDatePicker } from "./UiDatePicker";
 import { useI18n } from "../i18n";
 
 /**
@@ -37,7 +38,7 @@ export type TimeRangeController = {
   /** Resolved inclusive lower/upper bound (RFC3339); undefined = open-ended. */
   since?: string;
   until?: string;
-  /** Raw `datetime-local` drafts for the custom inputs. */
+  /** Local wall-clock drafts for the custom inputs. */
   draftSince: string;
   draftUntil: string;
   /** True when both drafts parse and are ordered. */
@@ -55,7 +56,7 @@ export type TimeRangeController = {
   refresh: () => void;
 };
 
-/** `datetime-local` value (local wall clock, second precision) from an ISO instant. */
+/** Local wall-clock value (second precision) from an ISO instant. */
 export function toLocalInput(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -64,7 +65,7 @@ export function toLocalInput(iso?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-/** Local `datetime-local` value → RFC3339. Empty stays empty (open-ended). */
+/** Local wall-clock value → RFC3339. Empty stays empty (open-ended). */
 export function fromLocalInput(value: string): string | undefined {
   const raw = value.trim();
   if (!raw) return undefined;
@@ -146,13 +147,21 @@ export function useTimeRange(
   };
 }
 
-/** Compact local clock stamp ("09-17 20:16:03"); null when unset/unparseable. */
+/** Compact local clock stamp ("09-17 20:16"); null when unset/unparseable. */
 export function formatClock(iso?: string): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return (
+    pad(d.getMonth() + 1) +
+    "-" +
+    pad(d.getDate()) +
+    " " +
+    pad(d.getHours()) +
+    ":" +
+    pad(d.getMinutes())
+  );
 }
 
 /** Compact absolute caption for a resolved window ("09-17 14:00 → 15:00"). */
@@ -182,6 +191,7 @@ export function TimeRangePicker({
     <div className={`time-range${compact ? " is-compact" : ""}`}>
       <HeroTabs
         className="hero-tabs time-range-tabs"
+        orientation="horizontal"
         selectedKey={range.preset}
         onSelectionChange={(key) => range.setPreset(String(key))}
       >
@@ -201,22 +211,20 @@ export function TimeRangePicker({
         <div className="time-range-custom">
           <label>
             <span>{t("timeRange.from")}</span>
-            <input
-              type="datetime-local"
-              step={1}
-              aria-label={t("timeRange.from")}
+            <UiDatePicker
+              granularity="second"
+              ariaLabel={t("timeRange.from")}
               value={range.draftSince}
-              onChange={(e) => range.setDraft({ since: e.target.value })}
+              onChange={(since) => range.setDraft({ since })}
             />
           </label>
           <label>
             <span>{t("timeRange.to")}</span>
-            <input
-              type="datetime-local"
-              step={1}
-              aria-label={t("timeRange.to")}
+            <UiDatePicker
+              granularity="second"
+              ariaLabel={t("timeRange.to")}
               value={range.draftUntil}
-              onChange={(e) => range.setDraft({ until: e.target.value })}
+              onChange={(until) => range.setDraft({ until })}
             />
           </label>
           {!range.draftValid ? (

@@ -9,12 +9,13 @@ export type ThemeChromeProps = {
   topNavigation: { id: string; label: string; to: string }[];
   activeTopNavigation: string;
   showAdminAccount: boolean;
+  showMemberAccount: boolean;
+  onOpenAdminAccount: () => void;
   appearanceHiddenNav: string[];
   sections: { label: string; items: ThemeNavItem[] }[];
   version: string;
   theme: "light" | "dark";
   onThemeChange: () => void;
-  onSearch: () => void;
   onDisconnect: () => void;
   health: { healthy: number; total: number; loading: boolean; available?: boolean };
   tone: "idle" | "ok" | "down" | "warn";
@@ -23,8 +24,6 @@ export type ThemeChromeProps = {
   onCollapse: () => void;
   onOpenNav: () => void;
   onSelectTopNavigation: (to: string) => void;
-  sectionLabel: string;
-  pageLabel: string;
 };
 export type ThemeDetailsProps = {
   open: boolean;

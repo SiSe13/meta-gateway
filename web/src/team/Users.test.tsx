@@ -25,6 +25,11 @@ const member = {
   role: "member",
   status: "active",
   policy_id: 1,
+  policy_ids: [1],
+  max_keys: 5,
+  rpm: 60,
+  allow_routing: false,
+  allow_request_preferences: false,
   key_count: 1,
   created_at: "2026-10-02",
   quota_total_tokens: 1000,
@@ -38,10 +43,15 @@ const policy = {
   models: [],
   member_ids: [],
   all_models: false,
-  max_keys: 5,
-  rpm: 60,
-  allow_routing: false,
-  allow_request_preferences: false,
+  user_count: 1,
+};
+const policyDS = {
+  id: 2,
+  name: "DS",
+  models: ["deepseek-chat"],
+  member_ids: [21],
+  all_models: false,
+  user_count: 0,
 };
 const group = {
   name: "default",
@@ -86,7 +96,7 @@ function renderUsers({
     if (path === "/admin/team/settings")
       return { settings: { mode, branding }, has_owner: true, role } as T;
     if (path === "/admin/team/users") return [member] as T;
-    if (path === "/admin/team/policies") return [policy] as T;
+    if (path === "/admin/team/policies") return [policy, policyDS] as T;
     if (path === "/admin/groups") return [group] as T;
     return [] as T;
   };
@@ -131,6 +141,8 @@ describe("user management module", () => {
   it("opens the member list by default in team mode", async () => {
     renderUsers();
     expect(await screen.findByText("Alice")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "User management" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Manage members, access and quotas/)).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Overview" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Member interface" })).not.toBeInTheDocument();
   });
@@ -163,6 +175,19 @@ describe("user management module", () => {
         quota_total_tokens: 5000,
         quota_total_cost: 25,
       });
+    });
+  });
+
+  it("adds another authorization group to a member without replacing existing groups", async () => {
+    const calls = renderUsers();
+    fireEvent.click(await screen.findByRole("button", { name: /More actions/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Manage" }));
+    const ds = await screen.findByRole("checkbox", { name: "DS" });
+    fireEvent.click(ds);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => {
+      const patch = calls.find((c) => c.method === "PATCH");
+      expect(patch?.body).toMatchObject({ policy_ids: [1, 2] });
     });
   });
 

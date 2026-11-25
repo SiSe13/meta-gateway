@@ -25,9 +25,11 @@ type Onboarding = {
 export function OperatorClaimPanel({
   onSaved,
   onBusyChange,
+  onDismiss,
 }: {
   onSaved?: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onDismiss?: () => void;
 }) {
   const { client } = useSession();
   const { t } = useI18n();
@@ -137,10 +139,17 @@ export function OperatorClaimPanel({
                 />
               </Field>
             ) : null}
+          </fieldset>
+          <div className="operator-claim-actions">
+            {onDismiss ? (
+              <Button variant="quiet" type="button" onClick={onDismiss}>
+                {t("operator.later")}
+              </Button>
+            ) : null}
             <Button type="submit" disabled={!token || !username.trim() || !password || mismatch}>
               {claiming ? t("operator.claimSubmit") : t("common.save")}
             </Button>
-          </fieldset>
+          </div>
         </form>
       )}
       {save.isError ? (
@@ -198,11 +207,13 @@ export function OperatorUpgradePrompt({ onReady }: { onReady?: (ready: boolean) 
   }, [onReady, resolved, visible]);
   if (!visible) return null;
   return (
-    <Dialog title={t("operator.claimTitle")} onClose={close} busy={busy}>
-      <OperatorClaimPanel onSaved={close} onBusyChange={setBusy} />
-      <Button variant="quiet" onClick={close}>
-        {t("operator.later")}
-      </Button>
+    <Dialog
+      title={t("operator.claimTitle")}
+      onClose={close}
+      busy={busy}
+      className="operator-claim-dialog"
+    >
+      <OperatorClaimPanel onSaved={close} onBusyChange={setBusy} onDismiss={close} />
     </Dialog>
   );
 }

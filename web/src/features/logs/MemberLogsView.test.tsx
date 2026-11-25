@@ -117,7 +117,7 @@ it("exports the visible slow-only member rows without administrator columns", as
     </QueryClientProvider>,
   );
   await screen.findByText("slow-model");
-  fireEvent.click(screen.getByRole("checkbox", { name: /slow/i }));
+  fireEvent.click(screen.getByRole("switch", { name: /slow/i }));
   fireEvent.click(screen.getByRole("button", { name: /export/i }));
   const content = String(vi.mocked(downloadText).mock.calls[0]?.[1]);
   expect(content).toContain("slow-id");

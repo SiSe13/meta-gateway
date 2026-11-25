@@ -35,7 +35,7 @@ func TestModelPricingReferenceUsesBillingLayersAndAccountGrants(t *testing.T) {
 	if err := e.db.ModelRatio.SetRatio("priced-model", 2); err != nil {
 		t.Fatal(err)
 	}
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", AllModels: true, MemberIDs: []int64{first}, MaxKeys: 2, RPM: 60}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", AllModels: true, MemberIDs: []int64{first}}, 200)
 	alice := e.member("pricing-alice", "member")
 	var catalogue []teamModelView
 	if err := json.Unmarshal(alice.request("GET", "/me/model-catalog", nil, 200), &catalogue); err != nil {
@@ -375,7 +375,7 @@ func TestMemberModelPricingBatchHonorsPolicyGrants(t *testing.T) {
 	if _, err = e.db.RouteMember.Create(&domain.RouteMember{RouteID: route, ChannelID: channel, GroupName: "other", Enabled: true, Weight: 100, PricePromptPer1k: 9}); err != nil {
 		t.Fatal(err)
 	}
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", AllModels: true, MemberIDs: []int64{granted}, MaxKeys: 2, RPM: 60}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", AllModels: true, MemberIDs: []int64{granted}}, 200)
 	alice := e.member("batch-alice", "member")
 
 	// The operator sees both candidates; the member only the granted one, and

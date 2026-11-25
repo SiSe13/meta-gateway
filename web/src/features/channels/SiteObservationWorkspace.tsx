@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Download, RefreshCw, Search, Settings2 } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import {
+  Button as HeroButton,
+  Checkbox as HeroCheckbox,
+  Input as HeroInput,
+  Switch as HeroSwitch,
+} from "@heroui/react";
 import { ApiError, api } from "../../api/client";
 import type {
   SiteObservation,
@@ -475,19 +480,21 @@ export function SiteObservationWorkspace({
   return (
     <section className="site-observation-workspace">
       <div className="observation-toolbar">
-        <label className="observation-search">
+        <div className="observation-search">
           <Search size={15} />
-          <input
+          <HeroInput
+            className="observation-search-input"
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("observation.search")}
             aria-label={t("observation.search")}
           />
-        </label>
+        </div>
         <div className="observation-period" role="group" aria-label={t("observation.period")}>
           {[24, 168].map((value) => (
             <HeroButton
+              className="observation-choice"
               variant="ghost"
               type="button"
               key={value}
@@ -551,6 +558,7 @@ export function SiteObservationWorkspace({
             <div className="observation-site-filters">
               {(["all", "issues", "data"] as const).map((value) => (
                 <HeroButton
+                  className="observation-choice"
                   variant="ghost"
                   type="button"
                   key={value}
@@ -567,10 +575,10 @@ export function SiteObservationWorkspace({
             <div className="observation-site-list">
               {siteRows.map((site) => (
                 <HeroButton
+                  className={`observation-site${site.site_id === selected?.site_id ? " is-selected" : ""}`}
                   variant="ghost"
                   type="button"
                   key={site.site_id}
-                  className={`observation-site${site.site_id === selected?.site_id ? " is-selected" : ""}`}
                   aria-current={site.site_id === selected?.site_id ? "true" : undefined}
                   onPress={() => setSelectedId(site.site_id)}
                 >
@@ -641,28 +649,24 @@ export function SiteObservationWorkspace({
                 </header>
                 {routeImpactBlock}
                 <div className="observation-switches">
-                  <label className="check marginless">
-                    <input
-                      className="switch"
-                      type="checkbox"
-                      checked={selected.probe_source_enabled}
-                      disabled={busy || sites.isPending || sites.isError}
-                      onChange={() => toggle.mutate({ site: selected, automatic: false })}
-                    />
-                    <span>{t("observation.collectSwitch")}</span>
-                  </label>
-                  <label className="check marginless">
-                    <input
-                      className="switch"
-                      type="checkbox"
-                      checked={selected.auto_apply}
-                      disabled={
-                        busy || sites.isPending || sites.isError || !selected.probe_source_enabled
-                      }
-                      onChange={() => toggle.mutate({ site: selected, automatic: true })}
-                    />
-                    <span>{t("observation.autoAdjust")}</span>
-                  </label>
+                  <HeroSwitch
+                    className="observation-toggle"
+                    isSelected={selected.probe_source_enabled}
+                    isDisabled={busy || sites.isPending || sites.isError}
+                    onChange={() => toggle.mutate({ site: selected, automatic: false })}
+                  >
+                    <HeroSwitch.Content>{t("observation.collectSwitch")}</HeroSwitch.Content>
+                  </HeroSwitch>
+                  <HeroSwitch
+                    className="observation-toggle"
+                    isSelected={selected.auto_apply}
+                    isDisabled={
+                      busy || sites.isPending || sites.isError || !selected.probe_source_enabled
+                    }
+                    onChange={() => toggle.mutate({ site: selected, automatic: true })}
+                  >
+                    <HeroSwitch.Content>{t("observation.autoAdjust")}</HeroSwitch.Content>
+                  </HeroSwitch>
                   <InfoTip label={t("observation.autoAdjustHint")} />
                 </div>
                 {toggle.error ? <ErrorState error={toggle.error} /> : null}
@@ -785,7 +789,7 @@ export function SiteObservationWorkspace({
       )}
       <details className="observation-maintenance">
         <summary>{t("modelsPage.siteProbe.maintenance")}</summary>
-        <Button variant="quiet" disabled={busy} onClick={() => setPruneOpen(true)}>
+        <Button variant="danger" disabled={busy} onClick={() => setPruneOpen(true)}>
           {t("modelsPage.siteProbe.prune")}
         </Button>
         <p className="field-hint">{t("modelsPage.siteProbe.pruneHint")}</p>
@@ -864,12 +868,18 @@ function ObservationRow({
     <div className={`observation-model${bulkSelect && selected ? " is-selected" : ""}`}>
       <div className="observation-model-name">
         {bulkSelect ? (
-          <input
-            type="checkbox"
-            checked={selected}
+          <HeroCheckbox
+            className="observation-row-checkbox"
+            isSelected={selected}
             aria-label={item.raw_model}
             onChange={onToggleSelected}
-          />
+          >
+            <HeroCheckbox.Content>
+              <HeroCheckbox.Control>
+                <HeroCheckbox.Indicator />
+              </HeroCheckbox.Control>
+            </HeroCheckbox.Content>
+          </HeroCheckbox>
         ) : null}
         <div>
           <code title={item.raw_model}>{item.raw_model}</code>
@@ -935,7 +945,8 @@ function PolicyFields({
       ).map(([key, label, max]) => (
         <label className="field" key={key}>
           <span>{t(`modelsPage.siteProbe.${label}`)}</span>
-          <input
+          <HeroInput
+            className="observation-policy-input"
             type="number"
             min="1"
             max={max}
@@ -1024,21 +1035,23 @@ function SourceSettings({
         </>
       }
     >
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={automatic}
-          disabled={busy}
-          onChange={(event) => setAutomatic(event.target.checked)}
-        />
-        <span>{t("modelsPage.siteProbe.autoSource")}</span>
+      <div className="observation-source-switch">
+        <HeroSwitch
+          className="observation-toggle"
+          isSelected={automatic}
+          isDisabled={busy}
+          onChange={setAutomatic}
+        >
+          <HeroSwitch.Content>{t("modelsPage.siteProbe.autoSource")}</HeroSwitch.Content>
+        </HeroSwitch>
         <InfoTip label={t("modelsPage.siteProbe.autoSourceHint")} />
-      </label>
+      </div>
       {!automatic ? (
         <div className="observation-source-url">
           <label className="field">
             <span>{t("modelsPage.siteProbe.sourceUrl")}</span>
-            <input
+            <HeroInput
+              className="observation-source-input"
               value={url}
               disabled={save.isPending || clear.isPending}
               aria-label={t("modelsPage.siteProbe.sourceUrl")}

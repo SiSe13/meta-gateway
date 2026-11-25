@@ -1,4 +1,4 @@
-import { useState, useRef, type FormEvent } from "react";
+import { useEffect, useState, useRef, type FormEvent } from "react";
 import { Button as HeroButton } from "@heroui/react";
 import { TeamField as Field, TeamModal } from "./ui";
 import { formatCost } from "../lib/format";
@@ -46,6 +46,10 @@ export function NewMemberDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
+  const [policyIDs, setPolicyIDs] = useState<number[]>(policies[0] ? [policies[0].id] : []);
+  useEffect(() => {
+    if (policyIDs.length === 0 && policies[0]) setPolicyIDs([policies[0].id]);
+  }, [policies, policyIDs.length]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,7 +63,7 @@ export function NewMemberDialog({
           username: form.get("username"),
           name: form.get("name"),
           password: form.get("password") ?? "",
-          policy_id: Number(form.get("policy_id") ?? 0),
+          policy_ids: policyIDs,
           role: form.get("role") ?? "member",
           quota_tokens: Number(form.get("quota_tokens") ?? 0),
           quota_cost: Number(form.get("quota_cost") ?? 0),
@@ -112,15 +116,12 @@ export function NewMemberDialog({
             <Field label={`${t("password")} · ${t("passwordOptional")}`}>
               <input name="password" type="password" autoComplete="new-password" />
             </Field>
-            <Field label={t("policy")}>
-              <select name="policy_id" defaultValue={policies[0]?.id ?? 1}>
-                {policies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <PolicyGroupChoices
+              policies={policies}
+              selected={policyIDs}
+              onChange={setPolicyIDs}
+              t={t}
+            />
             <Field label={t("role")}>
               <select name="role" defaultValue="member" disabled={!isOwner}>
                 <option value="member">{t("member")}</option>
@@ -152,7 +153,7 @@ export function NewMemberDialog({
               variant="primary"
               className="team-button primary"
               type="submit"
-              isDisabled={busy}
+              isDisabled={busy || policyIDs.length === 0}
             >
               {busy ? t("saving") : t("create")}
             </HeroButton>
@@ -189,6 +190,10 @@ export function ImportMembersDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
+  const [policyIDs, setPolicyIDs] = useState<number[]>(policies[0] ? [policies[0].id] : []);
+  useEffect(() => {
+    if (policyIDs.length === 0 && policies[0]) setPolicyIDs([policies[0].id]);
+  }, [policies, policyIDs.length]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -200,7 +205,7 @@ export function ImportMembersDialog({
         method: "POST",
         body: JSON.stringify({
           text: form.get("text"),
-          policy_id: Number(form.get("policy_id") ?? 0),
+          policy_ids: policyIDs,
           quota_tokens: Number(form.get("quota_tokens") ?? 0),
           quota_cost: Number(form.get("quota_cost") ?? 0),
         }),
@@ -283,15 +288,12 @@ export function ImportMembersDialog({
           </Field>
           <p className="team-muted">{t("importHint")}</p>
           <div className="team-grid">
-            <Field label={t("policy")}>
-              <select name="policy_id" defaultValue={policies[0]?.id ?? 1}>
-                {policies.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <PolicyGroupChoices
+              policies={policies}
+              selected={policyIDs}
+              onChange={setPolicyIDs}
+              t={t}
+            />
             <Field label={t("quota")}>
               <input name="quota_tokens" type="number" min={0} step={1000} defaultValue={0} />
             </Field>
@@ -317,7 +319,7 @@ export function ImportMembersDialog({
               variant="primary"
               className="team-button primary"
               type="submit"
-              isDisabled={busy}
+              isDisabled={busy || policyIDs.length === 0}
             >
               {busy ? t("saving") : t("import")}
             </HeroButton>
@@ -333,6 +335,43 @@ export function ImportMembersDialog({
         </form>
       )}
     </TeamModal>
+  );
+}
+
+function PolicyGroupChoices({
+  policies,
+  selected,
+  onChange,
+  t,
+}: {
+  policies: Policy[];
+  selected: number[];
+  onChange: (ids: number[]) => void;
+  t: TeamText;
+}) {
+  return (
+    <fieldset className="team-policy-choices">
+      <legend>{t("authorizationGroups")}</legend>
+      <p className="team-muted">{t("authorizationGroupsHint")}</p>
+      {policies.map((policy) => (
+        <label className="check marginless" key={policy.id}>
+          <input
+            type="checkbox"
+            checked={selected.includes(policy.id)}
+            disabled={selected.length === 1 && selected.includes(policy.id)}
+            onChange={(event) =>
+              onChange(
+                event.target.checked
+                  ? [...selected, policy.id]
+                  : selected.filter((id) => id !== policy.id),
+              )
+            }
+          />
+          <span>{policy.name}</span>
+        </label>
+      ))}
+      {!policies.length && <p className="team-muted">{t("none")}</p>}
+    </fieldset>
   );
 }
 

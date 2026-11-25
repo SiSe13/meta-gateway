@@ -1,7 +1,8 @@
-import { ShieldCheck } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../api/client";
+import type { AuditEvent } from "../../api/types";
 import { useClientPagination } from "../../hooks/useClientPagination";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -17,6 +18,55 @@ import {
   formatDate,
 } from "../../components/ui";
 
+export function auditActionLabel(action: string, t: (key: string) => string) {
+  const key = `systemLogs.action.${action}`;
+  const translated = t(key);
+  if (translated !== key) return translated;
+
+  const parts = action.split(".").filter((part) => part !== "admin");
+  const verb = parts.pop();
+  const resource = parts.map((part) => t(`systemLogs.part.${part}`));
+  const verbLabel = verb ? t(`systemLogs.part.${verb}`) : "";
+  const knownParts = resource.every((part) => !part.startsWith("systemLogs.part."));
+  if (knownParts && !verbLabel.startsWith("systemLogs.part.")) {
+    return `${verbLabel}${resource.length ? `：${resource.join(" / ")}` : ""}`;
+  }
+  return action;
+}
+
+function auditResourceLabel(event: AuditEvent, t: (key: string) => string) {
+  if (!event.resource_kind) return t("systemLogs.noResource");
+  const key = `systemLogs.resource.${event.resource_kind}`;
+  const translated = t(key);
+  const resource = translated === key ? event.resource_kind : translated;
+  return event.resource_id ? `${resource} #${event.resource_id}` : resource;
+}
+
+function auditActorLabel(event: AuditEvent, t: (key: string) => string) {
+  const key = `systemLogs.actor.${event.actor_kind}`;
+  const translated = t(key);
+  const actor = translated === key ? event.actor_kind : translated;
+  return event.actor_id ? `${actor} #${event.actor_id}` : actor;
+}
+
+function auditCategoryLabel(category: string | undefined, t: (key: string) => string) {
+  if (!category) return t("systemLogs.noFailureReason");
+  const key = `systemLogs.category.${category}`;
+  const translated = t(key);
+  return translated === key ? category : translated;
+}
+
+function statusExplanation(status: number, t: (key: string) => string) {
+  if (status >= 200 && status < 300) return t("systemLogs.status.success");
+  if (status === 401 || status === 403) return t("systemLogs.status.permission");
+  if (status === 404) return t("systemLogs.status.notFound");
+  if (status === 409) return t("systemLogs.status.conflict");
+  if (status === 429) return t("systemLogs.status.rateLimited");
+  if (status >= 500) return t("systemLogs.status.serverError");
+  if (status >= 400) return t("systemLogs.status.requestError");
+  return t("systemLogs.status.other");
+}
+
 export function AuditPanel() {
   const { client } = useSession();
   const { t } = useI18n();
@@ -24,14 +74,16 @@ export function AuditPanel() {
   const qc = useQueryClient();
   const [before, setBefore] = useState<number | undefined>();
   const [confirm, setConfirm] = useState(false);
+  const [cleanedCount, setCleanedCount] = useState<number | null>(null);
   const q = useQuery({
     queryKey: ["audit", before],
     queryFn: ({ signal }) => s.auditEvents(before, signal),
   });
   const cleanup = useMutation({
     mutationFn: s.cleanupAudit,
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["audit"] });
+      setCleanedCount(result.removed);
       setConfirm(false);
     },
   });
@@ -42,27 +94,36 @@ export function AuditPanel() {
       actions={
         <Button
           variant="secondary"
-          icon={<ShieldCheck size={16} />}
-          onClick={() => setConfirm(true)}
+          icon={<Trash2 size={16} />}
+          onClick={() => {
+            setCleanedCount(null);
+            setConfirm(true);
+          }}
         >
-          {t("ops.applyRetention")}
+          {t("systemLogs.cleanupButton")}
         </Button>
       }
     >
+      {cleanedCount !== null ? (
+        <p className="system-logs-cleanup-result" role="status">
+          {t("systemLogs.cleanupSuccess", { count: cleanedCount })}
+        </p>
+      ) : null}
       {q.isPending ? (
         <Loading />
       ) : q.isError ? (
         <ErrorState error={q.error} />
       ) : (
         <>
+          <p className="system-logs-guide">{t("systemLogs.guide")}</p>
           <DataTable
             headers={[
-              t("common.action"),
-              t("common.actor"),
-              t("common.resource"),
-              t("common.outcome"),
-              t("common.status"),
-              t("common.category"),
+              t("systemLogs.column.action"),
+              t("systemLogs.column.actor"),
+              t("systemLogs.column.target"),
+              t("systemLogs.column.result"),
+              t("systemLogs.column.httpStatus"),
+              t("systemLogs.column.reason"),
               t("common.time"),
             ]}
             empty={!auditRows.length}
@@ -70,19 +131,19 @@ export function AuditPanel() {
             {auditPagination.pageItems.map((e) => (
               <tr key={e.id}>
                 <td>
-                  <strong>{e.action}</strong>
-                  <small>#{e.id}</small>
+                  <strong title={e.action}>{auditActionLabel(e.action, t)}</strong>
+                  <small>{t("systemLogs.eventId", { id: e.id })}</small>
                 </td>
-                <td>{e.actor_kind}</td>
-                <td>
-                  {e.resource_kind || "-"}
-                  {e.resource_id ? ` #${e.resource_id}` : ""}
-                </td>
+                <td>{auditActorLabel(e, t)}</td>
+                <td>{auditResourceLabel(e, t)}</td>
                 <td>
                   <StatusBadge value={e.outcome} />
                 </td>
-                <td>{e.status_code}</td>
-                <td>{e.category || "-"}</td>
+                <td title={statusExplanation(e.status_code, t)}>
+                  <span className="system-logs-http-status">HTTP {e.status_code}</span>
+                  <small>{statusExplanation(e.status_code, t)}</small>
+                </td>
+                <td>{auditCategoryLabel(e.category, t)}</td>
                 <td>{formatDate(e.created_at)}</td>
               </tr>
             ))}
@@ -113,9 +174,9 @@ export function AuditPanel() {
       )}
       {confirm && (
         <ConfirmDialog
-          title={t("ops.applyRetentionTitle")}
-          message={t("ops.applyRetentionMsg")}
-          confirmLabel={t("ops.runCleanup")}
+          title={t("systemLogs.cleanupTitle")}
+          message={t("systemLogs.cleanupMessage")}
+          confirmLabel={t("systemLogs.cleanupConfirm")}
           pending={cleanup.isPending}
           error={cleanup.error}
           onClose={() => setConfirm(false)}

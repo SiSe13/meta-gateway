@@ -184,7 +184,7 @@ func TestOAuthRequiresConfiguredSelfRegistration(t *testing.T) {
 	mock := newOAuthMockProvider(t)
 	// A policy with no route grants: usable, but not what a member lands on by
 	// default.
-	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Default", Models: []string{}, MemberIDs: []int64{}, MaxKeys: 5, RPM: 120}, 200)
+	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Default", Models: []string{}, MemberIDs: []int64{}}, 200)
 	configureOAuth(t, e, mock, false, 1)
 
 	client := oauthBrowser(t, e)

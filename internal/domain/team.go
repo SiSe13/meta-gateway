@@ -16,6 +16,8 @@ type TeamAccess struct {
 	Plan            map[int64]TeamRouteMember
 	PlanModels      map[string]bool
 	RPM             int
+	AllowRouting             bool
+	AllowRequestPreferences bool
 	DisableFailover bool
 	RetryLimit      *int
 	// QuotaTotalTokens is the account-level credit pool in tokens (0 =

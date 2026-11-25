@@ -49,7 +49,7 @@ export function MemberModelsPage() {
   });
   const userID = account.data?.user.id;
   const canRoute = Boolean(
-    account.data?.policy.allow_routing && account.data?.branding.show_routing,
+    account.data?.user.allow_routing && account.data?.branding.show_routing,
   );
   const plans = useQuery({
     queryKey: ["user", userID, "plans"],

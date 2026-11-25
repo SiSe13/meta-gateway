@@ -45,5 +45,61 @@ it("offers personal/team setup and does not advance after saving sync defaults f
   await waitFor(() =>
     expect(fetcher.mock.calls.some(([path]) => String(path).includes("runtime"))).toBe(true),
   );
-  expect(screen.getByRole("heading", { name: "Welcome to Meta Gateway" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Start with the basics" })).toBeInTheDocument();
+});
+
+it("adds the selected site type when creating the first upstream site", async () => {
+  localStorage.setItem("meta-gateway.locale", "en");
+  localStorage.setItem("meta-gateway.admin-token", "test");
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const path = String(input);
+    if (path === "/admin/mode")
+      return new Response(JSON.stringify({ mode: "personal", has_owner: true, role: "owner" }));
+    if (path === "/admin/runtime-settings" && !init?.method)
+      return new Response(JSON.stringify({ editable: { default_model_sync_mode: "manual" } }));
+    if (path === "/admin/runtime-settings" && init?.method === "PUT")
+      return new Response(JSON.stringify({}));
+    if (path === "/admin/connections" && init?.method === "POST")
+      return new Response(JSON.stringify({ channel: { id: 42 } }));
+    return new Response(JSON.stringify({ error: "unexpected request" }), { status: 500 });
+  });
+  vi.stubGlobal("fetch", fetcher);
+  render(
+    <QueryClientProvider
+      client={
+        new QueryClient({
+          defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+        })
+      }
+    >
+      <I18nProvider>
+        <SessionProvider>
+          <MemoryRouter>
+            <SetupWizard />
+          </MemoryRouter>
+        </SessionProvider>
+      </I18nProvider>
+    </QueryClientProvider>,
+  );
+
+  fireEvent.click((await screen.findAllByRole("radio"))[1]!);
+  fireEvent.click(screen.getByRole("button", { name: "Next" }));
+  const siteType = await screen.findByLabelText("Site type");
+  expect(siteType).toHaveTextContent("OpenAI Compatible");
+  fireEvent.click(siteType);
+  fireEvent.click(await screen.findByRole("option", { name: "Anthropic (Claude Official)" }));
+  fireEvent.change(screen.getByLabelText("Site Base URL"), {
+    target: { value: "https://api.anthropic.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Upstream API key"), {
+    target: { value: "test-upstream-key" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Add site" }));
+
+  await waitFor(() => {
+    const request = fetcher.mock.calls.find(
+      ([path, init]) => String(path) === "/admin/connections" && init?.method === "POST",
+    );
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ type_hint: "anthropic" });
+  });
 });

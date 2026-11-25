@@ -15,6 +15,7 @@ export type ActionMenuItem = {
   key: string;
   label: string;
   icon?: ReactNode;
+  description?: string;
   group?: string;
   danger?: boolean;
   disabled?: boolean;
@@ -250,6 +251,9 @@ export function ActionMenu({
                           </span>
                           <span className="action-menu-copy">
                             <Label>{item.label}</Label>
+                            {item.description ? (
+                              <Description>{item.description}</Description>
+                            ) : null}
                             {hint ? <Description>{hint}</Description> : null}
                           </span>
                         </Dropdown.Item>

@@ -249,3 +249,33 @@ func TestDetectNewAPIByEnvelope(t *testing.T) {
 		t.Fatalf("result=%+v", result)
 	}
 }
+
+func TestDetectOfficialProviderFromURL(t *testing.T) {
+	tests := []struct {
+		url    string
+		family string
+	}{
+		{"https://api.anthropic.com", "anthropic"},
+		{"https://generativelanguage.googleapis.com/v1beta", "gemini"},
+		{"https://api.deepseek.com/v1", "deepseek"},
+		{"https://open.bigmodel.cn/api/paas/v4", "zhipu"},
+		{"https://api.deepseek.com/anthropic", "anthropic"},
+	}
+	for _, test := range tests {
+		t.Run(test.family+"/"+test.url, func(t *testing.T) {
+			result, err := Detect(context.Background(), nil, test.url)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result.Family != test.family || result.Evidence != "url-pattern" {
+				t.Fatalf("result=%+v want family %q from URL", result, test.family)
+			}
+		})
+	}
+}
+
+func TestDetectProviderURLDoesNotMatchLookalikeHost(t *testing.T) {
+	if family, _, ok := detectURLType("https://api.deepseek.com.attacker.example"); ok {
+		t.Fatalf("lookalike host was classified as %q", family)
+	}
+}

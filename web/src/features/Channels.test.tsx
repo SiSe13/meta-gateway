@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { I18nProvider } from "../i18n";
 import { SessionProvider } from "../session";
 import { ToastProvider } from "../toast";
@@ -49,7 +49,15 @@ function renderChannelsAt(path: string) {
           <SessionProvider>
             <MemoryRouter initialEntries={[path]}>
               <Routes>
-                <Route path="/" element={<Channels />} />
+                <Route
+                  path="/"
+                  element={
+                    <>
+                      <Channels />
+                      <CurrentSearch />
+                    </>
+                  }
+                />
               </Routes>
             </MemoryRouter>
           </SessionProvider>
@@ -57,6 +65,10 @@ function renderChannelsAt(path: string) {
       </I18nProvider>
     </QueryClientProvider>,
   );
+}
+
+function CurrentSearch() {
+  return <output data-testid="current-search">{useLocation().search}</output>;
 }
 
 describe("Channels two-phase create", () => {
@@ -160,9 +172,22 @@ describe("Channels two-phase create", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
+    expect(await screen.findByText("Sites")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Site management" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
+    const readyStat = screen.getByRole("button", { name: /Ready/ });
+    fireEvent.click(readyStat);
+    expect(readyStat).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: /Sites/ }));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Add site" })[0]!);
+    fireEvent.click(screen.getByRole("button", { name: "Type" }));
+    const anthropicOption = await screen.findByRole("option", {
+      name: "Anthropic (Claude Official)",
+    });
+    fireEvent.pointerDown(anthropicOption);
+    fireEvent.click(anthropicOption);
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
       target: { value: "https://api.example.com" },
     });
@@ -196,7 +221,7 @@ describe("site observations console entry", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the observations workspace and full connection directory without an inner tab", async () => {
+  it("shows only the observations workspace without the connection directory", async () => {
     const overview = {
       channel: {
         id: 5,
@@ -249,9 +274,14 @@ describe("site observations console entry", () => {
 
     renderChannelsAt("/?view=observations");
 
-    expect(await screen.findByRole("heading", { name: "Site observations" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Site observations" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("searchbox", { name: "Search sites or models" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("group", { name: "Connection views" })).not.toBeInTheDocument();
-    expect(await screen.findByText("observation-directory-channel")).toBeInTheDocument();
+    expect(screen.queryByText("observation-directory-channel")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Sites/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add site" })).not.toBeInTheDocument();
   });
 });
 
@@ -337,7 +367,7 @@ describe("Channels model sync payload", () => {
     );
 
     renderChannels();
-    await screen.findByRole("heading", { name: "Site management" });
+    await screen.findByText("Sites");
     await screen.findByText("empty-upstream");
     fireEvent.click(screen.getAllByRole("button", { name: "More actions" })[0]!);
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sync models" }));
@@ -765,7 +795,12 @@ describe("Channels create-key double-submit guard", () => {
       trigger.click();
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(screen.getByRole("menuitem", { name: /create api key/i })).toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /^edit/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("menuitem", { name: /^disable/i })).not.toBeInTheDocument();
     });
+    expect(screen.getByRole("button", { name: /^details:/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^edit:/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^disable:/i })).toBeInTheDocument();
   });
 });
 
@@ -846,13 +881,10 @@ describe("Channels edit dialog sync mode", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
+    expect(await screen.findByText("Sites")).toBeInTheDocument();
 
     await waitFor(async () => {
-      const trigger = screen.getByRole("button", { name: /more actions/i });
-      trigger.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      screen.getByRole("menuitem", { name: /^edit$/i }).click();
+      screen.getByRole("button", { name: /^edit:/i }).click();
     });
 
     const dialog = await screen.findByRole("dialog");
@@ -937,13 +969,10 @@ describe("Channels edit dialog sync mode", () => {
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
+    expect(await screen.findByText("Sites")).toBeInTheDocument();
 
     await waitFor(async () => {
-      const trigger = screen.getByRole("button", { name: /more actions/i });
-      trigger.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      screen.getByRole("menuitem", { name: /^edit$/i }).click();
+      screen.getByRole("button", { name: /^edit:/i }).click();
     });
 
     const dialog = await screen.findByRole("dialog");
@@ -1020,7 +1049,6 @@ describe("Channels edit dialog user id", () => {
     const credentialBodies: Record<string, unknown>[] = [];
     const credentialPuts: { path: string; body: Record<string, unknown> }[] = [];
     const channelPuts: Record<string, unknown>[] = [];
-    const seen: string[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -1041,6 +1069,9 @@ describe("Channels edit dialog user id", () => {
               updated_at: "",
             },
           ]);
+        }
+        if (path === "/admin/runtime-settings" && method === "GET") {
+          return jsonResponse({ editable: { checkin_enabled: true, checkin_cron: "0 8 * * *" } });
         }
         if (path === "/admin/sites/3/credentials" && method === "GET") {
           return jsonResponse(
@@ -1103,96 +1134,55 @@ describe("Channels edit dialog user id", () => {
           channelPuts.push(JSON.parse(String(init?.body ?? "{}")));
           return jsonResponse({ id: 7 });
         }
-        seen.push(`${method} ${path}`);
         return jsonResponse({ error: `unexpected ${method} ${path}` }, 500);
       }),
     );
 
     renderChannels();
-    expect(await screen.findByRole("heading", { name: "Site management" })).toBeInTheDocument();
+    expect(await screen.findByText("Sites")).toBeInTheDocument();
 
     await waitFor(async () => {
-      const trigger = screen.getByRole("button", { name: /more actions/i });
-      trigger.click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      screen.getByRole("menuitem", { name: /^edit$/i }).click();
+      screen.getByRole("button", { name: /^edit:/i }).click();
     });
     return {
       dialog: await screen.findByRole("dialog"),
       credentialBodies,
       credentialPuts,
       channelPuts,
-      seen,
     };
   }
 
-  it("seeds the stored platform user id and writes a changed one to credential meta", async () => {
-    // The dead end this feature closes: the row badge says "Needs user id"
-    // but there was nowhere to type it.
-    const { dialog, credentialPuts } = await openEditDialog({
-      storedUserID: 1544,
+  it("keeps check-in parameters out of the edit form", async () => {
+    const { dialog } = await openEditDialog({ storedUserID: 1544 });
+    expect(within(dialog).queryByLabelText("User ID")).toBeNull();
+    expect(within(dialog).queryByText(/user id/i)).toBeNull();
+    expect(within(dialog).queryByRole("heading", { name: "Check-in" })).toBeNull();
+  });
+
+  it("opens a separate parameter dialog and enables check-in after saving the missing id", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({ withUserCredential: true });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    const checkinToggle = screen.getByRole("button", {
+      name: "Enable scheduled check-in: new-api-channel",
     });
-
-    const field = within(dialog).getByLabelText("User ID");
-    expect(field).toHaveValue("1544");
-
+    fireEvent.click(checkinToggle);
+    const checkinDialog = await screen.findByRole("dialog", { name: "Check-in" });
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    const field = within(checkinDialog).getByPlaceholderText("e.g. 1544");
     fireEvent.change(field, { target: { value: "2001" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    fireEvent.click(
+      within(checkinDialog).getByRole("button", { name: "Enable scheduled check-in" }),
+    );
 
-    await waitFor(() => expect(credentialPuts.length).toBe(1));
+    await waitFor(() => expect(credentialPuts).toHaveLength(2));
     expect(credentialPuts[0]?.path).toBe("/admin/credentials/42");
     expect(credentialPuts[0]?.body).toMatchObject({
       meta_json: JSON.stringify({ platform_user_id: 2001 }),
     });
-  });
-
-  it("keeps stored meta untouched when the user id was not edited", async () => {
-    const { dialog, credentialPuts, channelPuts } = await openEditDialog({
-      storedUserID: 1544,
-    });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
-
-    // The channel update completes, and no credential write happened: an
-    // untouched dialog must never rewrite (or drop) the stored user id.
-    await waitFor(() => expect(channelPuts.length).toBe(1));
-    expect(credentialPuts).toHaveLength(0);
-    expect(channelPuts[0]).not.toHaveProperty("meta_json");
-  });
-
-  it("rejects a non-numeric user id instead of silently dropping it", async () => {
-    const { dialog, credentialPuts } = await openEditDialog({
-      storedUserID: 1544,
-    });
-    const field = within(dialog).getByLabelText("User ID");
-    fireEvent.change(field, { target: { value: "abc" } });
-
-    expect(within(dialog).getByText("User ID must be digits only.")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Save" })).toBeDisabled();
-    expect(credentialPuts).toHaveLength(0);
-  });
-
-  it("opens the credential section when a user id is missing", async () => {
-    // The row badge says "Needs user id"; the field that fixes it must not be
-    // hidden behind a collapsed section.
-    const { dialog } = await openEditDialog({ withUserCredential: true });
-    expect(within(dialog).getByLabelText("User ID")).toBeInTheDocument();
-  });
-
-  it("tells the operator a typed id needs a user credential to be saved on", async () => {
-    const { dialog } = await openEditDialog({
-      withUserCredential: false,
-    });
-
-    // Nothing stored yet, so the credential fields stay collapsed (the row
-    // badge for this state points at the token, not at the user id).
-    fireEvent.click(within(dialog).getByRole("button", { name: /show advanced/i }));
-
-    const field = within(dialog).getByLabelText("User ID");
-    fireEvent.change(field, { target: { value: "1544" } });
-
-    expect(
-      within(dialog).getByText(/No user credential is set\. Fill in the User Access Token/),
-    ).toBeInTheDocument();
+    expect(credentialPuts[1]?.path).toBe("/admin/credentials/42/checkin");
+    expect(credentialPuts[1]?.body).toMatchObject({ enabled: true });
   });
 });
 
@@ -1369,12 +1359,10 @@ describe("Channels edit dialog endpoint mapping visibility", () => {
     );
 
     renderChannels();
-    await screen.findByRole("heading", { name: "Site management" });
+    await screen.findByText("Sites");
 
     await waitFor(async () => {
-      screen.getByRole("button", { name: /more actions/i }).click();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      screen.getByRole("menuitem", { name: /^edit$/i }).click();
+      screen.getByRole("button", { name: /^edit:/i }).click();
     });
 
     const dialog = await screen.findByRole("dialog");
@@ -1437,13 +1425,11 @@ describe("Channels edit dialog endpoint mapping visibility", () => {
     expect(within(dialog).queryByRole("heading", { name: "Check-in" })).toBeNull();
   });
 
-  it("offers scheduled check-in beside the credential for a supported provider", async () => {
+  it("keeps scheduled check-in out of the edit form for a supported provider", async () => {
     const dialog = await openEditAdvanced({ type_hint: "new-api" }, { checkin_supported: true });
     const advanced = dialog.querySelector(".advanced-fields");
     expect(advanced).not.toBeNull();
-    expect(
-      within(advanced as HTMLElement).getByRole("heading", { name: "Check-in" }),
-    ).toBeInTheDocument();
+    expect(within(advanced as HTMLElement).queryByRole("heading", { name: "Check-in" })).toBeNull();
   });
 });
 
@@ -1596,6 +1582,33 @@ describe("Channels key-pool deep-link", () => {
         row.textContent?.includes("WorkBuddy"),
       );
     await waitFor(() => expect(workBuddyRow()).toHaveClass("is-selected"));
+  });
+
+  it("remembers the selected row after refresh without reopening its details", async () => {
+    stubTwoSites();
+
+    const firstRender = renderChannelsAt("/");
+    await screen.findByText("WorkBuddy");
+    const workBuddyRow = () =>
+      Array.from(document.querySelectorAll(".channels-directory tbody tr")).find((row) =>
+        row.textContent?.includes("WorkBuddy"),
+      );
+    await waitFor(() =>
+      expect(
+        document.querySelector(".channels-directory tbody tr.is-selected"),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("current-search")).toBeEmptyDOMElement();
+
+    fireEvent.click(workBuddyRow()!);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("current-search")).toBeEmptyDOMElement();
+    firstRender.unmount();
+
+    renderChannelsAt("/");
+    await screen.findByText("WorkBuddy");
+    await waitFor(() => expect(workBuddyRow()).toHaveClass("is-selected"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });
 

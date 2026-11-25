@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { CHROME_NAV_ITEMS } from "./chromeNav";
+import { CHROME_NAV_GROUPS, CHROME_NAV_ITEMS } from "./chromeNav";
 import { MODE_GATED_NAV, modeHiddenNav } from "./topBar";
 
 describe("console navigation registry", () => {
+  it("orders the top-level workspaces as requested", () => {
+    expect(CHROME_NAV_GROUPS.map((group) => group.id)).toEqual([
+      "console",
+      "users",
+      "observations",
+      "settings",
+      "backup",
+    ]);
+  });
+
   it("keeps the requested workspaces and pages in one navigation registry", () => {
-    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users")?.group).toBe("users");
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users/members")?.group).toBe("users");
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users/oauth")?.group).toBe("users");
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/backups")?.group).toBe("backup");
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/logs")?.roles).toEqual([
+      "owner",
+      "admin",
+      "member",
+    ]);
+    expect(CHROME_NAV_ITEMS.find((item) => item.path === "/system-logs")?.roles).toEqual([
+      "owner",
+      "admin",
+    ]);
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/workbench")).toBeUndefined();
     expect(CHROME_NAV_ITEMS.filter((item) => item.group === "settings")).toEqual([
       expect.objectContaining({ path: "/settings?tab=runtime" }),
@@ -30,7 +49,7 @@ describe("console navigation registry", () => {
 it("reserves personal settings for a team account while retaining deployment settings", async () => {
   const { CHROME_NAV_ITEMS, canAccessNav } = await import("./chromeNav");
   expect(CHROME_NAV_ITEMS.some((item) => item.path === "/account")).toBe(false);
-  const users = CHROME_NAV_ITEMS.find((item) => item.path === "/users")!;
+  const users = CHROME_NAV_ITEMS.find((item) => item.path === "/users/members")!;
   expect(canAccessNav(users, "admin")).toBe(true);
   expect(canAccessNav(users, "member")).toBe(false);
   expect(

@@ -1,4 +1,13 @@
-import { HeartPulse, Plus, RefreshCw, UserCheck } from "lucide-react";
+import {
+  Cable,
+  CircleCheck,
+  HeartPulse,
+  KeyRound,
+  Plus,
+  RefreshCw,
+  TriangleAlert,
+  UserCheck,
+} from "lucide-react";
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -44,7 +53,6 @@ import {
 import { useListSelection } from "../lib/useListSelection";
 import { useChannelBulk } from "./channels/useChannelBulk";
 import { ChannelDirectory } from "./channels/ChannelDirectory";
-import { parseCredentialMeta } from "./credentialMeta";
 export { channelReadiness } from "./channelHealth";
 
 const INVALIDATE = [
@@ -89,6 +97,7 @@ export function Channels() {
     createKeyLocked,
     closeModelsDrawer,
     selectedId,
+    setSelectedId,
     inspectorOpen,
     setInspectorOpen,
     contextMenu,
@@ -101,13 +110,11 @@ export function Channels() {
     query,
     setQuery,
     healthFilter,
-    setHealthFilter,
     typeFilter,
     setTypeFilter,
     groupFilter,
     setGroupFilter,
     updateFilterParam,
-    toggleHealthFilter,
   } = filters;
   const verifyAfterCreate = useRef(false);
   const runVerifyRef = useRef<(channelId: number, name: string) => void>(() => undefined);
@@ -325,8 +332,6 @@ export function Channels() {
       usage_limit_tokens?: number;
       userToken: string;
       userCookie: string;
-      /** New-API family numeric user id (`New-Api-User`). Empty = unknown. */
-      userID: string;
       apiKey: string;
     }) => {
       const name = input.name.trim() || input.channel.name;
@@ -360,14 +365,6 @@ export function Channels() {
       const apiKey = input.apiKey.trim();
       const userCred = input.userCredential;
       const relayCred = input.relayCredential;
-      // The New-API numeric user id lives in credential meta_json
-      // ({"platform_user_id":1544}). An empty field means "unknown": the
-      // gateway keeps resolving it from /api/user/self at check-in time, so
-      // only write when the operator typed something or cleared a stored id.
-      const userIDRaw = input.userID.trim();
-      const storedUserID = parseCredentialMeta(userCred?.meta_json).platform_user_id;
-      const userID = /^[0-9]+$/.test(userIDRaw) ? Number(userIDRaw) : undefined;
-      const metaChanged = userID !== storedUserID;
       // The mask means "keep the stored value". An empty field means "remove"
       // only when something was actually stored; otherwise every save of an
       // untouched dialog would fire a pointless credential write.
@@ -387,11 +384,11 @@ export function Channels() {
           userCred,
           userToken,
           userCookie,
-          userID,
+          userID: undefined,
           userAuthMode,
           secretChanged,
           cookieChanged,
-          metaChanged,
+          metaChanged: false,
         });
       if (input.site) {
         if (userCred?.id) {
@@ -408,7 +405,6 @@ export function Channels() {
             kind: "access_token",
             ...(userToken ? { secret: userToken } : {}),
             ...(userCookie ? { cookie: userCookie } : {}),
-            ...(userID ? { meta_json: JSON.stringify({ platform_user_id: userID }) } : {}),
             auth_mode: userAuthMode,
             status: "enabled",
           });
@@ -549,6 +545,9 @@ export function Channels() {
     onSuccess: (_data, id) => {
       setRemove(null);
       if (selectedId === id) {
+        setSelectedId(undefined);
+        writeChannelTab("selected", null);
+        setInspectorOpen(false);
         const next = new URLSearchParams(params);
         next.delete("id");
         setParams(next, { replace: true });
@@ -681,29 +680,20 @@ export function Channels() {
     />
   );
 
-  // Selection for a URL that carries no usable ?id — in priority order: the
-  // channel a deep-link is landing on, the selection this tab had last (a bare
-  // sidebar navigation drops the query string), then the first row. This used
-  // to be two effects, and the first-row one ran second: it overwrote both the
-  // stored selection and the deep-link that opened the drawer.
+  // Restore the tab's last row, or select the first visible row without turning
+  // that ordinary selection into a persistent deep link that reopens on refresh.
   useEffect(() => {
-    if (selectedId) return;
     // The ?channel=/?keys= effects above own the selection while their target is
     // still unread from the URL (they commit the id in this same render pass).
     if (params.get("channel") || params.get("keys")) return;
     if (!rows.length) return;
+    if (selectedId && (overviews.data ?? []).some((r) => r.channel.id === selectedId)) return;
     const saved = readChannelTab<number | null>("selected", null);
     const target =
       saved != null && rows.some((r) => r.channel.id === saved) ? saved : rows[0]!.channel.id;
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("id", String(target));
-        return next;
-      },
-      { replace: true },
-    );
-  }, [rows, selectedId, params, setParams]);
+    setSelectedId(target);
+    writeChannelTab("selected", target);
+  }, [rows, overviews.data, selectedId, params, setSelectedId]);
 
   const selected =
     rows.find((r) => r.channel.id === selectedId) ??
@@ -718,9 +708,12 @@ export function Channels() {
 
   const selectRow = (id: number) => {
     writeChannelTab("selected", id);
+    setSelectedId(id);
     const next = new URLSearchParams(params);
-    next.set("id", String(id));
-    setParams(next, { replace: true });
+    if (next.has("id")) {
+      next.delete("id");
+      setParams(next, { replace: true });
+    }
   };
 
   /** User token for check-in on a site; see channels/channelCredentials.ts. */
@@ -794,294 +787,312 @@ export function Channels() {
   const observationView = params.get("view") === "observations";
   return (
     <Page
-      title={t(observationView ? "observation.title" : "channels.title")}
-      description={t(observationView ? "observation.description" : "channels.description")}
-      actions={
-        <>
-          <Button
-            variant="secondary"
-            icon={<RefreshCw size={16} className={refreshAll.isPending ? "spin" : ""} />}
-            disabled={refreshAll.isPending || !rows.length}
-            onClick={() => {
-              refreshAll.reset();
-              refreshAll.mutate();
-            }}
-          >
-            {t("channels.refreshAll")}
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<UserCheck size={16} className={checkAllTokens.isPending ? "spin" : ""} />}
-            disabled={checkAllTokens.isPending || !rows.length}
-            onClick={() => {
-              checkAllTokens.reset();
-              checkAllTokens.mutate();
-            }}
-          >
-            {t("channels.checkAllTokens")}
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<HeartPulse size={16} />}
-            disabled={!rows.length}
-            onClick={() => setKeepaliveOpen(true)}
-          >
-            {t("channels.keepalive.open")}
-          </Button>
-          <Button icon={<Plus size={16} />} onClick={openAdd}>
-            {t("channels.add")}
-          </Button>
-        </>
-      }
+      className={`channels-page${observationView ? " channels-observation-page" : ""}`}
+      title=""
+      description=""
+      hideHeading={observationView}
     >
       {observationView ? (
         <SiteObservationWorkspace
           initialSiteId={Number(params.get("site")) || undefined}
           initialModel={params.get("model") || ""}
         />
-      ) : null}
-      <div className="ops-canvas">
-        {bulkFailures.length > 0 ? (
-          <div role="alert" className="inline-error">
-            {bulkFailures.map((failure) => (
-              <p key={failure.item}>
-                #{failure.item}: {formatErrorMessage(failure.error, t)}
-              </p>
-            ))}
-          </div>
-        ) : null}
-        <TelemetryStrip
-          items={[
-            {
-              label: t("channels.stat.total"),
-              value: overviews.data?.length ?? "—",
-              onClick: () => setHealthFilter("all"),
-              active: healthFilter === "all",
-              hint: t("channels.stat.totalHint"),
-              tone: "primary",
-            },
-            {
-              label: t("channels.stat.ready"),
-              value: overviews.isPending ? "—" : readyCount,
-              onClick: () => toggleHealthFilter("ready"),
-              active: healthFilter === "ready",
-              hint: t("channels.stat.readyHint"),
-              tone: "success",
-            },
-            {
-              label: t("channels.stat.missingKey"),
-              value: overviews.isPending ? "—" : missingKeyCount,
-              onClick: () => toggleHealthFilter("missing_key"),
-              active: healthFilter === "missing_key",
-              hint: t("channels.stat.missingKeyHint"),
-              tone: "warning",
-            },
-            {
-              label: t("channels.stat.attention"),
-              value: overviews.isPending ? "—" : attentionCount,
-              onClick: () => toggleHealthFilter("attention"),
-              active: healthFilter === "attention",
-              hint: t("channels.stat.attentionHint"),
-              tone: "danger",
-            },
-          ]}
-        />
-
-        {stageMessage?.kind === "created" ? (
-          <ResultStrip status="info">
-            {t("channels.createdOnly", { name: stageMessage.name })}
-          </ResultStrip>
-        ) : null}
-        {stageMessage?.kind === "created_and_verified" ? (
-          <ResultStrip status="success">
-            {t("channels.createdAndSynced", {
-              name: stageMessage.name,
-              models: stageMessage.models ?? 0,
-            })}
-          </ResultStrip>
-        ) : null}
-        {stageMessage?.kind === "verify_failed" ? (
-          <ResultStrip status="error">
-            <span>{t("channels.verifyFailed", { name: stageMessage.name })}</span>
-            <Button
-              variant="secondary"
-              disabled={refresh.isPending}
-              onClick={() => retryVerify(stageMessage.channelId)}
-            >
-              {t("channels.retryVerify")}
-            </Button>
-          </ResultStrip>
-        ) : null}
-        {refreshAll.data ? (
-          <ResultStrip status={refreshAll.data.failure_count > 0 ? "error" : "success"}>
-            {t("ops.refreshSummary", {
-              success: refreshAll.data.success_count,
-              failure: refreshAll.data.failure_count,
-            })}
-          </ResultStrip>
-        ) : null}
-        {checkAllTokens.data ? (
-          <ResultStrip
-            status={checkAllTokens.data.items.some((item) => !item.ok) ? "error" : "success"}
-          >
-            {t("channels.checkAllTokensSummary", {
-              success: checkAllTokens.data.items.filter((item) => item.ok).length,
-              failure: checkAllTokens.data.items.filter((item) => !item.ok).length,
-            })}
-          </ResultStrip>
-        ) : null}
-        {refresh.data && stageMessage?.kind !== "created_and_verified" ? (
-          <ResultStrip status="success">
-            {t("channels.refreshResult", {
-              id: refresh.data.channel_id,
-              models: (refresh.data.models ?? []).length,
-            })}
-          </ResultStrip>
-        ) : null}
-        {probe.data ? (
-          <ResultStrip status="success">
-            {t("channels.probeResult", {
-              id: probe.data.channel_id,
-              models: (probe.data.models ?? []).length,
-              latency: probe.data.latency_ms,
-            })}
-          </ResultStrip>
-        ) : null}
-        {accountProbe.data ? (
-          <ResultStrip status="success">
-            {t("channels.accountProbeResult", {
-              user: accountProbe.data.username,
-              latency: accountProbe.data.latency_ms,
-            })}
-          </ResultStrip>
-        ) : null}
-        {syncKeys.data ? (
-          <ResultStrip
-            status={
-              syncKeys.data.created_credentials + syncKeys.data.reused_credentials > 0
-                ? "success"
-                : syncKeys.data.skipped_masked > 0 || syncKeys.data.empty_list
-                  ? "error"
-                  : "info"
-            }
-          >
-            <span>
-              {t("channels.syncKeysResult", {
-                created: syncKeys.data.created_credentials,
-                reused: syncKeys.data.reused_credentials,
-                masked: syncKeys.data.skipped_masked,
-                deleted: syncKeys.data.deleted_credentials ?? 0,
-              })}
-              {(syncKeys.data.created_channels || syncKeys.data.updated_channels) &&
-                ` ${t("channels.syncKeysGroups", {
-                  created: syncKeys.data.created_channels ?? 0,
-                  updated: syncKeys.data.updated_channels ?? 0,
-                })}`}
-              {syncKeys.data.message
-                ? ` — ${formatErrorMessage(syncKeys.data.message, t)}`
-                : syncKeys.data.empty_list
-                  ? ` — ${t("channels.syncKeysEmpty")}`
-                  : syncKeys.data.skipped_masked > 0 &&
-                      syncKeys.data.created_credentials + syncKeys.data.reused_credentials === 0
-                    ? ` — ${t("channels.syncKeysMasked")}`
-                    : ""}
-            </span>
-          </ResultStrip>
-        ) : null}
-
-        <div className="channels-workspace">
-          <ChannelDirectory
-            t={t}
-            query={query}
-            setQuery={setQuery}
-            params={params}
-            setParams={setParams}
-            typeFilter={typeFilter}
-            setTypeFilter={setTypeFilter}
-            groupFilter={groupFilter}
-            setGroupFilter={setGroupFilter}
-            updateFilterParam={updateFilterParam}
-            filterOptions={filterOptions}
-            healthFilter={healthFilter}
-            setHealthFilter={setHealthFilter}
-            overviews={overviews}
-            pinnedIds={channelPins.pinnedRefs}
-            rows={rows}
-            modelMatches={modelMatches}
-            pageRows={pageRows}
-            siteById={siteById}
-            selected={selected}
-            pagination={pagination}
-            bulkMode={bulkMode}
-            bulkSelected={bulkSelected}
-            toggleBulkSelected={toggleBulkSelected}
-            setBulkSelected={setBulkSelected}
-            exitBulkMode={exitBulkMode}
-            bulkBusy={bulkBusy}
-            bulkSync={bulkSync}
-            bulkStatus={bulkStatus}
-            bulkHeader={bulkHeader}
-            openAdd={openAdd}
-            selectRow={selectRow}
-            setInspectorOpen={setInspectorOpen}
-            setContextMenu={setContextMenu}
-            contextMenu={contextMenu}
-            connectionActions={connectionActions}
-            pending={{ refresh, probe, accountProbe, syncKeys, toggle, del }}
+      ) : (
+        <div className="ops-canvas">
+          {bulkFailures.length > 0 ? (
+            <div role="alert" className="inline-error">
+              {bulkFailures.map((failure) => (
+                <p key={failure.item}>
+                  #{failure.item}: {formatErrorMessage(failure.error, t)}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <TelemetryStrip
+            className="channels-stats"
+            items={[
+              {
+                label: t("channels.stat.total"),
+                value: overviews.data?.length ?? "—",
+                onClick: () => filters.setHealthFilter("all"),
+                active: healthFilter === "all",
+                hint: t("channels.stat.totalHint"),
+                tone: "primary",
+                icon: <Cable size={17} />,
+              },
+              {
+                label: t("channels.stat.ready"),
+                value: overviews.isPending ? "—" : readyCount,
+                onClick: () => filters.toggleHealthFilter("ready"),
+                active: healthFilter === "ready",
+                hint: t("channels.stat.readyHint"),
+                tone: "success",
+                icon: <CircleCheck size={17} />,
+              },
+              {
+                label: t("channels.stat.missingKey"),
+                value: overviews.isPending ? "—" : missingKeyCount,
+                onClick: () => filters.toggleHealthFilter("missing_key"),
+                active: healthFilter === "missing_key",
+                hint: t("channels.stat.missingKeyHint"),
+                tone: "warning",
+                icon: <KeyRound size={17} />,
+              },
+              {
+                label: t("channels.stat.attention"),
+                value: overviews.isPending ? "—" : attentionCount,
+                onClick: () => filters.toggleHealthFilter("attention"),
+                active: healthFilter === "attention",
+                hint: t("channels.stat.attentionHint"),
+                tone: "danger",
+                icon: <TriangleAlert size={17} />,
+              },
+            ]}
           />
 
-          <ThemeDetails
-            open={inspectorOpen}
-            title={t("channels.details")}
-            onClose={() => setInspectorOpen(false)}
-          >
-            <div className="detail-card ops-detail-card is-compact">
-              {!selected ? (
-                <div className="detail-empty">{t("channels.selectHint")}</div>
-              ) : (
-                <ChannelDetail
-                  overview={selected}
-                  site={
-                    selected.channel.site_id != null
-                      ? siteById.get(selected.channel.site_id)
-                      : undefined
-                  }
-                  accountData={
-                    accountProbe.data?.channel_id === selected.channel.id ? accountProbe.data : null
-                  }
-                  busy={
-                    refresh.pendingId === selected.channel.id ||
-                    probe.pendingId === selected.channel.id ||
-                    accountProbe.pendingId === selected.channel.id ||
-                    syncKeys.pendingId === selected.channel.id ||
-                    toggle.pendingId === selected.channel.id ||
-                    del.pendingId === selected.channel.id ||
-                    ping.pendingId === selected.channel.id
-                  }
-                  onCheckAccount={() => {
-                    accountProbe.reset();
-                    accountProbe.mutate(selected.channel.id);
-                  }}
-                  onPing={() => {
-                    ping.reset();
-                    ping.mutate(selected.channel.id);
-                  }}
-                  pingPending={ping.pendingId === selected.channel.id}
-                  pingResult={ping.data?.channel_id === selected.channel.id ? ping.data : null}
-                  onRefresh={() => {
-                    refresh.reset();
-                    refresh.mutate(selected.channel.id);
-                  }}
-                  onEdit={() => {
-                    saveEdit.reset();
-                    setEdit(selected.channel);
-                  }}
-                />
-              )}
-            </div>
-          </ThemeDetails>
+          {stageMessage?.kind === "created" ? (
+            <ResultStrip status="info">
+              {t("channels.createdOnly", { name: stageMessage.name })}
+            </ResultStrip>
+          ) : null}
+          {stageMessage?.kind === "created_and_verified" ? (
+            <ResultStrip status="success">
+              {t("channels.createdAndSynced", {
+                name: stageMessage.name,
+                models: stageMessage.models ?? 0,
+              })}
+            </ResultStrip>
+          ) : null}
+          {stageMessage?.kind === "verify_failed" ? (
+            <ResultStrip status="error">
+              <span>{t("channels.verifyFailed", { name: stageMessage.name })}</span>
+              <Button
+                variant="secondary"
+                disabled={refresh.isPending}
+                onClick={() => retryVerify(stageMessage.channelId)}
+              >
+                {t("channels.retryVerify")}
+              </Button>
+            </ResultStrip>
+          ) : null}
+          {refreshAll.data ? (
+            <ResultStrip status={refreshAll.data.failure_count > 0 ? "error" : "success"}>
+              {t("ops.refreshSummary", {
+                success: refreshAll.data.success_count,
+                failure: refreshAll.data.failure_count,
+              })}
+            </ResultStrip>
+          ) : null}
+          {checkAllTokens.data ? (
+            <ResultStrip
+              status={checkAllTokens.data.items.some((item) => !item.ok) ? "error" : "success"}
+            >
+              {t("channels.checkAllTokensSummary", {
+                success: checkAllTokens.data.items.filter((item) => item.ok).length,
+                failure: checkAllTokens.data.items.filter((item) => !item.ok).length,
+              })}
+            </ResultStrip>
+          ) : null}
+          {refresh.data && stageMessage?.kind !== "created_and_verified" ? (
+            <ResultStrip status="success">
+              {t("channels.refreshResult", {
+                id: refresh.data.channel_id,
+                models: (refresh.data.models ?? []).length,
+              })}
+            </ResultStrip>
+          ) : null}
+          {probe.data ? (
+            <ResultStrip status="success">
+              {t("channels.probeResult", {
+                id: probe.data.channel_id,
+                models: (probe.data.models ?? []).length,
+                latency: probe.data.latency_ms,
+              })}
+            </ResultStrip>
+          ) : null}
+          {accountProbe.data ? (
+            <ResultStrip status="success">
+              {t("channels.accountProbeResult", {
+                user: accountProbe.data.username,
+                latency: accountProbe.data.latency_ms,
+              })}
+            </ResultStrip>
+          ) : null}
+          {syncKeys.data ? (
+            <ResultStrip
+              status={
+                syncKeys.data.created_credentials + syncKeys.data.reused_credentials > 0
+                  ? "success"
+                  : syncKeys.data.skipped_masked > 0 || syncKeys.data.empty_list
+                    ? "error"
+                    : "info"
+              }
+            >
+              <span>
+                {t("channels.syncKeysResult", {
+                  created: syncKeys.data.created_credentials,
+                  reused: syncKeys.data.reused_credentials,
+                  masked: syncKeys.data.skipped_masked,
+                  deleted: syncKeys.data.deleted_credentials ?? 0,
+                })}
+                {(syncKeys.data.created_channels || syncKeys.data.updated_channels) &&
+                  ` ${t("channels.syncKeysGroups", {
+                    created: syncKeys.data.created_channels ?? 0,
+                    updated: syncKeys.data.updated_channels ?? 0,
+                  })}`}
+                {syncKeys.data.message
+                  ? ` — ${formatErrorMessage(syncKeys.data.message, t)}`
+                  : syncKeys.data.empty_list
+                    ? ` — ${t("channels.syncKeysEmpty")}`
+                    : syncKeys.data.skipped_masked > 0 &&
+                        syncKeys.data.created_credentials + syncKeys.data.reused_credentials === 0
+                      ? ` — ${t("channels.syncKeysMasked")}`
+                      : ""}
+              </span>
+            </ResultStrip>
+          ) : null}
+
+          <div className="channels-workspace">
+            <ChannelDirectory
+              t={t}
+              query={query}
+              setQuery={setQuery}
+              params={params}
+              setParams={setParams}
+              typeFilter={typeFilter}
+              setTypeFilter={setTypeFilter}
+              groupFilter={groupFilter}
+              setGroupFilter={setGroupFilter}
+              updateFilterParam={updateFilterParam}
+              filterOptions={filterOptions}
+              healthFilter={healthFilter}
+              setHealthFilter={filters.setHealthFilter}
+              overviews={overviews}
+              pinnedIds={channelPins.pinnedRefs}
+              rows={rows}
+              modelMatches={modelMatches}
+              pageRows={pageRows}
+              selected={selected}
+              pagination={pagination}
+              bulkMode={bulkMode}
+              bulkSelected={bulkSelected}
+              toggleBulkSelected={toggleBulkSelected}
+              setBulkSelected={setBulkSelected}
+              exitBulkMode={exitBulkMode}
+              bulkBusy={bulkBusy}
+              bulkSync={bulkSync}
+              bulkStatus={bulkStatus}
+              bulkHeader={bulkHeader}
+              addAction={
+                <Button
+                  className="channels-add-site-button"
+                  icon={<Plus size={16} />}
+                  onClick={openAdd}
+                >
+                  {t("channels.add")}
+                </Button>
+              }
+              maintenanceActions={
+                <>
+                  <Button
+                    variant="secondary"
+                    icon={<RefreshCw size={16} className={refreshAll.isPending ? "spin" : ""} />}
+                    disabled={refreshAll.isPending || !rows.length}
+                    onClick={() => {
+                      refreshAll.reset();
+                      refreshAll.mutate();
+                    }}
+                  >
+                    {t("channels.refreshAll")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    icon={
+                      <UserCheck size={16} className={checkAllTokens.isPending ? "spin" : ""} />
+                    }
+                    disabled={checkAllTokens.isPending || !rows.length}
+                    onClick={() => {
+                      checkAllTokens.reset();
+                      checkAllTokens.mutate();
+                    }}
+                  >
+                    {t("channels.checkAllTokens")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    icon={<HeartPulse size={16} />}
+                    disabled={!rows.length}
+                    onClick={() => setKeepaliveOpen(true)}
+                  >
+                    {t("channels.keepalive.open")}
+                  </Button>
+                </>
+              }
+              setCheckin={(input) => setCheckin.mutateAsync(input)}
+              openAdd={openAdd}
+              selectRow={selectRow}
+              setInspectorOpen={setInspectorOpen}
+              setContextMenu={setContextMenu}
+              contextMenu={contextMenu}
+              connectionActions={connectionActions}
+              pending={{ refresh, probe, accountProbe, syncKeys, toggle, del }}
+            />
+
+            <ThemeDetails
+              open={inspectorOpen}
+              title={t("channels.details")}
+              onClose={() => setInspectorOpen(false)}
+            >
+              <div className="detail-card ops-detail-card is-compact">
+                {!selected ? (
+                  <div className="detail-empty">{t("channels.selectHint")}</div>
+                ) : (
+                  <ChannelDetail
+                    overview={selected}
+                    site={
+                      selected.channel.site_id != null
+                        ? siteById.get(selected.channel.site_id)
+                        : undefined
+                    }
+                    accountData={
+                      accountProbe.data?.channel_id === selected.channel.id
+                        ? accountProbe.data
+                        : null
+                    }
+                    busy={
+                      refresh.pendingId === selected.channel.id ||
+                      probe.pendingId === selected.channel.id ||
+                      accountProbe.pendingId === selected.channel.id ||
+                      syncKeys.pendingId === selected.channel.id ||
+                      toggle.pendingId === selected.channel.id ||
+                      del.pendingId === selected.channel.id ||
+                      ping.pendingId === selected.channel.id
+                    }
+                    onCheckAccount={() => {
+                      accountProbe.reset();
+                      accountProbe.mutate(selected.channel.id);
+                    }}
+                    onPing={() => {
+                      ping.reset();
+                      ping.mutate(selected.channel.id);
+                    }}
+                    pingPending={ping.pendingId === selected.channel.id}
+                    pingResult={ping.data?.channel_id === selected.channel.id ? ping.data : null}
+                    onRefresh={() => {
+                      refresh.reset();
+                      refresh.mutate(selected.channel.id);
+                    }}
+                    onEdit={() => {
+                      saveEdit.reset();
+                      setEdit(selected.channel);
+                    }}
+                  />
+                )}
+              </div>
+            </ThemeDetails>
+          </div>
         </div>
-      </div>
+      )}
 
       {keepaliveOpen ? <KeepaliveDialog onClose={() => setKeepaliveOpen(false)} /> : null}
 

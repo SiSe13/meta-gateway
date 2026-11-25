@@ -2,7 +2,7 @@ import type React from "react";
 import { Link } from "react-router-dom";
 import { useAvailability } from "../../hooks/useAvailability";
 import { AvailabilityIndicator } from "../../components/AvailabilityIndicator";
-import { Pin, Plus } from "lucide-react";
+import { Filter, Pin } from "lucide-react";
 import type { Channel, Route, RouteOverview } from "../../api/types";
 import { ActionMenu, type ActionMenuItem } from "../../components/ActionMenu";
 import { rowContextPoint, rowKeyboardContextPoint } from "../../components/contextMenu";
@@ -11,6 +11,7 @@ import { EntityState } from "../../components/EntityState";
 import { ListShell } from "../../components/ListShell";
 import { ModelDirectoryToolbar } from "../../components/ModelDirectoryToolbar";
 import { PaginationBar } from "../../components/PaginationBar";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { Button, Panel } from "../../components/ui";
 import { ModelDirectoryTable } from "./ModelDirectoryTable";
 import { modelGroup } from "./modelGroups";
@@ -37,6 +38,7 @@ type ContextTarget = { routeId: number; top: number; left: number } | null;
 
 export type RouteDirectoryProps = {
   t: Text;
+  headerActions?: React.ReactNode;
   /* Search and filters. */
   query: string;
   setQuery: (value: string) => void;
@@ -103,14 +105,12 @@ export type RouteDirectoryProps = {
   modelActions: (route: Route, options?: { closeContext?: boolean }) => ActionMenuItem[];
   /* Row busy state. */
   pending: { toggleRoute: { pendingId?: number | string | null }; del: { isPending: boolean } };
-  /* Creating a route from the empty state: reset the draft, then open it. */
-  resetRouteDraft: () => void;
-  startNewRoute: () => void;
 };
 
 export function RouteDirectory(props: RouteDirectoryProps) {
   const {
     t,
+    headerActions,
     query,
     setQuery,
     params,
@@ -151,12 +151,14 @@ export function RouteDirectory(props: RouteDirectoryProps) {
     modelActions,
     modelPins,
     pending,
-    resetRouteDraft,
-    startNewRoute,
   } = props;
   const availability = useAvailability({ routeIds: pageRows.map((item) => item.route.id!) });
   return (
-    <Panel className="ops-list-panel model-directory" title={t("modelsPage.listTitle")}>
+    <Panel
+      className="ops-list-panel model-directory"
+      title={t("modelsPage.listTitle")}
+      actions={headerActions}
+    >
       <ModelDirectoryToolbar
         value={query}
         label={t("routing.searchPlaceholder")}
@@ -171,7 +173,11 @@ export function RouteDirectory(props: RouteDirectoryProps) {
       >
         <Button
           variant="quiet"
+          icon={<Filter size={14} />}
           aria-expanded={showModelFilters}
+          className={
+            activeFilterCount > 0 ? "models-filter-trigger is-active" : "models-filter-trigger"
+          }
           onClick={() => setShowModelFilters(!showModelFilters)}
         >
           {activeFilterCount > 0
@@ -179,11 +185,15 @@ export function RouteDirectory(props: RouteDirectoryProps) {
             : t("modelsPage.filters")}
         </Button>
         <div className="models-filter-options" hidden={!showModelFilters}>
-          <select
+          <SearchableSelect
             aria-label={t("modelsPage.groupFilter")}
+            placeholder={t("modelsPage.allGroups")}
+            options={[
+              { value: "", label: t("modelsPage.allGroups") },
+              ...modelGroups.map((group) => ({ value: group, label: group })),
+            ]}
             value={groupFilter}
-            onChange={(event) => {
-              const nextGroup = event.target.value;
+            onChange={(nextGroup) => {
               setGroupFilter(nextGroup);
               const next = new URLSearchParams(params);
               if (nextGroup) next.set("group", nextGroup);
@@ -191,19 +201,17 @@ export function RouteDirectory(props: RouteDirectoryProps) {
               next.delete("route");
               setSearchParams(next, { replace: true });
             }}
-          >
-            <option value="">{t("modelsPage.allGroups")}</option>
-            {modelGroups.map((group) => (
-              <option key={group} value={group}>
-                {group}
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <SearchableSelect
             aria-label={t("ops.filterChannel")}
-            value={channelFilter}
-            onChange={(event) => {
-              const next = Number(event.target.value) || 0;
+            placeholder={t("ops.allChannels")}
+            options={[
+              { value: "0", label: t("ops.allChannels") },
+              ...channels.map((channel) => ({ value: String(channel.id), label: channel.name })),
+            ]}
+            value={String(channelFilter)}
+            onChange={(value) => {
+              const next = Number(value) || 0;
               setChannelFilter(next);
               const nextParams = new URLSearchParams(params);
               if (next > 0) nextParams.set("channel_id", String(next));
@@ -211,29 +219,24 @@ export function RouteDirectory(props: RouteDirectoryProps) {
               nextParams.delete("route");
               setSearchParams(nextParams, { replace: true });
             }}
-          >
-            <option value={0}>{t("ops.allChannels")}</option>
-            {channels.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {channel.name}
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <SearchableSelect
             aria-label={t("modelsPage.statusFilter")}
+            placeholder={t("modelsPage.statusAll")}
+            options={[
+              { value: "all", label: t("modelsPage.statusAll") },
+              { value: "enabled", label: t("common.enabled") },
+              { value: "disabled", label: t("common.disabled") },
+            ]}
             value={statusFilter}
-            onChange={(event) => {
-              const next = event.target.value as "enabled" | "disabled" | "all";
+            onChange={(value) => {
+              const next = value as "enabled" | "disabled" | "all";
               setStatusFilter(next);
               const nextParams = new URLSearchParams(params);
               nextParams.delete("route");
               setSearchParams(nextParams, { replace: true });
             }}
-          >
-            <option value="all">{t("modelsPage.statusAll")}</option>
-            <option value="enabled">{t("common.enabled")}</option>
-            <option value="disabled">{t("common.disabled")}</option>
-          </select>
+          />
         </div>
       </ModelDirectoryToolbar>
 
@@ -249,22 +252,9 @@ export function RouteDirectory(props: RouteDirectoryProps) {
             body={t("modelsPage.empty")}
             actions={
               <>
-                {/* The recommended path: adopt models from the channel's model
-                    settings — routes are created automatically. Manual route
-                    creation stays available but demoted. */}
                 <Link className="button" to="/channels">
                   {t("modelsPage.ctaConnections")}
                 </Link>
-                <Button
-                  variant="secondary"
-                  icon={<Plus size={16} />}
-                  onClick={() => {
-                    resetRouteDraft();
-                    startNewRoute();
-                  }}
-                >
-                  {t("routing.addRoute")}
-                </Button>
               </>
             }
           />

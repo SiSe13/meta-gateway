@@ -32,7 +32,10 @@ func TestTeamRouteModelNameIsPercentDecoded(t *testing.T) {
 	route, _ := e.db.Route.Create(&domain.Route{ModelPattern: "cn:auto", Enabled: true})
 	member, _ := e.db.RouteMember.Create(&domain.RouteMember{RouteID: route, ChannelID: channelID, Priority: 10, Weight: 100, Enabled: true})
 	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Granted", Models: []string{"cn:auto"},
-		MemberIDs: []int64{member}, MaxKeys: 5, RPM: 120, AllowRouting: true}, 200)
+		MemberIDs: []int64{member}}, 200)
+	if _, err := e.db.Exec(`UPDATE team_users SET allow_routing=1 WHERE username='alice'`); err != nil {
+		t.Fatal(err)
+	}
 	alice := e.member("alice", "member")
 
 	alice.request("PUT", "/me/routes/cn%3Aauto", teamRouteOrderInput{Entries: []domain.TeamRouteEntry{{ID: member, Weight: 100}}}, 200)

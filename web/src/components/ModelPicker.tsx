@@ -1,8 +1,9 @@
 import { ChevronDown, Search, X } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import { MODEL_GROUP_ORDER, autoModelGroup } from "../lib/modelGroups";
+import { SearchableSelect } from "./SearchableSelect";
 
 /** One channel that can serve a candidate model name. */
 export type ModelPickerChannel = { id: number; name: string };
@@ -263,7 +264,11 @@ export function ModelPicker({
       <div className="model-picker-toolbar">
         <div className="model-picker-search">
           <Search size={14} />
-          <input
+          <HeroInput
+            className="model-picker-search-input"
+            type="search"
+            name="model-picker-search"
+            autoComplete="off"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder ?? t("modelPicker.search")}
@@ -271,21 +276,18 @@ export function ModelPicker({
           />
         </div>
         {channelChoices.length > 1 ? (
-          <select
-            className="model-picker-channel-filter"
-            aria-label={t("modelPicker.channelFilter")}
-            value={channelFilter}
-            onChange={(event) =>
-              setChannelFilter(event.target.value === "" ? "" : Number(event.target.value))
-            }
-          >
-            <option value="">{t("modelPicker.allChannels")}</option>
-            {channelChoices.map((channel) => (
-              <option key={channel.id} value={channel.id}>
-                {`${channel.name} (${channel.count})`}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            ariaLabel={t("modelPicker.channelFilter")}
+            value={channelFilter === "" ? "" : String(channelFilter)}
+            onChange={(value) => setChannelFilter(value === "" ? "" : Number(value))}
+            options={[
+              { value: "", label: t("modelPicker.allChannels") },
+              ...channelChoices.map((channel) => ({
+                value: String(channel.id),
+                label: `${channel.name} (${channel.count})`,
+              })),
+            ]}
+          />
         ) : null}
         {filtered.length > 0 ? (
           <HeroButton
@@ -316,7 +318,9 @@ export function ModelPicker({
                     onPress={() => toggleGroup(group)}
                   >
                     <ChevronDown size={13} />
-                    <span className="model-picker-group-name">{group}</span>
+                    <span className="model-picker-group-name">
+                      {group === "GPT" ? "Gpt" : group}
+                    </span>
                     <span className="model-picker-group-count">{items.length}</span>
                   </HeroButton>
                 ) : null}

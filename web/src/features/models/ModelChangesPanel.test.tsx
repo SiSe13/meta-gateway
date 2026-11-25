@@ -293,6 +293,18 @@ describe("upstream model maintenance", () => {
 // Confidence signals, bulk-ignore of harmless removals, and the adopt
 // deep-link — zh locale, with a router so the deep link can be observed.
 describe("upstream model maintenance signals", () => {
+  it("uses compact custom dropdowns for the change filters", async () => {
+    setup();
+    fireEvent.click(await screen.findByRole("button", { name: /View changes|查看变更/ }));
+
+    expect(document.querySelectorAll(".model-change-filters select")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: /All channels|全部渠道/ }));
+    fireEvent.click(await screen.findByRole("option", { name: "Channel A" }));
+
+    expect(screen.getAllByText("old-model")).toHaveLength(1);
+    expect(screen.queryByText("Channel B")).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     localStorage.setItem("meta-gateway.locale", "zh-CN");
   });
@@ -425,6 +437,22 @@ describe("upstream model maintenance signals", () => {
     );
     const impacted = screen.getAllByText("impacted-model")[0]!.closest("article")!;
     expect(within(impacted).getByRole("button", { name: "删除绑定" })).toBeEnabled();
+  });
+
+  it("explains why bulk actions are disabled when the selected removal has no affected members", async () => {
+    setupWithRouter();
+    fireEvent.click(await screen.findByRole("button", { name: "查看变更" }));
+    const empty = (await screen.findByText("gone-model")).closest("article")!;
+    fireEvent.click(within(empty).getByRole("checkbox", { name: "选择变更 gone-model / WONG" }));
+
+    expect(screen.getByRole("button", { name: "替换选中变更（1）" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "删除选中绑定（1）" })).toBeDisabled();
+    expect(
+      screen.getByText("所选记录没有受影响的路由成员，因此无需替换或删除；可以忽略提醒。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("批量替换请只选择同一渠道的待处理移除记录。"),
+    ).not.toBeInTheDocument();
   });
 
   it("deep-links a pending addition to the channel models page", async () => {

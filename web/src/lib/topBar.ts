@@ -10,8 +10,7 @@ const CHANGE_EVENT = "meta-gateway:topbar-changed";
  *
  * Two kinds of entry live behind one preference:
  *
- *   - controls — the top bar's own buttons (search, update notice, light/dark,
- *     language);
+ *   - controls — the top bar's own buttons (update notice, light/dark, language);
  *   - navigation — the rail/sidebar entries, named by path.
  *
  * Everything here is a display choice, so this is a browser preference like the
@@ -36,7 +35,7 @@ const CHANGE_EVENT = "meta-gateway:topbar-changed";
  * it in the appearance panel (see ChromePrefs.pinnedNav).
  */
 export const MODE_GATED_NAV = [
-  "/users",
+  "/users/members",
   "/users/policies",
   "/users/quotas",
   "/users/codes",
@@ -49,7 +48,7 @@ export function modeHiddenNav(mode: string | undefined): string[] {
   return mode === "team" ? [] : [...MODE_GATED_NAV];
 }
 
-export const TOP_BAR_CONTROLS = ["search", "update", "theme", "language"] as const;
+export const TOP_BAR_CONTROLS = ["update", "theme", "language"] as const;
 export type TopBarControlId = (typeof TOP_BAR_CONTROLS)[number];
 
 export interface ChromePrefs {
@@ -71,7 +70,6 @@ export interface ChromePrefs {
 }
 
 const DEFAULT_CONTROLS: Record<TopBarControlId, boolean> = {
-  search: true,
   update: true,
   theme: true,
   language: true,

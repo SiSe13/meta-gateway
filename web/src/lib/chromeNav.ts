@@ -7,6 +7,7 @@ import {
   CalendarCheck,
   KeyRound,
   Package,
+  FileClock,
   ScrollText,
   Settings,
   UserRound,
@@ -29,14 +30,14 @@ export interface ChromeNavGroup {
  */
 export const CHROME_NAV_GROUPS: ChromeNavGroup[] = [
   { id: "console", labelKey: "app.topNav.console", defaultPath: "/" },
-  { id: "backup", labelKey: "app.topNav.backupExtensions", defaultPath: "/exchange" },
   { id: "users", labelKey: "app.topNav.users", defaultPath: "/users" },
-  { id: "settings", labelKey: "app.topNav.settings", defaultPath: "/settings?tab=runtime" },
   {
     id: "observations",
     labelKey: "app.topNav.observations",
     defaultPath: "/channels?view=observations",
   },
+  { id: "settings", labelKey: "app.topNav.settings", defaultPath: "/settings?tab=runtime" },
+  { id: "backup", labelKey: "app.topNav.backupExtensions", defaultPath: "/exchange" },
 ];
 
 export interface ChromeNavItem {
@@ -68,7 +69,20 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
   },
   { path: "/models", labelKey: "app.nav.models", icon: Boxes, group: "console", roles: ALL },
   { path: "/keys", labelKey: "app.nav.keys", icon: KeyRound, group: "console", roles: ALL },
-  { path: "/logs", labelKey: "app.nav.logs", icon: ScrollText, group: "console", roles: ALL },
+  {
+    path: "/logs",
+    labelKey: "app.nav.logs",
+    icon: ScrollText,
+    group: "console",
+    roles: ALL,
+  },
+  {
+    path: "/system-logs",
+    labelKey: "app.nav.systemLogs",
+    icon: FileClock,
+    group: "console",
+    roles: STAFF,
+  },
   {
     path: "/checkins",
     labelKey: "app.nav.checkins",
@@ -97,7 +111,13 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
     group: "backup",
     roles: STAFF,
   },
-  { path: "/users", labelKey: "users.nav.members", icon: Users, group: "users", roles: STAFF },
+  {
+    path: "/users/members",
+    labelKey: "users.nav.members",
+    icon: Users,
+    group: "users",
+    roles: STAFF,
+  },
   {
     path: "/users/policies",
     labelKey: "users.nav.policies",
@@ -156,6 +176,7 @@ export const STAFF_ONLY_PATHS = [
   "/exchange",
   "/backups",
   "/settings",
+  "/system-logs",
   "/store",
   "/users",
   "/setup",

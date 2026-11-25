@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../i18n";
 import { SessionProvider } from "../../session";
 import { ToastProvider } from "../../toast";
 import { AddChannelDialog } from "./AddChannelDialog";
+import type { CreateConnectionInput } from "./helpers";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -53,7 +54,10 @@ function stubPreview(detectedFamily = "") {
   return calls;
 }
 
-function renderDialog() {
+function renderDialog(props?: {
+  existingGroups?: string[];
+  onSave?: (value: CreateConnectionInput, options: { verify: boolean }) => void;
+}) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -62,7 +66,13 @@ function renderDialog() {
       <I18nProvider>
         <ToastProvider>
           <SessionProvider>
-            <AddChannelDialog pending={false} error={null} onClose={() => {}} onSave={() => {}} />
+            <AddChannelDialog
+              pending={false}
+              error={null}
+              existingGroups={props?.existingGroups}
+              onClose={() => {}}
+              onSave={props?.onSave ?? (() => {})}
+            />
           </SessionProvider>
         </ToastProvider>
       </I18nProvider>
@@ -100,6 +110,79 @@ describe("AddChannelDialog endpoint preview", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Type" })).toHaveTextContent("DeepSeek"),
     );
+  });
+
+  it("does not let a delayed URL detection overwrite a manual type selection", async () => {
+    let resolveDetection: (response: Response) => void = () => {};
+    const delayedDetection = new Promise<Response>((resolve) => {
+      resolveDetection = resolve;
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const raw = String(input);
+        const path = raw.split("?")[0] ?? "";
+        if (path === "/admin/site-type") return delayedDetection;
+        if (path === "/admin/sites") return jsonResponse([]);
+        if (path === "/admin/runtime-settings") {
+          return jsonResponse({ editable: { default_model_sync_mode: "manual" } });
+        }
+        if (path === "/admin/endpoint-preview") {
+          return jsonResponse({
+            base_url: "https://api.example.com",
+            protocol: "anthropic",
+            chat_url: "https://api.example.com/v1/messages",
+            models_url: "https://api.example.com/v1/models",
+          });
+        }
+        return jsonResponse({ error: `unexpected ${path}` }, 500);
+      }),
+    );
+    renderDialog();
+
+    const baseUrl = screen.getByPlaceholderText("https://api.example.com");
+    fireEvent.change(baseUrl, { target: { value: "https://api.example.com" } });
+    fireEvent.blur(baseUrl);
+
+    fireEvent.click(screen.getByRole("button", { name: "Type" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Anthropic (Claude Official)" }));
+    act(() => resolveDetection(jsonResponse({ family: "deepseek" })));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Type" })).toHaveTextContent("Anthropic"),
+    );
+  });
+
+  it("lets the operator choose an existing channel group", async () => {
+    stubPreview();
+    renderDialog({ existingGroups: ["paid", "internal", "paid"] });
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel group" }));
+    fireEvent.click(await screen.findByRole("option", { name: "paid" }));
+
+    expect(screen.getByRole("button", { name: "Channel group" })).toHaveTextContent("paid");
+  });
+
+  it("lets the operator type a new channel group", async () => {
+    stubPreview();
+    const onSave = vi.fn();
+    renderDialog({ existingGroups: ["paid"], onSave });
+
+    fireEvent.click(screen.getByRole("button", { name: "Channel group" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Enter a new group…" }));
+    fireEvent.change(screen.getByPlaceholderText("Enter group name"), {
+      target: { value: "internal-team" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
+      target: { value: "https://api.example.com" },
+    });
+    fireEvent.change(document.querySelector('input[type="password"]')!, {
+      target: { value: "sk-test" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save & verify" }));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]?.[0].group_name).toBe("internal-team");
   });
 
   // The upstream can speak one of three wire shapes, and the dialog has to answer

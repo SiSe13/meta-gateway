@@ -11,7 +11,7 @@ import type { Policy } from "../types";
  * pool, which are things that only exist once the gateway has members. The
  * board itself is CodePanel — kept as its own component because minting,
  * listing and revoking codes is a coherent unit; this file only supplies the
- * policy list it needs for its policy picker.
+ * authorization group list it needs for its group picker.
  */
 export function CodesPanel() {
   const { request, locale, t } = useUsers();

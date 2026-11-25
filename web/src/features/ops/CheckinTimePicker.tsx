@@ -1,3 +1,5 @@
+import { TimeField as HeroTimeField } from "@heroui/react";
+import { Time } from "@internationalized/date";
 import { useI18n } from "../../i18n";
 
 /** Parse a daily "m h * * *" cron into wall-clock time; null for custom schedules. */
@@ -39,40 +41,27 @@ function CheckinTimePicker({
       />
     );
   }
-  const hourOptions = Array.from({ length: 24 }, (_, h) => h);
-  const minuteOptions = Array.from({ length: 12 }, (_, i) => i * 5);
   const pick = (hour: number, minute: number) => onChange(`${minute} ${hour} * * *`);
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
     <span className="checkin-time-picker">
-      <select
-        aria-label={t("ops.runtime.checkinHour")}
-        disabled={disabled}
-        value={time.hour}
-        onChange={(e) => pick(Number(e.target.value), time.minute)}
+      <HeroTimeField
+        className="checkin-time-field"
+        aria-label={t("ops.runtime.checkinTime")}
+        hourCycle={24}
+        granularity="minute"
+        isDisabled={disabled}
+        value={new Time(time.hour, time.minute)}
+        onChange={(next) => {
+          if (next) pick(next.hour, next.minute);
+        }}
       >
-        {hourOptions.map((h) => (
-          <option key={h} value={h}>
-            {pad(h)}
-          </option>
-        ))}
-      </select>
-      <b>:</b>
-      <select
-        aria-label={t("ops.runtime.checkinMinute")}
-        disabled={disabled}
-        value={time.minute}
-        onChange={(e) => pick(time.hour, Number(e.target.value))}
-      >
-        {minuteOptions.includes(time.minute) ? null : (
-          <option value={time.minute}>{pad(time.minute)}</option>
-        )}
-        {minuteOptions.map((m) => (
-          <option key={m} value={m}>
-            {pad(m)}
-          </option>
-        ))}
-      </select>
+        <HeroTimeField.Group className="checkin-time-group">
+          <HeroTimeField.Input>
+            {(segment) => <HeroTimeField.Segment segment={segment} />}
+          </HeroTimeField.Input>
+        </HeroTimeField.Group>
+      </HeroTimeField>
       <span className="checkin-time-hint">
         {t("ops.runtime.checkinDaily")} · {pad(time.hour)}:{pad(time.minute)}
       </span>

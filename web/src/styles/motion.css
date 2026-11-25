@@ -16,8 +16,6 @@
 .login-motion .login-tile.is-back { animation-delay: -2s; }
 .login-motion .login-tile.is-middle { animation-delay: -1s; }
 .login-motion .login-tile.is-front { border-color: var(--line-strong); box-shadow: 8px 8px 0 rgba(41,62,54,.08); }
-.login-poster-code { position: absolute; top: -7px; left: 6px; color: var(--muted); font: 10px var(--mono); letter-spacing: .13em; }
-.login-poster-axis { position: absolute; bottom: 0; right: 0; color: var(--muted-dark); font: 9px var(--mono); letter-spacing: .15em; writing-mode: vertical-rl; }
 .login-motion .login-orbit { border-radius: 0; border-color: var(--line); transform: rotate(-19deg); }
 .login-motion .login-orbit-point { border-radius: 0; width: 9px; height: 9px; transform: rotate(-19deg); }
 .login-motion .login-orbit { animation: orbit-breathe 8s ease-in-out infinite; }
@@ -32,6 +30,7 @@
 
 .dashboard-page { position: relative; isolation: isolate; }
 .dashboard-page .page-header { position: relative; min-height: 108px; padding: 4px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.dashboard-page > .page-header { display: none; }
 .dashboard-page .page-heading h1 { font-size:28px; letter-spacing:-.035em; }
 .dashboard-page .page-heading h1:after { display: none; }
 /* Confined to the page-header band: it used to bleed down over the first card
@@ -83,7 +82,8 @@
 @media (prefers-reduced-motion: reduce) {
   .login-light-ribbons, .katana-canvas, .console-content.route-enter:before { display: none; }
   .login-motion .login-sculpture { transform: none; }
-  .login-motion .login-tile, .login-motion .login-orbit, .aura-flow, .aura-node, .authenticated-stage.is-revealing, .login-motion .login-submit:before, .katana-spark, .tabs > button[aria-selected="true"]:after, .console-nav-link.active .console-nav-indicator { animation: none !important; }
+  .login-motion .login-tile, .login-motion .login-orbit,
+  .aura-flow, .aura-node, .authenticated-stage.is-revealing, .login-motion .login-submit:before, .katana-spark, .tabs > button[aria-selected="true"]:after, .console-nav-link.active .console-nav-indicator { animation: none !important; }
   .console-nav-link > svg, .console-nav-link:hover > svg { transition: none; transform: none; }
   ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
   .aura-plane { animation: none; }

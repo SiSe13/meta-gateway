@@ -34,7 +34,6 @@ it("closes mobile navigation after choosing a destination", () => {
           version="dev"
           theme="light"
           onThemeChange={vi.fn()}
-          onSearch={vi.fn()}
           onDisconnect={vi.fn()}
           health={{ total: 2, healthy: 1, loading: false }}
         >
@@ -43,12 +42,142 @@ it("closes mobile navigation after choosing a destination", () => {
       </MemoryRouter>
     </I18nProvider>,
   );
+  expect(screen.queryByRole("button", { name: /search commands/i })).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Workspace", { selector: ".console-breadcrumb span" }),
+  ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
   const drawer = screen.getByRole("dialog", { name: "Meta Gateway" });
   fireEvent.click(within(drawer).getByRole("link", { name: "Connections" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByTestId("destination")).toHaveTextContent("/channels");
   expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "page");
+});
+
+it("shows only the selected top workspace and omits the sidebar section caption", () => {
+  const { container } = render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/channels?view=observations"]}>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[
+            {
+              label: "Console",
+              items: [{ to: "/channels", label: "Connections", icon: Cable }],
+            },
+          ]}
+          topNavigation={[
+            { id: "console", label: "Console", to: "/channels" },
+            { id: "observations", label: "Site observations", to: "/channels?view=observations" },
+          ]}
+          activeTopNavigation="observations"
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 0, healthy: 0, loading: false }}
+        >
+          {null}
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+
+  const topNavigation = container.querySelector(".metapi-top-navigation");
+  expect(container.querySelector(".console-shell")).toHaveClass("is-observation-view");
+  expect(container.querySelector(".console-sidebar")).not.toBeInTheDocument();
+  expect(container.querySelector(".console-mobile-trigger")).not.toBeInTheDocument();
+  expect(topNavigation?.querySelectorAll("a.active")).toHaveLength(1);
+  expect(topNavigation?.querySelector('a[href="/channels"]')).not.toHaveClass("active");
+  expect(topNavigation?.querySelector('a[href="/channels?view=observations"]')).toHaveClass(
+    "active",
+  );
+  expect(container.querySelector(".console-nav-caption")).toBeNull();
+});
+
+it("marks only the exact team board as active", () => {
+  const { container } = render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/users/policies"]}>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[
+            {
+              label: "Users",
+              items: [
+                { to: "/users/members", label: "Members & invitations", icon: Cable },
+                { to: "/users/policies", label: "Permissions & routing", icon: Boxes },
+              ],
+            },
+          ]}
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 0, healthy: 0, loading: false }}
+        >
+          {null}
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+
+  expect(container.querySelectorAll(".console-nav-link.active")).toHaveLength(1);
+  expect(container.querySelector('a[href="/users/members"]')).not.toHaveClass("active");
+  expect(container.querySelector('a[href="/users/policies"]')).toHaveClass("active");
+});
+
+it("opens the administrator account as a dialog action", () => {
+  const openAccount = vi.fn();
+  render(
+    <I18nProvider>
+      <MemoryRouter>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[]}
+          showAdminAccount
+          onOpenAdminAccount={openAccount}
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 0, healthy: 0, loading: false }}
+        >
+          {null}
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Administrator account" }));
+  expect(openAccount).toHaveBeenCalledOnce();
+});
+
+it("takes a team account to its own settings page", () => {
+  function CurrentLocation() {
+    return <output data-testid="destination">{useLocation().pathname}</output>;
+  }
+  render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/models"]}>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[]}
+          showMemberAccount
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 0, healthy: 0, loading: false }}
+        >
+          <CurrentLocation />
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "My account" }));
+  expect(screen.getByTestId("destination")).toHaveTextContent("/account");
 });
 
 it("keeps page header actions bound to the current selection", () => {

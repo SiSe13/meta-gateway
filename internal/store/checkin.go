@@ -15,6 +15,8 @@ type CheckinLogFilter struct {
 	SiteID       *int64
 	Status       string
 	Source       string
+	Since        *time.Time
+	Until        *time.Time
 	Limit        int
 }
 
@@ -53,6 +55,14 @@ func (s *CheckinLogStore) List(f CheckinLogFilter) ([]domain.CheckinLog, error) 
 	if f.Source != "" {
 		where = append(where, "source=?")
 		args = append(args, f.Source)
+	}
+	if f.Since != nil {
+		where = append(where, "ran_at>=?")
+		args = append(args, f.Since.UTC().Format("2006-01-02T15:04:05.000000000Z07:00"))
+	}
+	if f.Until != nil {
+		where = append(where, "ran_at<?")
+		args = append(args, f.Until.UTC().Format("2006-01-02T15:04:05.000000000Z07:00"))
 	}
 	args = append(args, limit)
 	rows, err := s.db.Query(`SELECT id, site_id, credential_id, source, status, category, message, reward, latency_ms, ran_at FROM checkin_logs WHERE `+strings.Join(where, " AND ")+` ORDER BY ran_at DESC, id DESC LIMIT ?`, args...)

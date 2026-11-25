@@ -190,13 +190,20 @@ func TestMigrationsAreTrackedAndIdempotent(t *testing.T) {
 	db := openTestDB(t)
 	// Keep this in step with the newest NNN_*.sql file: it is the tripwire that
 	// catches a migration that silently failed to apply (or applied twice).
-	const wantMigrations = 146
+	const wantMigrations = 148
 	var count int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
 	if count != wantMigrations {
 		t.Fatalf("got %d applied migrations, want %d", count, wantMigrations)
+	}
+	var authorizationGroupTable int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='team_model_authorization_groups'`).Scan(&authorizationGroupTable); err != nil {
+		t.Fatal(err)
+	}
+	if authorizationGroupTable != 0 {
+		t.Fatal("obsolete team authorization group table still exists")
 	}
 	if err := store.Migrate(db.DB); err != nil {
 		t.Fatalf("second migrate: %v", err)

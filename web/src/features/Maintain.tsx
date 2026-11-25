@@ -34,7 +34,7 @@ export function Maintain() {
     return <Navigate to="/logs?tab=discovery" replace />;
   }
   if (requested === "audit") {
-    return <Navigate to="/logs?tab=audit" replace />;
+    return <Navigate to="/system-logs" replace />;
   }
   if (requested === "checkins") {
     return <Navigate to="/checkins" replace />;

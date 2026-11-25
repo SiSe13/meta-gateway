@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
+import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
 import type {
   ModelChange,
   ModelDiscardPreview,
@@ -128,9 +129,46 @@ export function ModelChangesPanel({
       : discardableMembers(item).length
         ? t("modelChanges.discardHint")
         : t("modelChanges.discardWildcard");
+  const replaceDisabledHint = chosen.some((item) => item.kind !== "removed")
+    ? t("modelChanges.bulkReplaceRemovalsOnly")
+    : chosen.some((item) => item.members.length === 0)
+      ? t("modelChanges.bulkNoMembers")
+      : t("modelChanges.sameChannel");
+  const discardDisabledHint = chosen.some((item) => item.kind !== "removed")
+    ? t("modelChanges.bulkReplaceRemovalsOnly")
+    : chosen.some((item) => item.members.length === 0)
+      ? t("modelChanges.bulkNoMembers")
+      : chosen.some((item) => discardableMembers(item).length === 0)
+        ? t("modelChanges.bulkWildcard")
+        : t("modelChanges.bulkDiscardHint");
+  const selectionHints = [
+    ...new Set(
+      [!replaceable ? replaceDisabledHint : "", !discardable ? discardDisabledHint : ""].filter(
+        Boolean,
+      ),
+    ),
+  ];
   const harmlessVisible = visible.filter(harmless);
   const channels = [
     ...new Map(items.map((item) => [item.channel_id, item.channel_name])).entries(),
+  ];
+  const channelOptions: SelectOption[] = [
+    { value: "", label: t("modelChanges.allChannels") },
+    ...channels.map(([id, name]) => ({ value: String(id), label: name })),
+  ];
+  const kindOptions: SelectOption[] = [
+    { value: "", label: t("modelChanges.allKinds") },
+    ...["added", "removed"].map((kind) => ({
+      value: kind,
+      label: t(`modelChanges.${kind}`),
+    })),
+  ];
+  const statusOptions: SelectOption[] = [
+    { value: "", label: t("modelChanges.allStatuses") },
+    ...["pending", "ignored", "applied", "resolved"].map((status) => ({
+      value: status,
+      label: t(`modelChanges.${status}`),
+    })),
   ];
   const setFilter = (patch: Partial<Filters>) => {
     setFilters((current) => ({ ...current, ...patch }));
@@ -195,47 +233,36 @@ export function ModelChangesPanel({
           <p className="muted">{t("modelChanges.hint")}</p>
           <div className="model-change-filters">
             <input
+              className="model-change-filter-search"
               aria-label={t("modelChanges.search")}
               placeholder={t("modelChanges.search")}
               value={filters.query}
               onChange={(e) => setFilter({ query: e.target.value })}
             />
-            <select
-              aria-label={t("modelChanges.allChannels")}
-              value={filters.channel}
-              onChange={(e) => setFilter({ channel: e.target.value })}
-            >
-              <option value="">{t("modelChanges.allChannels")}</option>
-              {channels.map(([id, name]) => (
-                <option value={id} key={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label={t("modelChanges.kind")}
-              value={filters.kind}
-              onChange={(e) => setFilter({ kind: e.target.value })}
-            >
-              <option value="">{t("modelChanges.allKinds")}</option>
-              {["added", "removed"].map((kind) => (
-                <option key={kind} value={kind}>
-                  {t(`modelChanges.${kind}`)}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label={t("modelChanges.status")}
-              value={filters.status}
-              onChange={(e) => setFilter({ status: e.target.value })}
-            >
-              <option value="">{t("modelChanges.allStatuses")}</option>
-              {["pending", "ignored", "applied", "resolved"].map((status) => (
-                <option key={status} value={status}>
-                  {t(`modelChanges.${status}`)}
-                </option>
-              ))}
-            </select>
+            <div className="model-change-filter-select">
+              <SearchableSelect
+                ariaLabel={t("modelChanges.allChannels")}
+                options={channelOptions}
+                value={filters.channel}
+                onChange={(value) => setFilter({ channel: value })}
+              />
+            </div>
+            <div className="model-change-filter-select">
+              <SearchableSelect
+                ariaLabel={t("modelChanges.kind")}
+                options={kindOptions}
+                value={filters.kind}
+                onChange={(value) => setFilter({ kind: value })}
+              />
+            </div>
+            <div className="model-change-filter-select">
+              <SearchableSelect
+                ariaLabel={t("modelChanges.status")}
+                options={statusOptions}
+                value={filters.status}
+                onChange={(value) => setFilter({ status: value })}
+              />
+            </div>
           </div>
           {chosen.length ? (
             <div className="model-change-bulk">
@@ -245,7 +272,7 @@ export function ModelChangesPanel({
               <Button
                 variant="secondary"
                 disabled={!discardable}
-                title={discardable ? undefined : t("modelChanges.bulkDiscardHint")}
+                title={discardable ? undefined : discardDisabledHint}
                 onClick={() => setDiscard(chosen)}
               >
                 {t("modelChanges.bulkDiscard", { count: chosen.length })}
@@ -259,7 +286,11 @@ export function ModelChangesPanel({
               >
                 {t("modelChanges.ignore")}
               </Button>
-              {!replaceable ? <span className="muted">{t("modelChanges.sameChannel")}</span> : null}
+              {selectionHints.map((hint) => (
+                <span className="muted model-change-selection-hint" key={hint}>
+                  {hint}
+                </span>
+              ))}
             </div>
           ) : null}
           {!chosen.length && harmlessVisible.length ? (

@@ -20,7 +20,7 @@ type Session = {
  * Personal settings: request controls, display preferences and the account.
  *
  * Request controls are the only team-level knob a member may touch (the owner
- * grants `allow_request_preferences` on the policy), and they can only tighten
+ * grants `allow_request_preferences` on the account), and they can only tighten
  * the site rules — never loosen them. The account panel is where a member
  * changes their own password and revokes sessions, which is also why changing
  * the password signs every session out.
@@ -130,7 +130,7 @@ export function SettingsPage({
         <div className="member-identity-chips">
           <span className="member-home-chip">{t(account.user.role)}</span>
           <span className="member-home-chip">
-            {t("policy")} · {account.policy.name}
+            {t("authorizationGroups")} · {account.policies.map((policy) => policy.name).join(", ")}
           </span>
           <span className="member-home-chip">{account.branding.name}</span>
         </div>
@@ -371,7 +371,8 @@ export function SettingsPage({
             {account.user.name} · {account.user.username}
           </span>
           <span>
-            {t("role")}: {t(account.user.role)} · {t("policy")}: {account.policy.name}
+            {t("role")}: {t(account.user.role)} · {t("authorizationGroups")}:{" "}
+            {account.policies.map((policy) => policy.name).join(", ")}
           </span>
         </div>
         <form

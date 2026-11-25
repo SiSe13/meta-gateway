@@ -129,6 +129,12 @@ describe("Keys page", () => {
 
     renderKeys();
     expect(await screen.findByText(/No downstream tokens yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Tokens" })).not.toBeInTheDocument();
+    const listPanel = document.querySelector(".ops-list-panel");
+    expect(listPanel?.querySelector(".keys-toolbar")).not.toBeNull();
+    expect(listPanel?.querySelector("input[aria-label='Search tokens']")).not.toBeNull();
+    expect(listPanel).toContainElement(screen.getByRole("button", { name: "Create token" }));
+    expect(listPanel).toContainElement(screen.getByRole("button", { name: "Redemption codes" }));
     fireEvent.click(firstCreateKeyButton());
     expect(
       await screen.findByRole("heading", { name: "Create downstream key" }),
@@ -478,9 +484,8 @@ describe("Keys page", () => {
       target: { value: "25" },
     });
     fireEvent.click(within(dialog).getByText("Advanced"));
-    fireEvent.change(within(dialog).getByLabelText("Route group"), {
-      target: { value: "vip" },
-    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Route group" }));
+    fireEvent.click(await screen.findByRole("option", { name: "vip" }));
     fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
@@ -631,10 +636,12 @@ describe("Keys page", () => {
       fireEvent.click(screen.getByRole("button", { name: "More actions" }));
       fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
       const field = await screen.findByLabelText("Tenant group");
-      await waitFor(() =>
-        expect(within(field).getByRole("option", { name: "vip" })).toBeInTheDocument(),
+      fireEvent.click(field);
+      fireEvent.click(
+        await screen.findByRole("option", {
+          name: group || "Default group (no group limit)",
+        }),
       );
-      fireEvent.change(field, { target: { value: group } });
       fireEvent.click(screen.getByRole("button", { name: "Save" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       const put = fetcher.mock.calls.find(([, init]) => init?.method === "PUT");
@@ -643,7 +650,9 @@ describe("Keys page", () => {
       fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
       // An explicitly cleared group no longer automatically opens Advanced.
       if (!screen.queryByLabelText("Tenant group")) fireEvent.click(screen.getByText("Advanced"));
-      expect(await screen.findByLabelText("Tenant group")).toHaveValue(group);
+      expect(await screen.findByLabelText("Tenant group")).toHaveTextContent(
+        group || "Default group (no group limit)",
+      );
     },
   );
 

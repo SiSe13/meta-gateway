@@ -27,7 +27,8 @@ type createUserRequest struct {
 	Username string `json:"username"`
 	Name     string `json:"name"`
 	Password string `json:"password"`
-	PolicyID int64  `json:"policy_id"`
+	PolicyID  int64   `json:"policy_id"`
+	PolicyIDs []int64 `json:"policy_ids"`
 	Role     string `json:"role"`
 	Quota    int64  `json:"quota_tokens"`
 	// QuotaCost is the same allowance in money (0 = unlimited). Both budgets are
@@ -89,8 +90,17 @@ func (h *TeamHandler) validateCreate(req *createUserRequest, actorOwner bool) (s
 
 // insertUser writes the account row and reports whether the username was taken.
 func (h *TeamHandler) insertUser(req createUserRequest, hash string) (int64, bool, error) {
-	res, err := h.db.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id,quota_total_tokens,quota_total_cost) VALUES(?,?,?,?,?,?,?)`,
-		req.Username, req.Name, hash, req.Role, req.PolicyID, req.Quota, req.QuotaCost)
+	ids := req.PolicyIDs
+	if len(ids) == 0 {
+		ids = []int64{req.PolicyID}
+	}
+	tx, err := h.db.Begin()
+	if err != nil {
+		return 0, false, err
+	}
+	defer tx.Rollback()
+	res, err := tx.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id,quota_total_tokens,quota_total_cost) VALUES(?,?,?,?,?,?,?)`,
+		req.Username, req.Name, hash, req.Role, ids[0], req.Quota, req.QuotaCost)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "unique") {
 			return 0, true, nil
@@ -98,6 +108,12 @@ func (h *TeamHandler) insertUser(req createUserRequest, hash string) (int64, boo
 		return 0, false, err
 	}
 	id, err := res.LastInsertId()
+	if err == nil {
+		err = replaceUserPolicyGroups(tx, id, ids)
+	}
+	if err == nil {
+		err = tx.Commit()
+	}
 	return id, false, err
 }
 
@@ -118,10 +134,16 @@ func (h *TeamHandler) createUser(w http.ResponseWriter, r *http.Request) {
 		h.failCreate(w, fail)
 		return
 	}
-	if _, err := h.policy(req.PolicyID); err != nil {
+	if len(req.PolicyIDs) == 0 && req.PolicyID > 0 {
+		req.PolicyIDs = []int64{req.PolicyID}
+	}
+	var err error
+	req.PolicyIDs, err = h.validatePolicyIDs(req.PolicyIDs)
+	if err != nil {
 		teamFail(w, 400, "invalid_policy")
 		return
 	}
+	req.PolicyID = req.PolicyIDs[0]
 	id, taken, err := h.insertUser(req, hash)
 	if err != nil {
 		teamFail(w, 500, "save_failed")
@@ -163,6 +185,7 @@ func (h *TeamHandler) importUsers(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Text      string  `json:"text"`
 		PolicyID  int64   `json:"policy_id"`
+		PolicyIDs []int64 `json:"policy_ids"`
 		Quota     int64   `json:"quota_tokens"`
 		QuotaCost float64 `json:"quota_cost"`
 	}
@@ -181,7 +204,12 @@ func (h *TeamHandler) importUsers(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "invalid_quota")
 		return
 	}
-	if _, err := h.policy(req.PolicyID); err != nil {
+	if len(req.PolicyIDs) == 0 && req.PolicyID > 0 {
+		req.PolicyIDs = []int64{req.PolicyID}
+	}
+	var policyErr error
+	req.PolicyIDs, policyErr = h.validatePolicyIDs(req.PolicyIDs)
+	if policyErr != nil {
 		teamFail(w, 400, "invalid_policy")
 		return
 	}
@@ -214,7 +242,7 @@ func (h *TeamHandler) importUsers(w http.ResponseWriter, r *http.Request) {
 		for i := range fields {
 			fields[i] = strings.TrimSpace(fields[i])
 		}
-		item := createUserRequest{PolicyID: req.PolicyID, Role: "member", Quota: req.Quota, QuotaCost: req.QuotaCost}
+		item := createUserRequest{PolicyID: req.PolicyIDs[0], PolicyIDs: req.PolicyIDs, Role: "member", Quota: req.Quota, QuotaCost: req.QuotaCost}
 		item.Username = fields[0]
 		if len(fields) > 1 {
 			item.Name = fields[1]
@@ -306,6 +334,7 @@ func (h *TeamHandler) bulkUsers(w http.ResponseWriter, r *http.Request) {
 		IDs      []int64 `json:"ids"`
 		Action   string  `json:"action"`
 		PolicyID int64   `json:"policy_id"`
+		PolicyIDs []int64 `json:"policy_ids"`
 	}
 	if !teamRead(w, r, &req) {
 		return
@@ -358,15 +387,50 @@ func (h *TeamHandler) bulkUsers(w http.ResponseWriter, r *http.Request) {
 		h.audit(r, "team.users."+req.Action, actorID)
 		teamJSON(w, 200, map[string]any{"updated": n})
 	case "policy":
-		if _, err := h.policy(req.PolicyID); err != nil {
+		if len(req.PolicyIDs) == 0 && req.PolicyID > 0 {
+			req.PolicyIDs = []int64{req.PolicyID}
+		}
+		policyIDs, err := h.validatePolicyIDs(req.PolicyIDs)
+		if err != nil {
 			teamFail(w, 400, "invalid_policy")
 			return
 		}
-		n, err := affected(`UPDATE team_users SET policy_id=? WHERE id IN (`+inList+`)`+scope, append([]any{req.PolicyID}, args...))
+		tx, err := h.db.Begin()
 		if err != nil {
 			teamFail(w, 500, "save_failed")
 			return
 		}
+		defer tx.Rollback()
+		rows, err := tx.Query(`SELECT id FROM team_users WHERE id IN (`+inList+`)`+scope, args...)
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		eligible := []int64{}
+		for rows.Next() {
+			var userID int64
+			if err = rows.Scan(&userID); err != nil {
+				break
+			}
+			eligible = append(eligible, userID)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		for _, userID := range eligible {
+			if err = replaceUserPolicyGroups(tx, userID, policyIDs); err != nil {
+				break
+			}
+		}
+		if err == nil {
+			err = tx.Commit()
+		}
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		n := int64(len(eligible))
 		h.audit(r, "team.users.policy", actorID)
 		teamJSON(w, 200, map[string]any{"updated": n})
 	case "revoke_sessions":

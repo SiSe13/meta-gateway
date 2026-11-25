@@ -97,12 +97,11 @@ type memberModelHealthView struct {
 }
 
 func (h *TeamHandler) myModelAvailability(w http.ResponseWriter, r *http.Request) {
-	p, err := h.policy(teamActor(r).User.PolicyID)
+	access, err := h.userAccess(teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 503, "policy_unavailable")
 		return
 	}
-	access := policyAccess(p)
 	since := time.Now().UTC().Add(-memberProbeWindow)
 	rows, err := h.db.MemberModelProbes(&since)
 	if err != nil {

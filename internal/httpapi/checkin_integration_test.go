@@ -145,8 +145,42 @@ func TestCheckinAdminWorkflow(t *testing.T) {
 	if logs[0]["id"].(float64) <= logs[1]["id"].(float64) {
 		t.Fatalf("logs not newest first: %v", logs)
 	}
+	latestLogID := logs[0]["id"]
+	latestLogTime := logs[0]["ran_at"].(string)
+	status, raw = requestJSON(http.MethodGet, "/admin/checkin/logs?since="+latestLogTime, nil, true)
+	if status != http.StatusOK || json.Unmarshal(raw, &logs) != nil {
+		t.Fatalf("inclusive since-filtered logs status=%d logs=%s", status, raw)
+	}
+	if len(logs) == 0 || logs[0]["id"] != latestLogID {
+		t.Fatalf("since boundary excluded its matching log: %s", raw)
+	}
+	status, raw = requestJSON(http.MethodGet, "/admin/checkin/logs?since=2000-01-01T00:00:00Z&until="+latestLogTime, nil, true)
+	if status != http.StatusOK || json.Unmarshal(raw, &logs) != nil {
+		t.Fatalf("exclusive until-filtered logs status=%d logs=%s", status, raw)
+	}
+	for _, log := range logs {
+		if log["id"] == latestLogID {
+			t.Fatalf("until boundary included its matching log: %s", raw)
+		}
+	}
+	status, raw = requestJSON(http.MethodGet, "/admin/checkin/logs?since=2000-01-01T00:00:00Z&until=2999-01-01T00:00:00Z", nil, true)
+	if status != http.StatusOK || json.Unmarshal(raw, &logs) != nil || len(logs) != 2 {
+		t.Fatalf("date-filtered logs status=%d logs=%s", status, raw)
+	}
+	status, raw = requestJSON(http.MethodGet, "/admin/checkin/logs?since=2999-01-01T00:00:00Z", nil, true)
+	if status != http.StatusOK || json.Unmarshal(raw, &logs) != nil || len(logs) != 0 {
+		t.Fatalf("future-filtered logs status=%d logs=%s", status, raw)
+	}
 
-	for _, query := range []string{"?limit=501", "?status=unknown", "?source=unknown", "?site_id=0"} {
+	for _, query := range []string{
+		"?limit=501",
+		"?status=unknown",
+		"?source=unknown",
+		"?site_id=0",
+		"?since=not-a-time",
+		"?until=not-a-time",
+		"?since=2999-01-01T00:00:00Z&until=2000-01-01T00:00:00Z",
+	} {
 		status, _ = requestJSON(http.MethodGet, "/admin/checkin/logs"+query, nil, true)
 		if status != http.StatusBadRequest {
 			t.Fatalf("invalid query %s status=%d", query, status)

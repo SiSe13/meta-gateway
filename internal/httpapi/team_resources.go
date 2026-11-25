@@ -94,9 +94,9 @@ func (h *TeamHandler) validateKey(w http.ResponseWriter, r *http.Request, in *te
 		return false
 	}
 	if in.PlanID > 0 {
-		p, err := h.policy(teamActor(r).User.PolicyID)
+		access, err := h.userAccess(teamActor(r).User.ID)
 		var count int
-		if err != nil || !p.AllowRouting || h.db.QueryRow(`SELECT count(*) FROM team_route_plans WHERE id=? AND user_id=?`, in.PlanID, teamActor(r).User.ID).Scan(&count) != nil || count != 1 {
+		if err != nil || !access.AllowRouting || h.db.QueryRow(`SELECT count(*) FROM team_route_plans WHERE id=? AND user_id=?`, in.PlanID, teamActor(r).User.ID).Scan(&count) != nil || count != 1 {
 			teamFail(w, 403, "invalid_plan")
 			return false
 		}
@@ -125,9 +125,9 @@ func (h *TeamHandler) createKey(w http.ResponseWriter, r *http.Request) {
 	}
 	// The limit and insertion are one SQLite write, including concurrent creates.
 	res, err := h.db.Exec(`INSERT INTO downstream_keys(token_hash,token_enc,name,enabled,scopes,model_allowlist,expires_at,allowed_ips,user_id,team_plan_id,team_hint)
-		SELECT ?,?,?,?,'relay',?,?,?,?,?,? FROM team_users u JOIN team_policies p ON p.id=u.policy_id JOIN team_settings s ON s.id=1
+		SELECT ?,?,?,?,'relay',?,?,?,?,?,? FROM team_users u JOIN team_settings s ON s.id=1
 		WHERE u.id=? AND u.status='active' AND s.mode='team'
-		AND (SELECT count(*) FROM downstream_keys WHERE user_id=u.id AND team_deleted_at='')<p.max_keys`,
+		AND (SELECT count(*) FROM downstream_keys WHERE user_id=u.id AND team_deleted_at='')<u.max_keys`,
 		hash, encrypted, in.Name, enabled, in.Models, in.ExpiresAt, in.AllowedIPs, uid, in.PlanID, raw[len(raw)-4:], uid)
 	if err != nil {
 		teamFail(w, 500, "save_failed")
@@ -243,13 +243,6 @@ func (h *TeamHandler) candidates() (items []teamCandidate, err error) {
 	}
 	return items, rows.Err()
 }
-func policyAccess(p TeamPolicy) *domain.TeamAccess {
-	a := &domain.TeamAccess{Models: p.Models, AllModels: p.AllModels, MemberIDs: map[int64]bool{}, RPM: p.RPM}
-	for _, id := range p.MemberIDs {
-		a.MemberIDs[id] = true
-	}
-	return a
-}
 func (h *TeamHandler) adminCandidates(w http.ResponseWriter, r *http.Request) {
 	if !teamOwner(w, r) {
 		return
@@ -262,9 +255,9 @@ func (h *TeamHandler) adminCandidates(w http.ResponseWriter, r *http.Request) {
 	teamJSON(w, 200, items)
 }
 func (h *TeamHandler) myCandidates(w http.ResponseWriter, r *http.Request) {
-	p, err := h.policy(teamActor(r).User.PolicyID)
+	a, err := h.userAccess(teamActor(r).User.ID)
 	s, _ := h.settings()
-	if err != nil || !p.AllowRouting || !s.Branding.ShowRouting {
+	if err != nil || !a.AllowRouting || !s.Branding.ShowRouting {
 		teamFail(w, 403, "routing_not_allowed")
 		return
 	}
@@ -273,7 +266,6 @@ func (h *TeamHandler) myCandidates(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 500, "load_failed")
 		return
 	}
-	a := policyAccess(p)
 	out := []teamCandidate{}
 	for _, v := range items {
 		if a.AllowsGrant(v.ID) && a.AllowsModel(v.Model) {
@@ -283,7 +275,7 @@ func (h *TeamHandler) myCandidates(w http.ResponseWriter, r *http.Request) {
 	teamJSON(w, 200, out)
 }
 func (h *TeamHandler) myModels(w http.ResponseWriter, r *http.Request) {
-	p, err := h.policy(teamActor(r).User.PolicyID)
+	a, err := h.userAccess(teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 503, "policy_unavailable")
 		return
@@ -293,7 +285,6 @@ func (h *TeamHandler) myModels(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 500, "load_failed")
 		return
 	}
-	a := policyAccess(p)
 	seen := map[string]bool{}
 	out := []string{}
 	for _, v := range items {
@@ -399,8 +390,7 @@ func (h *TeamHandler) loadArrangement(planID, uid int64) (domain.TeamRouteArrang
 
 // validateArrangement refuses an arrangement that reaches outside what the
 // policy granted: every entry must be a granted member of that model's route.
-func (h *TeamHandler) validateArrangement(w http.ResponseWriter, p TeamPolicy, routes map[string][]domain.TeamRouteEntry) bool {
-	a := policyAccess(p)
+func (h *TeamHandler) validateArrangement(w http.ResponseWriter, a *domain.TeamAccess, routes map[string][]domain.TeamRouteEntry) bool {
 	for model, entries := range routes {
 		if !a.AllowsModel(model) {
 			teamFail(w, 403, "model_not_allowed")
@@ -424,14 +414,14 @@ func (h *TeamHandler) validateArrangement(w http.ResponseWriter, p TeamPolicy, r
 	return true
 }
 
-func (h *TeamHandler) routingAllowed(w http.ResponseWriter, r *http.Request) (TeamPolicy, bool) {
-	p, err := h.policy(teamActor(r).User.PolicyID)
+func (h *TeamHandler) routingAllowed(w http.ResponseWriter, r *http.Request) (*domain.TeamAccess, bool) {
+	a, err := h.userAccess(teamActor(r).User.ID)
 	s, _ := h.settings()
-	if err != nil || !p.AllowRouting || !s.Branding.ShowRouting {
+	if err != nil || !a.AllowRouting || !s.Branding.ShowRouting {
 		teamFail(w, 403, "routing_not_allowed")
-		return p, false
+		return a, false
 	}
-	return p, true
+	return a, true
 }
 func (h *TeamHandler) myPlans(w http.ResponseWriter, r *http.Request) {
 	if _, ok := h.routingAllowed(w, r); !ok {
@@ -821,7 +811,7 @@ func (h *TeamHandler) myRouteOrder(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "invalid_model")
 		return
 	}
-	a := policyAccess(p)
+	a := p
 	if !a.AllowsModel(model) {
 		teamFail(w, 403, "model_not_allowed")
 		return

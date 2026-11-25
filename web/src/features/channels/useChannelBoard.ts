@@ -3,7 +3,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { api } from "../../api/client";
 import type { Channel, Site } from "../../api/types";
 import { positiveId } from "../../lib/positiveId";
-import { writeChannelTab } from "./tabState";
+import { readChannelTab, writeChannelTab } from "./tabState";
 
 /** Whatever the client's own method returns — the queries must not restate it. */
 type Service = ReturnType<typeof api>;
@@ -23,9 +23,8 @@ type Resolved<T> = T extends Promise<infer U> ? U : never;
  * Three rules live here and are worth naming, because they are the ones that were
  * easy to get wrong when they were implicit:
  *
- *  - **the URL is the truth for selection** (`?id=`): the value is read from the
- *    query string, written back on click, and the deep links (?channel=, ?keys=)
- *    resolve to it as well;
+ *  - **explicit `?id=` links open the inspector once**: ordinary row selection
+ *    stays tab-scoped, so a refresh remembers the row without reopening details;
  *  - **deep links fire once per navigation**: `setX(null)` commits before the
  *    router's param transition, so without the one-shot markers the effect re-runs
  *    against a stale URL and re-opens the drawer the operator just closed;
@@ -58,6 +57,7 @@ export type ChannelBoard = {
   closeModelsDrawer: () => void;
   /* Selection and overlays. */
   selectedId: number | undefined;
+  setSelectedId: (id: number | undefined) => void;
   inspectorOpen: boolean;
   setInspectorOpen: (open: boolean) => void;
   contextMenu: { channelId: number; top: number; left: number } | null;
@@ -120,8 +120,24 @@ export function useChannelBoard({
     left: number;
   } | null>(null);
   const [stageMessage, setStageMessage] = useState<ChannelBoard["stageMessage"]>(null);
-  const selectedId = positiveId(params.get("id"));
-  const [inspectorOpen, setInspectorOpen] = useState(Boolean(selectedId));
+  const linkedId = positiveId(params.get("id"));
+  const [selectedId, setSelectedId] = useState<number | undefined>(
+    () => linkedId ?? readChannelTab<number | null>("selected", null) ?? undefined,
+  );
+  const [inspectorOpen, setInspectorOpen] = useState(Boolean(linkedId));
+
+  // Consume an explicit detail link after opening it. Selection is remembered
+  // per tab, so refreshing returns to the list instead of reopening the panel.
+  useEffect(() => {
+    const target = positiveId(params.get("id"));
+    if (!target) return;
+    setSelectedId(target);
+    setInspectorOpen(true);
+    writeChannelTab("selected", target);
+    const next = new URLSearchParams(params);
+    next.delete("id");
+    setParams(next, { replace: true });
+  }, [params, setParams]);
 
   // Deep-link from the models page (?channel=<id>): pop that channel's model
   // management drawer open so the user lands directly on the right tab.
@@ -224,6 +240,7 @@ export function useChannelBoard({
     createKeyLocked,
     closeModelsDrawer,
     selectedId,
+    setSelectedId,
     inspectorOpen,
     setInspectorOpen,
     contextMenu,

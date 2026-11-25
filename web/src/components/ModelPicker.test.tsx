@@ -113,9 +113,8 @@ describe("ModelPicker", () => {
 
   it("filters the list by channel", () => {
     render(<Harness />);
-    fireEvent.change(screen.getByLabelText("按渠道筛选"), {
-      target: { value: "3" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "按渠道筛选" }));
+    fireEvent.click(screen.getByRole("option", { name: /站点C/ }));
     expect(candidateNames()).toEqual(["deepseek-v4-flash"]);
   });
 

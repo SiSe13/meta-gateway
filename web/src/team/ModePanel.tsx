@@ -96,9 +96,11 @@ export function ModePanel({
                 <option value="personal">{t("personal")}</option>
                 <option value="team">{t("enabled")}</option>
               </select>
-              <p className="muted panel-lede" style={{ marginTop: 12 }}>
-                {t("disableHint")}
-              </p>
+              {query.data.mode === "team" && mode === "personal" ? (
+                <p className="muted panel-lede" style={{ marginTop: 12 }}>
+                  {t("disableHint")}
+                </p>
+              ) : null}
               <Button type="submit" style={{ marginTop: 6 }} disabled={mode === query.data.mode}>
                 {busy ? t("saving") : t("save")}
               </Button>

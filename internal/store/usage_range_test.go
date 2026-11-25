@@ -125,6 +125,30 @@ func TestUsageSeriesBucketsAndAlignment(t *testing.T) {
 	}
 }
 
+func TestUsageSeriesHonorsUnalignedRangeStart(t *testing.T) {
+	db := openTestDB(t)
+	base := time.Now().UTC().Truncate(time.Hour).Add(-2 * time.Hour)
+	since := base.Add(16 * time.Minute)
+	until := base.Add(time.Hour)
+	seedUsage(t, db, "before-window", "gpt-a", 10, 200, 0.01, base.Add(15*time.Minute+30*time.Second))
+	seedUsage(t, db, "inside-window", "gpt-a", 20, 200, 0.02, base.Add(16*time.Minute+30*time.Second))
+
+	series, err := db.Usage.Series(store.UsageScope{}, since, until, 4)
+	if err != nil {
+		t.Fatalf("series: %v", err)
+	}
+	var total int
+	for _, n := range series.Requests {
+		total += n
+	}
+	if total != 1 {
+		t.Fatalf("series total = %d, want only the request inside the exact range", total)
+	}
+	if series.Requests[0] != 1 {
+		t.Fatalf("first partial bucket = %d requests, want 1", series.Requests[0])
+	}
+}
+
 func TestUsageTopModelsRanksInsideWindow(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now().UTC().Truncate(time.Minute)

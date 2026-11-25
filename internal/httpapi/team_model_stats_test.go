@@ -154,7 +154,7 @@ func TestMemberModelAvailabilityFollowsThePolicyAndTheProbes(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.admin("PUT", "/admin/team/policies/1", TeamPolicy{ID: 1, Name: "Limited", AllModels: true,
-		MemberIDs: []int64{first, second}, MaxKeys: 5, RPM: 60}, 200)
+		MemberIDs: []int64{first, second}}, 200)
 
 	if _, err := e.db.Exec(`INSERT INTO model_health(channel_id,model,ok,latency_ms,probed_at,source) VALUES
 		(?, 'model-on', 1, 400, datetime('now'), 'probe'),
@@ -217,7 +217,7 @@ func TestMemberModelAvailabilityFollowsThePolicyAndTheProbes(t *testing.T) {
 	// A member on a policy that grants nothing sees nothing at all — being a
 	// member is not itself an authorization.
 	bob := e.member("health-bob", "member")
-	e.admin("POST", "/admin/team/policies", TeamPolicy{Name: "Nothing", MaxKeys: 1, RPM: 60}, 200)
+	e.admin("POST", "/admin/team/policies", TeamPolicy{Name: "Nothing"}, 200)
 	var policies []TeamPolicy
 	if err := json.Unmarshal(e.admin("GET", "/admin/team/policies", nil, 200), &policies); err != nil {
 		t.Fatal(err)

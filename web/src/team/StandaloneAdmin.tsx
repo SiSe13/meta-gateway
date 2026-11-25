@@ -49,7 +49,6 @@ export function StandaloneAdmin({
       version=""
       theme={scheme}
       onThemeChange={toggleScheme}
-      onSearch={() => setSearch(true)}
       onDisconnect={onDisconnect}
       health={{ healthy: 0, total: 0, loading: false, available: false }}
     >

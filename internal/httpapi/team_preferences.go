@@ -114,11 +114,7 @@ func (h *TeamHandler) patchMode(w http.ResponseWriter, r *http.Request) {
 
 func (h *TeamHandler) getRequestPreferences(w http.ResponseWriter, r *http.Request) {
 	u := teamActor(r).User
-	p, err := h.policy(u.PolicyID)
-	if err != nil {
-		teamFail(w, 503, "policy_unavailable")
-		return
-	}
+	canEdit := u.AllowRequestPreferences
 	var raw string
 	if h.db.QueryRow(`SELECT preferences_json FROM team_users WHERE id=?`, u.ID).Scan(&raw) != nil {
 		teamFail(w, 500, "load_failed")
@@ -137,7 +133,7 @@ func (h *TeamHandler) getRequestPreferences(w http.ResponseWriter, r *http.Reque
 		defaults = h.requestDefaults()
 	}
 	active := domain.UserRequestPreferences{Failover: "inherit"}
-	if p.AllowRequestPreferences {
+	if canEdit {
 		active = preferences
 	}
 	effective := TeamRequestDefaults{FailoverEnabled: defaults.FailoverEnabled && active.Failover != "off", RetryTimes: defaults.RetryTimes}
@@ -147,7 +143,7 @@ func (h *TeamHandler) getRequestPreferences(w http.ResponseWriter, r *http.Reque
 	if !effective.FailoverEnabled {
 		effective.RetryTimes = 0
 	}
-	teamJSON(w, 200, map[string]any{"preferences": preferences, "can_edit": p.AllowRequestPreferences, "site": defaults, "effective": effective})
+	teamJSON(w, 200, map[string]any{"preferences": preferences, "can_edit": canEdit, "site": defaults, "effective": effective})
 }
 
 func (h *TeamHandler) putRequestPreferences(w http.ResponseWriter, r *http.Request) {
@@ -164,8 +160,7 @@ func (h *TeamHandler) putRequestPreferences(w http.ResponseWriter, r *http.Reque
 	}
 	raw, _ := json.Marshal(preferences)
 	uid := teamActor(r).User.ID
-	result, err := h.db.Exec(`UPDATE team_users SET preferences_json=? WHERE id=? AND status='active'
-		AND EXISTS(SELECT 1 FROM team_policies p WHERE p.id=team_users.policy_id AND p.allow_request_preferences=1)
+	result, err := h.db.Exec(`UPDATE team_users SET preferences_json=? WHERE id=? AND status='active' AND allow_request_preferences=1
 		AND EXISTS(SELECT 1 FROM team_settings s WHERE s.id=1 AND s.mode='team')`, string(raw), uid)
 	if err != nil {
 		teamFail(w, 500, "save_failed")
@@ -193,12 +188,11 @@ type teamModelView struct {
 }
 
 func (h *TeamHandler) myModelCatalog(w http.ResponseWriter, r *http.Request) {
-	p, err := h.policy(teamActor(r).User.PolicyID)
+	access, err := h.userAccess(teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 503, "policy_unavailable")
 		return
 	}
-	access := policyAccess(p)
 	rows, err := h.db.Query(`SELECT rm.id,r.model_pattern,
 		COALESCE(NULLIF(mm.vendor,''),mc.provider,''),COALESCE(mc.kind,''),COALESCE(mm.context_window,0),
 		COALESCE(NULLIF(mm.input_modalities,''),mc.input_modalities,''),COALESCE(NULLIF(mm.output_modalities,''),mc.output_modalities,''),

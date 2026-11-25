@@ -300,12 +300,11 @@ func (h *TeamHandler) myModelPricing(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	policy, err := h.policy(teamActor(r).User.PolicyID)
+	access, err := h.userAccess(teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 503, "policy_unavailable")
 		return
 	}
-	access := policyAccess(policy)
 	if !access.AllowsModel(model) {
 		teamFail(w, 404, "model_unavailable")
 		return
@@ -327,12 +326,11 @@ func (h *TeamHandler) myModelPricingBatch(w http.ResponseWriter, r *http.Request
 	if !ok {
 		return
 	}
-	policy, err := h.policy(teamActor(r).User.PolicyID)
+	access, err := h.userAccess(teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 503, "policy_unavailable")
 		return
 	}
-	access := policyAccess(policy)
 	items, unavailable, err := referenceModelPricingBatch(h.db, models, input, access.AllowsModel, access.AllowsGrant)
 	if err != nil {
 		teamFail(w, 500, "pricing_unavailable")

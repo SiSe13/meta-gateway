@@ -3,9 +3,9 @@
  *
  * The console's sidebar navigates to a bare path (`/channels`, `/models`) with no
  * query string, so URL-only filters and selections are lost on every page switch.
- * Each board therefore remembers its tab state here, under its own namespace: the
- * URL stays the shareable truth, and this is only a memory of where the operator
- * was.
+ * Each board therefore remembers its tab state here, under its own namespace.
+ * Filters and explicit deep links stay in the URL; transient row selection can
+ * survive sidebar navigation without reopening an inspector after refresh.
  *
  * Both boards had written their own copy of this, identical apart from the key
  * prefix — which is exactly the kind of copy that drifts (one of them grew a

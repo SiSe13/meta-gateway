@@ -42,6 +42,39 @@ describe("searchable select", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("keeps the portalled list open for pointer and scroll events inside it", () => {
+    const close = vi.fn();
+    const change = vi.fn();
+    render(
+      <I18nProvider>
+        <Dialog title="Connection" onClose={close}>
+          <SearchableSelect
+            options={options}
+            value="OpenAI"
+            onChange={change}
+            placeholder="Provider"
+          />
+        </Dialog>
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "OpenAI" }));
+    const list = screen.getByRole("listbox");
+    const item = screen.getByRole("option", { name: "OpenAI" });
+
+    fireEvent.pointerDown(item);
+    expect(list).toBeInTheDocument();
+    fireEvent.scroll(list);
+    expect(list).toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+    expect(document.querySelector(".searchable-select-panel")).toHaveStyle({ height: "300px" });
+
+    fireEvent.click(screen.getByRole("option", { name: "New API" }));
+    expect(change).toHaveBeenCalledWith("New API");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Connection" })).toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it("keeps search mounted during filtering and preserves a custom type", () => {
     function Picker() {
       const [value, setValue] = useState("OpenAI");

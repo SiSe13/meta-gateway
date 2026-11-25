@@ -13,11 +13,7 @@ export interface TeamSettings {
   branding: Branding;
 }
 
-/**
- * A tenant group: the quota/rate-limit container a client token can be bound
- * to. It carries the same two budgets as an account (tokens and money), which
- * is why the quotas board shows them side by side.
- */
+/** A reusable authorization group containing model and route-member grants. */
 export interface KeyGroup {
   name: string;
   quota_total_tokens: number;
@@ -49,6 +45,11 @@ export interface TeamUser {
   role: "owner" | "admin" | "member";
   status: "active" | "paused";
   policy_id: number;
+  policy_ids: number[];
+  max_keys: number;
+  rpm: number;
+  allow_routing: boolean;
+  allow_request_preferences: boolean;
   created_at: string;
   key_count: number;
   /** The account's own credit pool; 0 means unlimited. */
@@ -64,10 +65,7 @@ export interface Policy {
   models: string[];
   member_ids: number[];
   all_models: boolean;
-  max_keys: number;
-  rpm: number;
-  allow_routing: boolean;
-  allow_request_preferences: boolean;
+  user_count: number;
 }
 export interface Candidate {
   id: number;
@@ -193,7 +191,7 @@ export interface ImportOutcome {
 export type BulkMemberAction = "pause" | "resume" | "policy" | "revoke_sessions" | "delete";
 export interface Account {
   user: TeamUser;
-  policy: Policy;
+  policies: Policy[];
   csrf: string;
   branding: Branding;
   credit: CreditView;

@@ -371,14 +371,18 @@ func (h *TeamHandler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 }
 func (h *TeamHandler) me(w http.ResponseWriter, r *http.Request) {
 	p := teamActor(r)
-	policy, err := h.policy(p.User.PolicyID)
-	if err != nil {
-		teamFail(w, 503, "policy_unavailable")
-		return
+	groups := make([]TeamPolicy, 0, len(p.User.PolicyIDs))
+	for _, id := range p.User.PolicyIDs {
+		group, err := h.policy(id)
+		if err != nil {
+			teamFail(w, 503, "policy_unavailable")
+			return
+		}
+		groups = append(groups, group)
 	}
 	s, _ := h.settings()
 	credit := creditFor(p.User.QuotaTotalTokens, p.User.QuotaUsedTokens, p.User.QuotaTotalCost, p.User.QuotaUsedCost)
-	teamJSON(w, 200, map[string]any{"user": p.User, "policy": policy, "csrf": p.CSRF, "branding": s.Branding, "credit": credit, "currency": h.currency()})
+	teamJSON(w, 200, map[string]any{"user": p.User, "policies": groups, "csrf": p.CSRF, "branding": s.Branding, "credit": credit, "currency": h.currency()})
 }
 func (h *TeamHandler) logout(w http.ResponseWriter, r *http.Request) {
 	_, err := h.db.Exec(`DELETE FROM team_sessions WHERE token_hash=?`, teamActor(r).SessionHash)

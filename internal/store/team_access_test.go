@@ -31,12 +31,37 @@ func TestRevokedPersonalRoutingRefusesOnlyExplicitlyBoundKeys(t *testing.T) {
 	}
 
 	// The same unbound key keeps its arrangement while the permission is on.
-	if _, err := db.Exec(`UPDATE team_policies SET allow_routing=1 WHERE id=1`); err != nil {
+	if _, err := db.Exec(`UPDATE team_users SET allow_routing=1 WHERE id=7`); err != nil {
 		t.Fatal(err)
 	}
 	access, err := db.DownstreamKey.ResolveTeamAccess(unbound)
 	if err != nil || !access.Arranged("model") {
 		t.Fatalf("granted permission did not apply the arrangement: %v", err)
+	}
+}
+
+// Multiple authorization groups combine model and channel grants; account
+// limits and personal features remain on the user record.
+func TestTeamAccessUnionsAssignedAuthorizationGroups(t *testing.T) {
+	db := openTestDB(t)
+	if _, err := db.Exec(`UPDATE team_settings SET mode='team' WHERE id=1;
+		UPDATE team_policies SET models_json='["gpt-model"]',members_json='[11]' WHERE id=1;
+		INSERT INTO team_users(id,username,name,password_hash,policy_id) VALUES(7,'member','Member','hash',1);
+		INSERT INTO team_policies(name,models_json,members_json) VALUES('DS','["ds-model"]','[22]');
+		INSERT INTO team_user_policies(user_id,policy_id) VALUES(7,2);
+		UPDATE team_users SET rpm=23,allow_routing=1,allow_request_preferences=1 WHERE id=7`); err != nil {
+		t.Fatal(err)
+	}
+	key := teamKeyRiding(t, db, 0)
+	access, err := db.DownstreamKey.ResolveTeamAccess(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !access.AllowsModel("gpt-model") || !access.AllowsModel("ds-model") || !access.AllowsGrant(11) || !access.AllowsGrant(22) {
+		t.Fatalf("authorization groups were not unioned: %+v", access)
+	}
+	if access.RPM != 23 || !access.AllowRouting || !access.AllowRequestPreferences {
+		t.Fatalf("account-level controls were not loaded from the user: %+v", access)
 	}
 }
 

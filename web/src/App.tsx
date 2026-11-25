@@ -1,5 +1,6 @@
 import { OperatorUpgradePrompt } from "./features/OperatorProfilePanel";
 import { DeploymentStepPrompt } from "./features/DeploymentStepPrompt";
+import { OperatorClaimPanel } from "./features/OperatorProfilePanel";
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,7 +10,6 @@ import {
   Puzzle,
   ShieldCheck,
   Ticket,
-  Image,
   Moon,
   Sun,
 } from "lucide-react";
@@ -18,13 +18,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button as HeroButton } from "@heroui/react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { ApiClient, ApiError, api } from "./api/client";
 import type { Site } from "./api/types";
 import { LanguageSwitcher, useI18n } from "./i18n";
 import { useSession, type AccountSession } from "./session";
 import { useModules } from "./hooks/useModules";
 import { Button, ErrorState, Dialog, Field, IconButton, Loading } from "./components/ui";
+import { BrandMark } from "./components/BrandMark";
 import { CommandPalette } from "./components/CommandPalette";
 import { ConsoleShell } from "./components/ConsoleShell";
 const Dashboard = lazy(() =>
@@ -83,6 +83,9 @@ const ExchangePage = lazy(() =>
 );
 const Keys = lazy(() => import("./features/Keys").then((module) => ({ default: module.Keys })));
 const Logs = lazy(() => import("./features/Logs").then((module) => ({ default: module.Logs })));
+const SystemLogs = lazy(() =>
+  import("./features/SystemLogs").then((module) => ({ default: module.SystemLogs })),
+);
 const Maintain = lazy(() =>
   import("./features/Maintain").then((module) => ({ default: module.Maintain })),
 );
@@ -313,88 +316,13 @@ function Connect({
     return () => controller.abort();
   }, []);
 
-  // Custom login background (persisted locally, per browser)
-  const [bgUrl, setBgUrl] = useState<string>(() => {
-    try {
-      return localStorage.getItem("mg.login.bg") ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [bgOpen, setBgOpen] = useState(false);
-  const bgInputRef = useRef<HTMLInputElement | null>(null);
-  const bgBtnRef = useRef<HTMLButtonElement | null>(null);
-  const [bgPos, setBgPos] = useState<{ top: number; left: number } | null>(null);
   useEffect(() => {
-    if (!bgOpen) {
-      setBgPos(null);
-      return;
-    }
-    const compute = () => {
-      const btn = bgBtnRef.current;
-      if (!btn) return;
-      const r = btn.getBoundingClientRect();
-      const w = 280;
-      const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
-      setBgPos({ top: Math.round(r.bottom + 8), left: Math.round(left) });
-    };
-    compute();
-    window.addEventListener("resize", compute);
-    return () => window.removeEventListener("resize", compute);
-  }, [bgOpen]);
-  const applyBg = (value: string) => {
-    const url = value.trim();
     try {
-      if (url) localStorage.setItem("mg.login.bg", url);
-      else localStorage.removeItem("mg.login.bg");
+      localStorage.removeItem("mg.login.bg");
     } catch {
-      // Storage unavailable; background only applies for this session.
+      // 浏览器限制存储时忽略旧背景偏好。
     }
-    setBgUrl(url);
-    setBgOpen(false);
-  };
-  const onBgFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    // Raw data URLs of photos blow past the localStorage quota, so re-encode
-    // through a canvas (WebP first, JPEG fallback) sized for a backdrop.
-    // createElement("img") because the lucide Image icon import shadows the
-    // global Image constructor in this module.
-    const img = document.createElement("img");
-    const revoke = () => URL.revokeObjectURL(img.src);
-    img.onload = () => {
-      revoke();
-      const maxSide = 2048;
-      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(1, Math.round(img.width * scale));
-      canvas.height = Math.max(1, Math.round(img.height * scale));
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        const reader = new FileReader();
-        reader.onload = () => applyBg(String(reader.result ?? ""));
-        reader.readAsDataURL(file);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      let data = canvas.toDataURL("image/webp", 0.85);
-      if (!data.startsWith("data:image/webp")) {
-        data = canvas.toDataURL("image/jpeg", 0.85);
-      }
-      if (data.length > 3_500_000) {
-        const small = document.createElement("canvas");
-        small.width = Math.round(canvas.width * 0.66);
-        small.height = Math.round(canvas.height * 0.66);
-        small.getContext("2d")?.drawImage(canvas, 0, 0, small.width, small.height);
-        const retry = small.toDataURL("image/webp", 0.7);
-        data = retry.startsWith("data:image/webp") ? retry : small.toDataURL("image/jpeg", 0.7);
-      }
-      applyBg(data);
-    };
-    img.onerror = revoke;
-    img.src = URL.createObjectURL(file);
-    e.target.value = "";
-  };
+  }, []);
 
   async function submit(e: React.FormEvent, legacy = false) {
     e.preventDefault();
@@ -456,9 +384,6 @@ function Connect({
   return (
     <LoginShell
       rootRef={loginRef}
-      atmosphereStyle={
-        bgUrl ? { backgroundImage: "url(" + JSON.stringify(bgUrl) + ")" } : undefined
-      }
       effects={
         <KatanaCanvas
           charging={isFocused || pending}
@@ -485,49 +410,6 @@ function Connect({
             {scheme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
           </IconButton>
           <LanguageSwitcher />
-          <IconButton
-            ref={bgBtnRef}
-            label={t("app.connect.background")}
-            onClick={() => setBgOpen((v) => !v)}
-            className={bgOpen ? "is-active" : ""}
-          >
-            <Image size={16} />
-          </IconButton>
-          {bgOpen && bgPos
-            ? createPortal(
-                <div className="bg-picker" style={{ top: bgPos.top, left: bgPos.left }}>
-                  <input
-                    ref={bgInputRef}
-                    type="text"
-                    placeholder={t("app.connect.bgPlaceholder")}
-                    defaultValue={bgUrl.startsWith("data:") ? "" : bgUrl}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && bgInputRef.current) {
-                        applyBg(bgInputRef.current.value);
-                      }
-                    }}
-                  />
-                  <div className="bg-row">
-                    <HeroButton
-                      type="button"
-                      variant="primary"
-                      className="is-primary"
-                      onPress={() => bgInputRef.current && applyBg(bgInputRef.current.value)}
-                    >
-                      {t("app.connect.bgApply")}
-                    </HeroButton>
-                    <label className="bg-upload-btn">
-                      <input type="file" accept="image/*" hidden onChange={onBgFile} />
-                      {t("app.connect.bgUpload")}
-                    </label>
-                    <HeroButton type="button" variant="ghost" onPress={() => applyBg("")}>
-                      {t("app.connect.bgClear")}
-                    </HeroButton>
-                  </div>
-                </div>,
-                document.body,
-              )
-            : null}
         </>
       }
     >
@@ -564,7 +446,7 @@ function Connect({
           <section className="login-card is-other" aria-labelledby="login-card-title">
             <div className="login-card-heading">
               <span className="login-card-mark">
-                <ShieldCheck size={22} strokeWidth={1.4} />
+                <BrandMark size={25} />
               </span>
               <h2 id="login-card-title">{t("login.otherTitle")}</h2>
               <p>{t("login.otherHint")}</p>
@@ -618,7 +500,7 @@ function Connect({
             >
               <div className="login-card-heading">
                 <span className="login-card-mark">
-                  <ShieldCheck size={22} strokeWidth={1.4} />
+                  <BrandMark size={25} />
                 </span>
                 <h2 id="login-card-title">{t("login.welcome")}</h2>
                 <p>{t("login.hint")}</p>
@@ -693,41 +575,26 @@ function Connect({
                   </span>
                 </Button>
               </form>
+              <HeroButton
+                type="button"
+                variant="ghost"
+                className="login-card-more"
+                isDisabled={pending}
+                onPress={() => setOtherOpen(true)}
+              >
+                <LogIn size={16} />
+                <span>{t("login.moreWays")}</span>
+                <ChevronRight size={15} />
+              </HeroButton>
               <p className="login-private">
                 <ShieldCheck size={13} />
                 {t("login.private")}
               </p>
             </section>
-            {/* The layer behind: its exposed edge is the whole affordance, and
-					    clicking it turns the card over. Registration, third-party sign-in
-					    and the upgrade guide live back there instead of competing with the
-					    form as a row of links. */}
-            {/* The upgrade entry belongs on the sign-in card, not behind "more
-				    options": this is the one page an operator lands on after updating,
-				    and it disappears by itself once the gateway has an owner account. */}
-            <HeroButton
-              type="button"
-              variant="ghost"
-              className="login-card-peek"
-              isDisabled={pending}
-              onPress={() => setOtherOpen(true)}
-            >
-              <span>{t("login.moreWays")}</span>
-              <ChevronRight size={14} />
-            </HeroButton>
           </>
         )}
       </div>
-      {/* The upgrade entry belongs on the sign-in card, not behind "more
-          options": this is the one page an operator lands on after updating, and
-          it disappears by itself once the gateway has an owner account.
-
-          It sits OUTSIDE .login-card-stack deliberately. The "more ways" tab is
-          the exposed edge of the layer behind, anchored top/bottom to that stack
-          so it hugs the card it belongs to — which only holds while the stack
-          contains nothing but the card and the tab. With the upgrade row inside,
-          the stack grew 49px taller than the card and the tab hung past the
-          card's bottom edge onto the upgrade row. */}
+      {/* 将旧版本升级提示放在登录卡片下方，避免与登录操作争抢注意力。 */}
       {!accepting && !otherOpen && upgradeLogin ? (
         <HeroButton
           type="button"
@@ -854,6 +721,8 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
   const hiddenPlugins = useHiddenPlugins();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [operatorPromptReady, setOperatorPromptReady] = useState(false);
+  const [operatorAccountOpen, setOperatorAccountOpen] = useState(false);
+  const [operatorAccountBusy, setOperatorAccountBusy] = useState(false);
   const { client, role } = useSession();
   // A raw admin token (role === null) is the operator themselves, so it ranks
   // with an owner. Everything the console shows is then filtered by role:
@@ -914,12 +783,16 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
 
   const location = useLocation();
   const navigate = useNavigate();
+  const [setupWizardOpen, setSetupWizardOpen] = useState(() => location.pathname === "/setup");
 
-  // First-run: a fresh instance (no channels) is claimed by the setup
-  // wizard once; the completion/skip flag persists in localStorage.
+  // 首次登录后若还没有站点，全局弹出设置引导；关闭或完成后记住选择。
   useEffect(() => {
     if (import.meta.env.VITEST) return;
-    if (location.pathname === "/setup" || location.pathname === "/team") return;
+    if (location.pathname === "/setup") {
+      setSetupWizardOpen(true);
+      return;
+    }
+    if (location.pathname === "/team") return;
     if (
       location.pathname === "/settings" &&
       ["mode", "runtime"].includes(new URLSearchParams(location.search).get("tab") ?? "")
@@ -928,17 +801,13 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
     if (!channelStats.isSuccess) return;
     if ((channelStats.data?.length ?? 0) !== 0) return;
     if (window.localStorage.getItem("mg.setup-wizard.done") === "1") return;
-    navigate("/setup", { replace: true });
-  }, [channelStats.isSuccess, channelStats.data, location.pathname, location.search, navigate]);
+    setSetupWizardOpen(true);
+  }, [channelStats.isSuccess, channelStats.data, location.pathname, location.search]);
 
-  // Same persisted custom background as the login page, applied to the console.
-  const [consoleBg] = useState<string>(() => {
-    try {
-      return localStorage.getItem("mg.login.bg") ?? "";
-    } catch {
-      return "";
-    }
-  });
+  const closeSetupWizard = () => {
+    setSetupWizardOpen(false);
+    if (location.pathname === "/setup") navigate("/", { replace: true });
+  };
 
   // The navigation is built from the shared catalogue (lib/chromeNav.ts), which
   // the appearance panel switches entry by entry. Plugin rows are appended from
@@ -980,12 +849,22 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
   const availableNav = [...registeredNav, ...enabledPlugins].filter(
     (item) => !modeHidesNav(item.to) && !hidden.has(item.to),
   );
+  const modeAvailableNav = [...registeredNav, ...enabledPlugins].filter(
+    (item) => !modeHidesNav(item.to),
+  );
   const activeTopNavigation = chromeNavGroupForLocation(location.pathname, location.search);
   const activeGroup = CHROME_NAV_GROUPS.find((item) => item.id === activeTopNavigation)!;
   const topNavigation = CHROME_NAV_GROUPS.flatMap((group) => {
-    const first = availableNav.find((item) => item.group === group.id);
-    if (!first) return [];
-    return [{ id: group.id, label: t(group.labelKey), to: first.to }];
+    const firstVisible = availableNav.find((item) => item.group === group.id);
+    const firstAvailable = modeAvailableNav.find((item) => item.group === group.id);
+    if (!firstAvailable) return [];
+    return [
+      {
+        id: group.id,
+        label: t(group.labelKey),
+        to: firstVisible?.to ?? firstAvailable.to,
+      },
+    ];
   });
   const navSections = [
     {
@@ -995,12 +874,26 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
         .map(({ to, label, icon }) => ({ to, label, icon })),
     },
   ];
+
   return (
     <>
       <OperatorUpgradePrompt onReady={setOperatorPromptReady} />
       {/* Gated on the claim prompt so the two dialogs never stack: the account
           comes first, then the deployment file. */}
       <DeploymentStepPrompt enabled={operatorPromptReady} />
+      {operatorAccountOpen ? (
+        <Dialog
+          title={t("operator.title")}
+          onClose={() => setOperatorAccountOpen(false)}
+          busy={operatorAccountBusy}
+          className="operator-claim-dialog"
+        >
+          <OperatorClaimPanel
+            onBusyChange={setOperatorAccountBusy}
+            onSaved={() => setOperatorAccountOpen(false)}
+          />
+        </Dialog>
+      ) : null}
       <ConsoleShell
         appearance={appearance}
         sections={navSections}
@@ -1008,11 +901,12 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
         activeTopNavigation={activeTopNavigation}
         onSelectTopNavigation={(to) => navigate(to)}
         showAdminAccount={role === null || role === "owner"}
+        showMemberAccount={role === "member" || role === "admin"}
+        onOpenAdminAccount={() => setOperatorAccountOpen(true)}
         appearanceHiddenNav={modeHiddenNav(operatingMode.data?.mode)}
         version={gatewayVersion}
         theme={theme}
         onThemeChange={changeTheme}
-        onSearch={() => setPaletteOpen(true)}
         onDisconnect={onUnauthorized}
         health={{ healthy, total, loading: channelStats.isPending, available: isStaff(role) }}
         update={
@@ -1020,13 +914,12 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
             ? updateCheck.data
             : undefined
         }
-        background={consoleBg}
       >
         <RouteGuard role={effectiveRole} pathname={location.pathname} />
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route index element={<Dashboard />} />
-            <Route path="setup" element={<SetupWizard />} />
+            <Route path="setup" element={<Dashboard />} />
             <Route path="channels" element={<Channels />} />
             <Route path="backups" element={<Backups />} />
             <Route path="models/channel/:channelId" element={<ChannelModels />} />
@@ -1054,6 +947,7 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
             <Route path="team" element={<Navigate to="/users" replace />} />
             <Route path="workbench" element={<Workbench />} />
             <Route path="logs" element={<Logs />} />
+            <Route path="system-logs" element={<SystemLogs />} />
             <Route path="checkins" element={<Checkins />} />
             <Route path="exchange" element={<ExchangePage />} />
             <Route path="settings" element={<Maintain />} />
@@ -1078,7 +972,8 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
         </Suspense>
       </ConsoleShell>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} nav={paletteNav} />
-      <GuidedTour enabled={isStaff(role) && operatorPromptReady} />
+      <GuidedTour enabled={isStaff(role) && operatorPromptReady && !setupWizardOpen} />
+      {setupWizardOpen && operatorPromptReady ? <SetupWizard onClose={closeSetupWizard} /> : null}
     </>
   );
 }

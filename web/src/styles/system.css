@@ -16,10 +16,11 @@ button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 .page-heading p { margin: 9px 0 0; max-width: 68ch; color: var(--muted); font: 13px/1.65 var(--font); }
 .page-header .toolbar { gap: 8px; }
 .page-actions:empty { display: none; }
+.page-header--actions-only:has(.page-actions:empty) { display: none; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
 .toolbar > * { min-width: 0; }
 a.button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 8px 13px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink-soft); font: 550 13px/1.4 var(--font); text-decoration: none; white-space: nowrap; }
-:is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+:is(button, a, [tabindex]):not(input):not(select):not(textarea):focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .panel, .detail-card { min-width: 0; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); transition: none; }
 .panel:hover, .detail-card:hover { transform: none; box-shadow: var(--shadow-sm); border-color: var(--line); }
 .page > .panel + .panel { margin-top: 20px; }
@@ -411,9 +412,9 @@ tbody td small { display: block; margin-top: 4px; color: var(--muted); font-size
 :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) { color: var(--ink); height: 40px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); font: 14px/1.5 var(--font); box-shadow: none; transition: border-color var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out); }
 :where(textarea) { height: auto; min-height: 96px; padding: 11px 13px; resize: vertical; }
 input::placeholder, textarea::placeholder { color: var(--muted); }
-/* Focus is where the eye already is: one ring, drawn outside the border so the
-   field does not move when it appears. */
-:where(input, select, textarea):focus-visible { border-color: var(--focus); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
+/* 表单控件的焦点提示贴合边框内侧，避免与外层搜索框重复画出大一圈。 */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus-visible { border-color: var(--focus); outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+:where(input[type="checkbox"], input[type="radio"], input[type="range"]):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 :where(input[type="checkbox"], input[type="radio"]):not(.switch) { width: 14px; height: 14px; min-height: 0; padding: 0; accent-color: var(--primary); }
 .field { display: flex; flex-direction: column; min-width: 0; gap: 8px; margin: 0; }
 .field-label { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); font: 550 13px/1.5 var(--font); }
@@ -488,10 +489,11 @@ summary:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-soft)
 .action-menu-separator { height: 1px; margin: 5px; background: var(--line); }
 .searchable-select { position: relative; width: 100%; }
 .searchable-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 38px; padding: 9px 11px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--ink); font: 12px var(--font); cursor: pointer; }
-.searchable-select-panel { position: fixed; z-index: 1100; min-width: 0; padding: 6px; border: 1px solid var(--surface-glass-border); border-radius: 12px; background: var(--surface-glass); backdrop-filter: blur(22px); box-shadow: var(--shadow-md); overflow-y: auto; overscroll-behavior: contain; }
+.searchable-select-panel { position: fixed; z-index: 1100; min-width: 0; padding: 6px; border: 1px solid var(--surface-glass-border); border-radius: 12px; background: var(--surface-glass); backdrop-filter: blur(22px); box-shadow: var(--shadow-md); overflow: hidden; overscroll-behavior: contain; }
 .searchable-select-search { display: flex; align-items: center; gap: 8px; padding: 4px 8px 8px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .searchable-select-search input { width: 100%; min-width: 0; min-height: 30px; border: 0; background: transparent; box-shadow: none; }
-.searchable-select-group { padding-top: 5px; }
+.searchable-select-group { display: flex; flex-direction: column; gap: 4px; padding-top: 5px; }
+.searchable-select-list { display: flex; flex-direction: column; gap: 6px; }
 .searchable-select-group-label { color: var(--muted); font: 12px var(--font); padding: 7px 10px; }
 .searchable-select-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 34px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); text-align: left; font: 12px var(--font); cursor: pointer; }
 .searchable-select-item:hover, .searchable-select-item:focus-visible, .searchable-select-item.is-selected { background: var(--primary-soft); color: var(--primary-active); outline: none; }

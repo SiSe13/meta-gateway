@@ -92,6 +92,24 @@ function renderLogs(initialEntry = "/logs", rows?: unknown[]) {
   return { requests, histogramRequests, paths, ...utils };
 }
 
+function enterDateSegment(label: string, segmentType: string, value: string) {
+  const group = screen.getByRole("group", { name: label });
+  const segment = group.querySelector<HTMLElement>(`[data-type="${segmentType}"]`);
+  if (!segment) throw new Error(`Missing ${segmentType} segment in ${label} date picker`);
+  segment.focus();
+  for (const digit of value) {
+    fireEvent(
+      segment,
+      new InputEvent("beforeinput", {
+        bubbles: true,
+        cancelable: true,
+        inputType: "insertText",
+        data: digit,
+      }),
+    );
+  }
+}
+
 describe("proxy log filters", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -106,6 +124,12 @@ describe("proxy log filters", () => {
 
   it("applies search, model and upstream request ID together", async () => {
     const { requests } = renderLogs();
+    const logTabs = document.querySelector(".logs-main-tabs");
+    expect(logTabs?.querySelectorAll('[role="tab"]')).toHaveLength(3);
+    expect(logTabs?.querySelector('[role="tablist"]')).toHaveAttribute(
+      "aria-orientation",
+      "horizontal",
+    );
     await screen.findByText("fast-model");
     expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
     fireEvent.change(
@@ -135,7 +159,7 @@ describe("proxy log filters", () => {
       "/logs?model=old&q=quota&upstream_request_id=up-old&status=failed",
     );
     await screen.findByText("fast-model");
-    fireEvent.click(screen.getByRole("checkbox", { name: "Slow only (≥5s)" }));
+    fireEvent.click(screen.getByRole("switch", { name: "Slow only (≥5s)" }));
     expect(screen.queryByText("fast-model")).not.toBeInTheDocument();
     expect(screen.getByText("slow-model")).toBeInTheDocument();
     const upstream = screen.getByRole("textbox", { name: "Upstream request ID" });
@@ -143,8 +167,8 @@ describe("proxy log filters", () => {
     fireEvent.submit(upstream.closest("form")!);
     await waitFor(() => expect(requests.at(-1)!.get("upstream_request_id")).toBe("up-new"));
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(screen.getByRole("checkbox", { name: "Slow only (≥5s)" })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Failures only" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Slow only (≥5s)" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "Failures only" })).not.toBeChecked();
     expect(screen.getByTestId("location")).toBeEmptyDOMElement();
     expect(await screen.findByText("fast-model")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
@@ -164,17 +188,18 @@ describe("proxy log filters", () => {
     const { requests } = renderLogs();
     await screen.findByText("fast-model");
     fireEvent.click(screen.getByRole("button", { name: "Exact filters" }));
-    fireEvent.change(screen.getByRole("combobox", { name: "Token" }), { target: { value: "9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Token" }));
+    fireEvent.click(screen.getByRole("option", { name: "cli-token" }));
     await waitFor(() => expect(requests.at(-1)!.get("downstream_key_id")).toBe("9"));
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     await waitFor(() => expect(requests.at(-1)!.get("downstream_key_id")).toBeNull());
-    expect(screen.getByRole("combobox", { name: "Token" })).toHaveValue("0");
+    expect(screen.getByRole("button", { name: "Token" })).toHaveTextContent("All tokens");
   });
 
   it("opens the exact filters when the URL already carries a token filter", async () => {
     renderLogs("/logs?downstream_key_id=9");
     await screen.findByText("fast-model");
-    expect(screen.getByRole("combobox", { name: "Token" })).toHaveValue("9");
+    expect(screen.getByRole("button", { name: "Token" })).toHaveTextContent("cli-token");
   });
 
   it("updates drafts when a link navigates to different log filters", async () => {
@@ -533,12 +558,16 @@ describe("log page reading order", () => {
     renderLogs();
     await screen.findByText("fast-model");
     fireEvent.click(screen.getByRole("tab", { name: "Custom" }));
-    fireEvent.change(screen.getByLabelText("From"), {
-      target: { value: "2026-09-17T10:00:00" },
-    });
-    fireEvent.change(screen.getByLabelText("To"), {
-      target: { value: "2026-09-17T11:30:00" },
-    });
+    enterDateSegment("From", "month", "09");
+    enterDateSegment("From", "day", "17");
+    enterDateSegment("From", "year", "2026");
+    enterDateSegment("From", "hour", "10");
+    enterDateSegment("From", "minute", "00");
+    enterDateSegment("To", "month", "09");
+    enterDateSegment("To", "day", "17");
+    enterDateSegment("To", "year", "2026");
+    enterDateSegment("To", "hour", "11");
+    enterDateSegment("To", "minute", "30");
     await waitFor(() =>
       expect(screen.getByTestId("location").textContent).toContain("range=custom"),
     );
@@ -553,12 +582,14 @@ describe("log page reading order", () => {
     renderLogs();
     await screen.findByText("fast-model");
     fireEvent.click(screen.getByRole("tab", { name: "Custom" }));
-    fireEvent.change(screen.getByLabelText("From"), {
-      target: { value: "2026-09-17T12:00:00" },
-    });
-    fireEvent.change(screen.getByLabelText("To"), {
-      target: { value: "2026-09-17T09:00:00" },
-    });
+    enterDateSegment("From", "month", "09");
+    enterDateSegment("From", "day", "17");
+    enterDateSegment("From", "year", "2026");
+    enterDateSegment("From", "hour", "12");
+    enterDateSegment("To", "month", "09");
+    enterDateSegment("To", "day", "17");
+    enterDateSegment("To", "year", "2026");
+    enterDateSegment("To", "hour", "09");
     expect(screen.getByText("The end time is before the start time")).toBeInTheDocument();
   });
 });

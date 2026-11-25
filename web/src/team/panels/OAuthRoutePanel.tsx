@@ -7,7 +7,7 @@ import type { Policy } from "../types";
  * Third-party sign-in for members (GitHub / Linux.do).
  *
  * The board is OAuthPanel; this route exists so the module's navigation can
- * address it like any other board, and so it can fetch the policy list its
+ * address it like any other board, and so it can fetch the authorization group list its
  * registration form needs without the shell having to pass it down.
  */
 export function OAuthRoutePanel() {

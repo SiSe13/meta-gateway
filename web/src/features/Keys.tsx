@@ -14,7 +14,16 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button as HeroButton, Switch as HeroSwitch } from "@heroui/react";
+import {
+  Button as HeroButton,
+  Calendar as HeroCalendar,
+  DateField as HeroDateField,
+  DatePicker as HeroDatePicker,
+  Input as HeroInput,
+  Switch as HeroSwitch,
+  TextArea as HeroTextArea,
+} from "@heroui/react";
+import { parseDateTime } from "@internationalized/date";
 import { Link, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -29,6 +38,7 @@ import { rowContextPoint, rowKeyboardContextPoint } from "../components/contextM
 import { EmptyHero } from "../components/EmptyHero";
 import { ListShell } from "../components/ListShell";
 import { ModelPicker, type ModelOption } from "../components/ModelPicker";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { ScopePicker } from "../components/ScopePicker";
 import { autoModelGroup, modelGroup, modelPatternMatches } from "./models/modelGroups";
 import { PaginationBar } from "../components/PaginationBar";
@@ -60,7 +70,6 @@ import {
   ErrorState,
   Field,
   IconButton,
-  Page,
   Panel,
   StatusBadge,
   formatDate,
@@ -670,45 +679,7 @@ export function KeysView({
   const contextKey = contextMenu ? rows.find((key) => key.id === contextMenu.id) : undefined;
 
   return (
-    <Page
-      title={t("keys.title")}
-      description={t("keys.description")}
-      actions={
-        <>
-          <label className="directory-search">
-            <Search size={14} aria-hidden="true" />
-            <input
-              value={searchParams.get("search") ?? ""}
-              onChange={(event) => {
-                const next = new URLSearchParams(searchParams);
-                const value = event.target.value;
-                if (value) next.set("search", value);
-                else next.delete("search");
-                setSearchParams(next, { replace: true });
-              }}
-              placeholder={t("keys.searchPlaceholder")}
-              aria-label={t("keys.searchPlaceholder")}
-            />
-          </label>
-          {caps.create ? (
-            <Button icon={<Plus size={16} />} onClick={openCreate}>
-              {t("keys.create")}
-            </Button>
-          ) : null}
-          {/* Credit codes are an operator concept in the console; the member
-              app redeems inside its own settings page instead. */}
-          {caps.quotas ? (
-            <Button
-              variant="secondary"
-              icon={<Ticket size={15} />}
-              onClick={() => setRedemption(true)}
-            >
-              {t("keys.redemption")}
-            </Button>
-          ) : null}
-        </>
-      }
-    >
+    <main className="page keys-page">
       <div className="ops-canvas">
         <TelemetryStrip
           items={[
@@ -743,6 +714,45 @@ export function KeysView({
         {usage.isError ? <ErrorState error={usage.error} retry={() => usage.refetch()} /> : null}
 
         <Panel className="ops-list-panel">
+          <div className="workspace-filter-row keys-toolbar">
+            <div className="directory-search channels-search keys-search">
+              <Search size={16} aria-hidden="true" />
+              <HeroInput
+                className="channels-search-input"
+                type="search"
+                name="key-search"
+                autoComplete="off"
+                value={searchParams.get("search") ?? ""}
+                onChange={(event) => {
+                  const next = new URLSearchParams(searchParams);
+                  const value = event.target.value;
+                  if (value) next.set("search", value);
+                  else next.delete("search");
+                  setSearchParams(next, { replace: true });
+                }}
+                placeholder={t("keys.searchPlaceholder")}
+                aria-label={t("keys.searchPlaceholder")}
+              />
+            </div>
+            <div className="keys-toolbar-actions">
+              {caps.create ? (
+                <Button icon={<Plus size={16} />} onClick={openCreate}>
+                  {t("keys.create")}
+                </Button>
+              ) : null}
+              {/* Credit codes are an operator concept in the console; the member
+                  app redeems inside its own settings page instead. */}
+              {caps.quotas ? (
+                <Button
+                  variant="secondary"
+                  icon={<Ticket size={15} />}
+                  onClick={() => setRedemption(true)}
+                >
+                  {t("keys.redemption")}
+                </Button>
+              ) : null}
+            </div>
+          </div>
           <EntityState
             isLoading={query.isPending}
             isError={query.isError}
@@ -755,11 +765,6 @@ export function KeysView({
                 body={t("keys.empty")}
                 actions={
                   <>
-                    {caps.create ? (
-                      <Button icon={<Plus size={16} />} onClick={openCreate}>
-                        {t("keys.create")}
-                      </Button>
-                    ) : null}
                     {caps.upstream ? (
                       <Link className="button button-secondary" to="/channels">
                         {t("keys.ctaConnections")}
@@ -1066,7 +1071,7 @@ export function KeysView({
           onClose={() => setRotatedToken(null)}
         />
       )}
-    </Page>
+    </main>
   );
 }
 
@@ -1185,6 +1190,7 @@ function KeyDialog({
   return (
     <Dialog
       title={mode === "create" ? t("keys.createDialog") : t("keys.editDialog")}
+      className="key-dialog"
       onClose={onClose}
       busy={pending}
       actions={
@@ -1222,7 +1228,8 @@ function KeyDialog({
         <span>{mode === "create" ? t("keys.createHint") : t("keys.editHint")}</span>
       </div>
       <Field label={t("common.name")}>
-        <input
+        <HeroInput
+          className="key-form-control"
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -1248,7 +1255,8 @@ function KeyDialog({
         {openBilling ? (
           <div className="key-dialog-fold-body">
             <Field label={t("keys.quotaTotal")} hint={t("keys.quotaTotalHint")}>
-              <input
+              <HeroInput
+                className="key-form-control"
                 type="number"
                 min={0}
                 step={1}
@@ -1262,7 +1270,8 @@ function KeyDialog({
               />
             </Field>
             <Field label={t("keys.quotaCost")} hint={t("keys.quotaCostHint")}>
-              <input
+              <HeroInput
+                className="key-form-control"
                 type="number"
                 min={0}
                 step="0.01"
@@ -1300,18 +1309,19 @@ function KeyDialog({
           <div className="key-dialog-fold-body">
             <Field label={t("keys.modelAllowlist")} hint={t("keys.modelAllowlistHint")}>
               <div className="model-group-picker">
-                <select
+                <SearchableSelect
+                  ariaLabel={t("keys.modelGroupPlaceholder")}
                   value={modelGroupSelection}
-                  onChange={(event) => addModelGroup(event.target.value)}
+                  onChange={addModelGroup}
                   disabled={pending}
-                >
-                  <option value="">{t("keys.modelGroupPlaceholder")}</option>
-                  {modelGroupOptions.map((group) => (
-                    <option key={group} value={group}>
-                      {group} ({modelsByGroup.get(group)?.size ?? 0})
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "", label: t("keys.modelGroupPlaceholder") },
+                    ...modelGroupOptions.map((group) => ({
+                      value: group,
+                      label: `${group} (${modelsByGroup.get(group)?.size ?? 0})`,
+                    })),
+                  ]}
+                />
                 <span className="field-hint">{t("keys.modelGroupHint")}</span>
               </div>
               <ModelPicker
@@ -1353,53 +1363,80 @@ function KeyDialog({
           <div className="key-dialog-fold-body">
             {tenantGroupNames.length > 0 || tenantGroup ? (
               <Field label={t("keys.group")} hint={t("keys.groupHint")}>
-                <select
+                <SearchableSelect
+                  ariaLabel={t("keys.group")}
                   value={tenantGroup}
                   disabled={pending}
-                  onChange={(e) => setTenantGroup(e.target.value)}
-                >
-                  <option value="">{t("keys.groupDefault")}</option>
-                  {tenantGroupNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setTenantGroup}
+                  options={[
+                    { value: "", label: t("keys.groupDefault") },
+                    ...tenantGroupNames.map((name) => ({ value: name, label: name })),
+                  ]}
+                />
               </Field>
             ) : null}
             <Field label={t("keys.routeGroup")} hint={t("keys.routeGroupHint")}>
-              <select
+              <SearchableSelect
+                ariaLabel={t("keys.routeGroup")}
                 value={routeGroup}
                 disabled={pending}
-                onChange={(e) => setRouteGroup(e.target.value)}
-              >
-                <option value="">{t("keys.routeGroupNone")}</option>
-                {routeGroup && !routeGroupNames.includes(routeGroup) ? (
-                  <option value={routeGroup}>{routeGroup}</option>
-                ) : null}
-                {routeGroupNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+                onChange={setRouteGroup}
+                options={[
+                  { value: "", label: t("keys.routeGroupNone") },
+                  ...(routeGroup && !routeGroupNames.includes(routeGroup)
+                    ? [{ value: routeGroup, label: routeGroup }]
+                    : []),
+                  ...routeGroupNames.map((name) => ({ value: name, label: name })),
+                ]}
+              />
             </Field>
             <div className="split is-tight">
               <Field label={t("keys.expiresAt")} hint={t("keys.expiresAtHint")}>
-                <input
-                  type="datetime-local"
-                  value={expiresAt ? toLocalInput(expiresAt) : ""}
-                  disabled={pending}
-                  onChange={(e) => setExpiresAt(e.target.value ? toRFC3339(e.target.value) : "")}
-                />
+                <HeroDatePicker
+                  aria-label={t("keys.expiresAt")}
+                  className="key-expiry-picker"
+                  granularity="minute"
+                  hourCycle={24}
+                  isDisabled={pending}
+                  value={expiresAt ? parseDateTime(toLocalInput(expiresAt)) : null}
+                  onChange={(value) => setExpiresAt(value ? toRFC3339(value.toString()) : "")}
+                >
+                  <HeroDateField.Group className="key-expiry-group" fullWidth>
+                    <HeroDateField.Input>
+                      {(segment) => <HeroDateField.Segment segment={segment} />}
+                    </HeroDateField.Input>
+                    <HeroDateField.Suffix>
+                      <HeroDatePicker.Trigger>
+                        <HeroDatePicker.TriggerIndicator />
+                      </HeroDatePicker.Trigger>
+                    </HeroDateField.Suffix>
+                  </HeroDateField.Group>
+                  <HeroDatePicker.Popover className="key-expiry-popover">
+                    <HeroCalendar aria-label={t("keys.expiresAt")} className="ui-date-calendar">
+                      <HeroCalendar.Header>
+                        <HeroCalendar.Heading />
+                        <HeroCalendar.NavButton slot="previous" />
+                        <HeroCalendar.NavButton slot="next" />
+                      </HeroCalendar.Header>
+                      <HeroCalendar.Grid>
+                        <HeroCalendar.GridHeader>
+                          {(day) => <HeroCalendar.HeaderCell>{day}</HeroCalendar.HeaderCell>}
+                        </HeroCalendar.GridHeader>
+                        <HeroCalendar.GridBody>
+                          {(date) => <HeroCalendar.Cell date={date} />}
+                        </HeroCalendar.GridBody>
+                      </HeroCalendar.Grid>
+                    </HeroCalendar>
+                  </HeroDatePicker.Popover>
+                </HeroDatePicker>
               </Field>
               <Field label={t("keys.allowedIPs")} hint={t("keys.allowedIPsHint")}>
-                <textarea
+                <HeroTextArea
+                  className="key-form-control key-form-textarea textarea-sm"
                   value={allowedIPs}
                   disabled={pending}
                   onChange={(e) => setAllowedIPs(e.target.value)}
                   placeholder="1.2.3.4&#10;10.0.0.0/8"
-                  className="textarea-sm"
                 />
               </Field>
             </div>
@@ -1430,7 +1467,8 @@ function KeyDialog({
                 </label>
                 {useCustomToken ? (
                   <Field label={t("keys.customToken")} hint={t("keys.customTokenHint")}>
-                    <input
+                    <HeroInput
+                      className="key-form-control"
                       type="password"
                       autoComplete="new-password"
                       aria-label={t("keys.customToken")}

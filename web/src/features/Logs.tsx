@@ -1,11 +1,13 @@
 import { RefreshCw, MessagesSquare, SlidersHorizontal, Timer, Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { Input as HeroInput, Switch as HeroSwitch } from "@heroui/react";
 import { Fragment, useMemo, useEffect, useState, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { AuditPanel, DiscoveryPanel } from "./ops";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
+import { DiscoveryPanel } from "./ops";
 import { api } from "../api/client";
 import type { BillingEvidence, BillingExplanation, ProxyLog, ProxyLogAttempt } from "../api/types";
 import { EmptyHero } from "../components/EmptyHero";
+import { SearchableSelect, type SelectOption } from "../components/SearchableSelect";
 import { ListShell } from "../components/ListShell";
 import { PaginationBar } from "../components/PaginationBar";
 import { EntityState } from "../components/EntityState";
@@ -787,6 +789,29 @@ export function LogsView({
     }
     return map;
   }, [keys.data]);
+  const limitOptions: SelectOption[] = LOG_LIMITS.map((value) => ({
+    value: String(value),
+    label: t("logsPage.loadLimitOption", { count: value }),
+  }));
+  const channelOptions: SelectOption[] = [
+    { value: "0", label: t("ops.allChannels") },
+    ...(channels.data ?? []).map((channel) => ({
+      value: String(channel.id),
+      label: channel.name,
+    })),
+  ];
+  const tokenOptions: SelectOption[] = [
+    { value: "0", label: t("logsPage.filterAllTokens") },
+    ...(keyIdParam && !keyName.has(keyIdParam)
+      ? [
+          {
+            value: String(keyIdParam),
+            label: t("logsPage.filterMissingToken", { id: keyIdParam }),
+          },
+        ]
+      : []),
+    ...(keys.data ?? []).map((key) => ({ value: String(key.id), label: key.name })),
+  ];
 
   const rows = logs.data ?? [];
   const visibleRows = slowOnly ? rows.filter((log) => log.latency_ms >= 5000) : rows;
@@ -1106,43 +1131,32 @@ export function LogsView({
             }}
           >
             {caps.upstream ? (
-              <select
-                aria-label={t("logsPage.loadLimit")}
-                value={limit}
-                onChange={(e) => setFilter({ limit: e.target.value })}
-              >
-                {LOG_LIMITS.map((value) => (
-                  <option key={value} value={value}>
-                    {t("logsPage.loadLimitOption", { count: value })}
-                  </option>
-                ))}
-              </select>
+              <div className="log-filter-select log-filter-limit">
+                <SearchableSelect
+                  ariaLabel={t("logsPage.loadLimit")}
+                  options={limitOptions}
+                  value={String(limit)}
+                  onChange={(value) => setFilter({ limit: value })}
+                />
+              </div>
             ) : null}
             {caps.upstream ? (
-              <select
-                aria-label={t("ops.filterChannel")}
-                value={channelId ?? 0}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  setFilter({
-                    channel_id: value > 0 ? String(value) : null,
-                  });
-                }}
-              >
-                <option value={0}>{t("ops.allChannels")}</option>
-                {(channels.data ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <div className="log-filter-select log-filter-channel">
+                <SearchableSelect
+                  ariaLabel={t("ops.filterChannel")}
+                  options={channelOptions}
+                  value={String(channelId ?? 0)}
+                  onChange={(value) => setFilter({ channel_id: Number(value) > 0 ? value : null })}
+                />
+              </div>
             ) : null}
-            <input
+            <HeroInput
               className="log-search-input"
+              type="text"
               aria-label={t("logsPage.search")}
               value={queryDraft}
               placeholder={t("logsPage.search")}
-              onChange={(e) => setQueryDraft(e.target.value)}
+              onChange={(event) => setQueryDraft(event.target.value)}
             />
             <Button
               variant="secondary"
@@ -1166,63 +1180,52 @@ export function LogsView({
               id="proxy-log-exact-filters"
               hidden={!showExactFilters}
             >
-              <input
+              <HeroInput
+                className="log-exact-input"
                 value={modelDraft}
                 aria-label={t("common.model")}
                 placeholder={t("common.model")}
-                onChange={(e) => setModelDraft(e.target.value)}
+                onChange={(event) => setModelDraft(event.target.value)}
               />
               {caps.upstream ? (
-                <input
+                <HeroInput
+                  className="log-exact-input"
                   value={upstreamIdDraft}
                   aria-label={t("logsPage.upstreamRequestId")}
                   placeholder={t("logsPage.upstreamRequestId")}
-                  onChange={(e) => setUpstreamIdDraft(e.target.value)}
+                  onChange={(event) => setUpstreamIdDraft(event.target.value)}
                 />
               ) : null}
-              <select
-                aria-label={t("logsPage.token")}
-                value={keyIdParam ?? 0}
-                onChange={(event) => {
-                  const value = Number(event.target.value);
-                  setFilter({ downstream_key_id: value > 0 ? String(value) : null });
-                }}
-              >
-                <option value={0}>{t("logsPage.filterAllTokens")}</option>
-                {/* A filter pointing at a token that no longer exists must stay
-				    visible: silently dropping it back to "all" would show other
-				    tokens' rows under a filter the user still sees in the URL. */}
-                {keyIdParam && !keyName.has(keyIdParam) ? (
-                  <option value={keyIdParam}>
-                    {t("logsPage.filterMissingToken", { id: keyIdParam })}
-                  </option>
-                ) : null}
-                {(keys.data ?? []).map((key) => (
-                  <option key={key.id} value={key.id}>
-                    {key.name}
-                  </option>
-                ))}
-              </select>
+              <div className="log-filter-select log-exact-token">
+                <SearchableSelect
+                  ariaLabel={t("logsPage.token")}
+                  options={tokenOptions}
+                  value={String(keyIdParam ?? 0)}
+                  onChange={(value) =>
+                    setFilter({ downstream_key_id: Number(value) > 0 ? value : null })
+                  }
+                />
+              </div>
             </div>
           </form>
           <div className="log-quick-filters">
             <div className="log-filter-switches">
-              <label className="check marginless">
-                <input
-                  type="checkbox"
-                  checked={failedOnly}
-                  onChange={(e) => setFilter({ status: e.target.checked ? "failed" : null })}
-                />
-                <span>{t("logsPage.failedOnly")}</span>
-              </label>
-              <label className="check marginless">
-                <input
-                  type="checkbox"
-                  checked={slowOnly}
-                  onChange={(e) => setSlowOnly(e.target.checked)}
-                />
-                <span>{t("logsPage.slowOnly")}</span>
-              </label>
+              <HeroSwitch
+                className="log-filter-toggle"
+                isSelected={failedOnly}
+                aria-label={t("logsPage.failedOnly")}
+                onChange={(selected) => setFilter({ status: selected ? "failed" : null })}
+              >
+                <HeroSwitch.Content>{t("logsPage.failedOnly")}</HeroSwitch.Content>
+              </HeroSwitch>
+              <HeroSwitch
+                className="log-filter-toggle"
+                isSelected={slowOnly}
+                aria-label={t("logsPage.slowOnly")}
+                onChange={setSlowOnly}
+              >
+                <HeroSwitch.Content>{t("logsPage.slowOnly")}</HeroSwitch.Content>
+              </HeroSwitch>
             </div>
           </div>
 
@@ -1546,10 +1549,13 @@ export function Logs() {
       : [
           { value: "live", label: t("logsPage.tab.live"), icon: <MessagesSquare size={14} /> },
           { value: "discovery", label: t("logsPage.tab.discovery") },
-          { value: "audit", label: t("logsPage.tab.audit") },
         ]),
   ];
   const active = tabItems.some((item) => item.value === rawTab) ? (rawTab as string) : "proxy";
+
+  if (rawTab === "audit") {
+    return <Navigate to="/system-logs" replace />;
+  }
 
   const changeTab = (value: string) => {
     const next = new URLSearchParams(params);
@@ -1568,9 +1574,10 @@ export function Logs() {
     <Page
       title={t("logsPage.title")}
       description={t(member ? "logsPage.memberDescription" : "logsPage.hubDescription")}
+      className={member ? "" : "logs-page"}
     >
       <div className="ops-canvas">
-        <Tabs items={tabItems} active={active} onChange={changeTab} />
+        <Tabs className="logs-main-tabs" items={tabItems} active={active} onChange={changeTab} />
         {active === "proxy" ? (
           <LogsView
             source={source}
@@ -1580,7 +1587,6 @@ export function Logs() {
         ) : null}
         {active === "live" ? <LiveTracePanel /> : null}
         {active === "discovery" ? <DiscoveryPanel /> : null}
-        {active === "audit" ? <AuditPanel /> : null}
       </div>
     </Page>
   );

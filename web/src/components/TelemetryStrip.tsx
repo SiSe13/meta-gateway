@@ -58,11 +58,19 @@ function SegmentBody({ item }: { item: TelemetryItem }) {
  * dividers; only genuinely clickable segments are buttons — read-only
  * measurements render as plain segments with a visible caption.
  */
-export function TelemetryStrip({ items }: { items: TelemetryItem[] }) {
+export function TelemetryStrip({
+  items,
+  className = "",
+}: {
+  items: TelemetryItem[];
+  className?: string;
+}) {
   const compact = items.length <= 3 && items.every((item) => !item.hint && item.trend == null);
   return (
     <div
-      className={`telemetry-strip${compact ? " is-compact" : ""}`}
+      className={["telemetry-strip", compact ? "is-compact" : "", className]
+        .filter(Boolean)
+        .join(" ")}
       role="group"
       aria-label="Telemetry"
     >

@@ -2,9 +2,27 @@ import { defineConfig } from "vitest/config";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  base: "/console/",
-  plugins: [react(), tailwindcss()],
+export default defineConfig(({ command }) => ({
+  base: command === "serve" ? "/" : "/console/",
+  plugins: [
+    react(),
+    tailwindcss(),
+    {
+      name: "legacy-console-dev-redirect",
+      configureServer(server) {
+        server.middlewares.use((request, response, next) => {
+          if (request.url?.startsWith("/console") && /^\/console(?:\/|\?|$)/.test(request.url)) {
+            const target = request.url.replace(/^\/console/, "") || "/";
+            response.statusCode = 308;
+            response.setHeader("Location", target.startsWith("?") ? `/${target}` : target);
+            response.end();
+            return;
+          }
+          next();
+        });
+      },
+    },
+  ],
   build: {
     outDir: "../internal/webui/dist",
     emptyOutDir: true,
@@ -33,6 +51,8 @@ export default defineConfig({
       // default, which turned every login from the dev server into a 403
       // csrf_failed.
       "/admin/": { target: "http://127.0.0.1:4100", changeOrigin: false },
+      "/me": { target: "http://127.0.0.1:4100", changeOrigin: false },
+      "/auth": { target: "http://127.0.0.1:4100", changeOrigin: false },
       "/healthz": { target: "http://127.0.0.1:4100", changeOrigin: false },
       "/readyz": { target: "http://127.0.0.1:4100", changeOrigin: false },
     },
@@ -48,4 +68,4 @@ export default defineConfig({
     // (it falls back to the deprecated react-dom/test-utils entry and throws).
     env: { NODE_ENV: "development" },
   },
-});
+}));

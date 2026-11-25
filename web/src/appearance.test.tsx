@@ -31,7 +31,6 @@ function mount() {
               version="test"
               theme="light"
               onThemeChange={() => {}}
-              onSearch={() => {}}
               onDisconnect={() => {}}
               health={{ healthy: 0, total: 0, loading: false }}
             >

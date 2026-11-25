@@ -955,11 +955,38 @@ label.directory-search input:focus {
 /* Latency distribution as a first-class panel at the top of the log page.
    The bars keep their own track so the readouts below never squeeze them. */
 .latency-panel .latency-panel-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
+}
+.logs-page > .page-header { display: none; }
+.latency-panel .latency-panel-header .cockpit-panel-title { min-width: 0; }
+.latency-panel .latency-panel-header .time-range {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 10px 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-light, var(--line));
+}
+.latency-panel .time-range-tabs,
+.latency-panel .time-range-tabs .time-range-presets {
+  width: auto !important;
+  max-width: 100%;
+}
+.latency-panel .time-range-tabs .time-range-presets {
+  display: inline-flex !important;
+  flex-direction: row !important;
   flex-wrap: wrap;
 }
+.latency-panel .time-range-tabs .time-range-presets [role="tab"] {
+  flex: 0 0 auto;
+  width: auto;
+}
+.latency-panel .time-range-meta { flex: 0 0 auto; }
 .latency-panel .latency-panel-scope {
   margin-right: auto;
   font-size: 12px;
@@ -967,6 +994,13 @@ label.directory-search input:focus {
 }
 .latency-panel .latency-histogram-bars {
   height: 76px;
+}
+@media (max-width: 760px) {
+  .latency-panel .latency-panel-header .time-range {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .latency-panel .time-range-meta { flex-wrap: wrap; }
 }
 .latency-readouts {
   display: flex;
@@ -3196,24 +3230,17 @@ td.actions {
   gap: 6px;
   flex-wrap: nowrap;
 }
-.checkin-time-picker select {
-  width: auto;
-  flex: 0 0 auto;
-  min-width: 0;
-}
-/* A `.field` stretches every child to the column width, and system.css gives
-   `.field select` 100%. That is right for a single control, but this picker is
-   compound: two stretched selects plus the colon and hint overflow the column
-   long before the viewport is narrow. Keep the picker at its intrinsic width
-   and let it wrap instead of pushing the minute select out of the panel. */
+.checkin-time-field { width: auto; flex: 0 0 auto; }
+.checkin-time-group { min-height: 36px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); }
+.checkin-time-group:focus-within { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.checkin-time-group .date-input-group__input { padding-inline: 10px; font: 13px var(--font); }
+/* Keep the compound time field at its intrinsic width and let it wrap before
+   the hint when the settings column narrows. */
 .field .checkin-time-picker {
   align-self: flex-start;
   width: fit-content;
   max-width: 100%;
   flex-wrap: wrap;
-}
-.field .checkin-time-picker select {
-  width: auto;
 }
 .checkin-log-toolbar {
   display: flex;
@@ -3233,7 +3260,7 @@ td.actions {
   margin-left: auto;
 }
 .checkin-log-filters select,
-.checkin-log-filters input[type="date"] {
+.checkin-log-filters > .ui-date-picker {
   width: auto;
 }
 @media (max-width: 760px) {
@@ -3265,10 +3292,6 @@ td.actions {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--danger);
-}
-.checkin-time-picker b {
-  color: var(--muted);
-  font-weight: 600;
 }
 .checkin-time-hint {
   font-size: 12px;
@@ -4948,8 +4971,7 @@ td.actions {
   background: transparent;
   font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--muted);
   cursor: pointer;
   user-select: none;
@@ -5005,6 +5027,16 @@ td.actions {
 .model-picker-name {
   flex: 1 1 auto;
   min-width: 0;
+}
+.channels-add-dialog .model-picker-list {
+  max-height: 17.5rem;
+}
+.channels-add-dialog .model-picker-group-head {
+  font-size: var(--text-sm);
+}
+.channels-add-dialog .model-picker-item {
+  padding-block: 5px;
+  font-size: var(--text-lg);
 }
 .model-picker-badge {
   flex: none;
@@ -7547,67 +7579,6 @@ label.check input[type="checkbox"]:not(.switch) {
   }
 }
 
-/* ==========================================================================
-   Custom login background image (localStorage persisted)
-   ========================================================================== */
-.bg-picker {
-  position: fixed;
-  z-index: 300;
-  width: 280px;
-  padding: 12px;
-  display: grid;
-  gap: 8px;
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-lg);
-  animation: search-drop var(--dur-base) var(--ease-out);
-}
-.bg-picker input[type="text"] {
-  width: 100%;
-  height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface-raised);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 11px;
-}
-.bg-picker .bg-row {
-  display: flex;
-  gap: 8px;
-}
-.bg-picker .bg-row button,
-.bg-picker .bg-row .bg-upload-btn {
-  flex: 1;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ink);
-  background: var(--surface-subtle);
-  border: 1px solid var(--line-strong);
-  cursor: pointer;
-  transition: all var(--dur-hover) var(--ease-hover);
-}
-.bg-picker .bg-row button:hover,
-.bg-picker .bg-row .bg-upload-btn:hover {
-  border-color: var(--primary-hairline);
-  background: var(--surface-hover);
-}
-.bg-picker .bg-row button.is-primary {
-  color: var(--on-primary);
-  background: var(--primary);
-  border-color: var(--primary);
-}
-.bg-picker .bg-row button.is-danger:hover {
-  color: #ffffff;
-  background: var(--danger);
-  border-color: var(--danger);
-}
-
 /* ============================================================
    全站战术工业 HUD 平面设计系统 (Tactical Cockpit & Hairline Grid)
    ============================================================ */
@@ -7633,6 +7604,37 @@ label.check input[type="checkbox"]:not(.switch) {
    would shove the right panel down. */
 .cockpit-dual-grid > .panel + .panel {
   margin-top: 0;
+}
+.cockpit-health-panel,
+.cockpit-news-panel {
+  min-height: 380px;
+  max-height: 480px;
+  align-self: start;
+}
+.cockpit-health-panel > .panel-header,
+.cockpit-news-panel > .panel-header {
+  flex: 0 0 auto;
+}
+.cockpit-health-panel > .cockpit-channel-list,
+.cockpit-news-panel > .site-news-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cockpit-health-panel > .cockpit-channel-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.cockpit-health-panel > .cockpit-channel-list::-webkit-scrollbar,
+.cockpit-news-panel > .site-news-list::-webkit-scrollbar {
+  width: 6px;
+}
+.cockpit-health-panel > .cockpit-channel-list::-webkit-scrollbar-thumb,
+.cockpit-news-panel > .site-news-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--line-strong);
 }
 @media (max-width: 1024px) {
   .cockpit-dual-grid {
@@ -8864,35 +8866,37 @@ a.log-chain-value:hover { text-decoration: underline; }
   border: 1px solid var(--line-strong);
 }
 
-/* —— First-run setup wizard (full-screen page, /setup) ——
-   The decision-making counterpart to the spotlight tour: collects the
-   day-one choices (default sync mode, first connection, first key). */
+/* —— First-run setup wizard dialog —— */
+.setup-wizard-dialog {
+  width: 50vw;
+  min-width: 640px;
+  max-width: 1100px;
+}
+:root[data-appearance="metapi"] .dialog.setup-wizard-dialog {
+  width: 50vw;
+  min-width: 640px;
+  max-width: 1100px;
+}
+.setup-wizard-dialog .dialog-body {
+  padding: 18px 24px 24px;
+  scrollbar-width: none;
+}
+.setup-wizard-dialog .dialog-body::-webkit-scrollbar {
+  display: none;
+}
 .setup-wizard {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 16px;
-  background: var(--bg-canvas);
+  min-height: 0;
 }
 .setup-wizard-card {
   width: 100%;
-  max-width: 540px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 26px 30px;
+  max-width: none;
+  padding: 0;
 }
 .setup-wizard-head {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-}
-.setup-wizard-head strong {
-  font-size: 15px;
-  font-weight: 650;
-  color: var(--ink);
 }
 .setup-wizard-skip {
   border: 0;
@@ -8902,6 +8906,8 @@ a.log-chain-value:hover { text-decoration: underline; }
   color: var(--muted-dark);
   cursor: pointer;
   padding: 0;
+  min-width: 0;
+  min-height: 0;
 }
 .setup-wizard-skip:hover {
   color: var(--ink);
@@ -8932,17 +8938,51 @@ a.log-chain-value:hover { text-decoration: underline; }
   font-weight: 650;
   color: var(--ink);
 }
+.setup-wizard-key-step > h2 {
+  margin-top: 14px;
+}
 .setup-wizard-card h3 {
   margin: 16px 0 2px;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
 }
+.setup-wizard-mode-intro h3 {
+  margin-top: 14px;
+}
+.setup-wizard-mode-intro .setup-wizard-desc {
+  margin-bottom: 8px;
+}
+.setup-wizard-mode {
+  margin: 0;
+}
+.setup-wizard-mode > .panel-header {
+  margin-bottom: 8px;
+}
+.setup-wizard-mode .panel-lede {
+  margin-bottom: 8px;
+}
+.setup-wizard-mode form > .team-modal-content {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+}
+.setup-wizard-mode form > .team-modal-content > .panel-lede {
+  grid-column: 1 / -1;
+}
+.setup-wizard-mode form > .team-modal-content > button {
+  justify-self: start;
+  margin-top: 0 !important;
+}
 .setup-wizard-desc {
   margin: 0 0 12px;
   font-size: 12px;
   line-height: 1.6;
   color: var(--muted);
+}
+.setup-wizard-card section > .field + .field {
+  margin-top: 14px;
 }
 .setup-wizard-tabs {
   display: flex;
@@ -9108,6 +9148,15 @@ a.log-chain-value:hover { text-decoration: underline; }
   gap: 10px;
   margin-top: 18px;
 }
+.setup-wizard-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+.setup-wizard-finish-actions {
+  justify-content: center;
+}
 .setup-wizard-curl {
   margin: 14px 0 4px;
   border: 1px solid var(--line);
@@ -9147,6 +9196,25 @@ a.log-chain-value:hover { text-decoration: underline; }
   line-height: 1.6;
   color: var(--ink-soft);
   overflow-x: auto;
+}
+@media (max-width: 900px) {
+  .setup-wizard-dialog,
+  :root[data-appearance="metapi"] .dialog.setup-wizard-dialog {
+    width: calc(100vw - 48px);
+    min-width: 0;
+  }
+}
+@media (max-width: 600px) {
+  .setup-wizard-dialog,
+  :root[data-appearance="metapi"] .dialog.setup-wizard-dialog {
+    width: calc(100vw - 24px);
+  }
+  .setup-wizard-dialog .dialog-body {
+    padding: 14px;
+  }
+  .setup-wizard-mode form > .team-modal-content {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
 }
 
 /* Preset dropdown + conditional time picker for runtime cron schedules. */
@@ -10030,11 +10098,11 @@ Whole-app render guard — see components/ErrorBoundary.tsx
    elements so the knob lands flush against the far wall whatever the global
    box-sizing is — flush is what makes a switch read as "on" at a glance.
 
-   Opt-in, via `.switch` on the input. A blanket rule over every checkbox would
+   Opt-in, via `input.switch`. A blanket rule over every checkbox would
    also restyle the ones that select rows in a list, where a checkbox is the right
    control. The settings page's own rows are listed alongside so one geometry has
    exactly one definition. */
-.switch,
+input.switch,
 .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"] {
   position: relative;
   /* Without this the platform widget paints over the track and a 42px switch
@@ -10058,7 +10126,7 @@ Whole-app render guard — see components/ErrorBoundary.tsx
     background var(--dur-fast, var(--dur-fast)),
     border-color var(--dur-fast, var(--dur-fast));
 }
-.switch::before,
+input.switch::before,
 .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"]::before {
   content: "";
   position: absolute;
@@ -10071,24 +10139,24 @@ Whole-app render guard — see components/ErrorBoundary.tsx
   background: var(--surface);
   transition: transform var(--dur-fast, var(--dur-fast));
 }
-.switch:checked,
+input.switch:checked,
 .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"]:checked {
   border-color: var(--primary);
   background: var(--primary);
 }
-.switch:checked::before,
+input.switch:checked::before,
 .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"]:checked::before {
   transform: translateX(20px);
   border-color: transparent;
 }
-.switch:focus-visible,
+input.switch:focus-visible,
 .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"]:focus-visible {
   outline: 2px solid var(--primary-soft);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .switch,
-  .switch::before,
+  input.switch,
+  input.switch::before,
   .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"],
   .runtime-cards-grid .runtime-rows .runtime-row-label-wrap > input[type="checkbox"]::before {
     transition: none;
