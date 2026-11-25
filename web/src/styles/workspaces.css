@@ -356,11 +356,13 @@
 .theme-metapi .models-split > .ops-detail-card .detail-head h2 { font-size: 21px; }
 .theme-metapi .models-split > .ops-detail-card .detail-head small { font: 12px/1.65 var(--font); }
 .theme-metapi .ops-list-panel { padding: 0; max-height: none; overflow: hidden; }
-.theme-metapi .model-directory { display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; }
-.theme-metapi .model-directory > .entity-state-fill { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; min-width: 0; }
+.theme-metapi .model-directory { display: flex; flex-direction: column; min-height: 0; }
+.theme-metapi .model-directory > .entity-state-fill { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .theme-metapi .model-directory > .state { flex: 1 1 auto; min-height: 0; }
-.theme-metapi .model-directory .list-shell { flex: 1 1 auto; min-height: 0; }
-.theme-metapi .model-directory .list-shell-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.theme-metapi .model-directory .list-shell { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; overflow: hidden; }
+.theme-metapi .model-directory .list-shell-body { flex: 1 1 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-strong) transparent; }
+.theme-metapi .model-directory .list-shell-body::-webkit-scrollbar { width: 8px; }
+.theme-metapi .model-directory .list-shell-body::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: var(--line-strong); background-clip: padding-box; }
 .theme-metapi .ops-list-panel > .panel-header { padding: 19px 20px; margin: 0; border-bottom: 1px solid var(--line); }
 .theme-metapi .ops-list-panel > .models-simple-toolbar { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 8px; }
 .theme-metapi .ops-list-panel .empty-hero { margin: 28px; }

@@ -461,6 +461,14 @@
   font-size: 12px;
   font-weight: 650;
 }
+.site-observation-workspace .observation-maintenance > .button {
+  min-height: 30px;
+  height: 30px;
+  margin: 8px 0 2px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+}
 .site-observation-workspace .observation-policy-fields {
   gap: 12px;
   margin: 16px 0;
@@ -505,7 +513,8 @@
 }
 @media (min-width: 761px) {
   .console-shell.is-observation-view .console-content {
-    max-width: 1920px;
+    max-width: 2200px;
+    padding-inline: 18px;
   }
   .site-observation-workspace .observation-layout {
     height: calc(100dvh - 425px);

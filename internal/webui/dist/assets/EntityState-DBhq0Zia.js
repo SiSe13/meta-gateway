@@ -1,0 +1,1 @@
+import{j as t}from"./framework-CRaovJLW.js";import{L as f,E as m,a8 as x}from"./index-3A7HKd8C.js";function E({isLoading:r,isError:s,error:i,isEmpty:a,empty:e,retry:n,children:o}){return r?t.jsx(f,{}):s?t.jsx(m,{error:i,retry:n}):a?t.jsx(x,{children:e}):t.jsx("div",{className:"entity-state-fill",children:o})}export{E};
