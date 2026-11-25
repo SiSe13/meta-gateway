@@ -48,9 +48,7 @@ export function MemberModelsPage() {
     queryFn: ({ signal }) => accountRequest<Account>("/me", { signal }),
   });
   const userID = account.data?.user.id;
-  const canRoute = Boolean(
-    account.data?.user.allow_routing && account.data?.branding.show_routing,
-  );
+  const canRoute = Boolean(account.data?.user.allow_routing && account.data?.branding.show_routing);
   const plans = useQuery({
     queryKey: ["user", userID, "plans"],
     queryFn: ({ signal }) => accountRequest<Plan[]>("/me/plans", { signal }),

@@ -52,9 +52,10 @@
 }
 
 .theme-metapi .button--danger {
-  --danger: var(--danger);
-  --danger-hover: var(--danger-hover);
-  --danger-foreground: var(--on-danger);
+  --button-bg: var(--danger);
+  --button-bg-hover: var(--danger-hover);
+  --button-bg-pressed: var(--danger-hover);
+  --button-fg: var(--on-danger);
 }
 
 .theme-metapi :is(.button, button.button) {

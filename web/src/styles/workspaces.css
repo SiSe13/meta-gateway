@@ -572,7 +572,7 @@
   display: block;
   margin-top: 4px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 .system-logs-page .system-logs-http-status { font-variant-numeric: tabular-nums; white-space: nowrap; }

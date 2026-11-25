@@ -194,10 +194,7 @@
   outline: 0;
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
-.site-observation-workspace .observation-search-input,
-.site-observation-workspace .observation-search-input [data-slot="input-wrapper"],
-.site-observation-workspace .observation-search-input input,
-.site-observation-workspace .observation-search-input [data-slot="input"] {
+.site-observation-workspace .observation-search-input {
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
@@ -211,10 +208,19 @@
   box-shadow: none;
   font: 13px var(--font);
 }
-.site-observation-workspace .observation-search-input [data-slot="input-wrapper"] {
+:root[data-appearance="metapi"] .site-observation-workspace .observation-search-input {
   border: 0 !important;
-  outline: 0;
-  background: transparent;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.site-observation-workspace .observation-search-input:focus,
+.site-observation-workspace .observation-search-input:focus-visible,
+.site-observation-workspace .observation-search-input[data-focused="true"] {
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
 .site-observation-workspace .observation-search-input::placeholder,
@@ -497,11 +503,6 @@
   outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
   outline-offset: 2px;
 }
-.site-observation-workspace .observation-search-input:focus-visible {
-  outline: 0;
-  box-shadow: none;
-}
-
 @media (min-width: 761px) {
   .console-shell.is-observation-view .console-content {
     max-width: 1920px;
