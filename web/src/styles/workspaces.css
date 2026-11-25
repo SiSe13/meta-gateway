@@ -360,7 +360,8 @@
 .theme-metapi .model-directory > .entity-state-fill { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .theme-metapi .model-directory > .state { flex: 1 1 auto; min-height: 0; }
 .theme-metapi .model-directory .list-shell { display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; overflow: hidden; }
-.theme-metapi .model-directory .list-shell-body { flex: 1 1 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-strong) transparent; }
+.theme-metapi .model-directory .list-shell-body { flex: 1 1 0; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: var(--line-strong) transparent; scrollbar-width: thin; }
+.theme-metapi .model-directory .table-wrap { max-height: none; overflow: visible; }
 .theme-metapi .model-directory .list-shell-body::-webkit-scrollbar { width: 8px; }
 .theme-metapi .model-directory .list-shell-body::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 8px; background: var(--line-strong); background-clip: padding-box; }
 .theme-metapi .ops-list-panel > .panel-header { padding: 19px 20px; margin: 0; border-bottom: 1px solid var(--line); }
@@ -760,12 +761,14 @@
   .theme-metapi .keys-page > .ops-canvas > .ops-list-panel { height: auto; min-height: 0; }
   .theme-metapi .dialog.key-dialog { width: calc(100vw - 24px); min-height: 0; max-height: calc(100dvh - 24px); }
   .key-dialog > .dialog-body { padding: 18px; }
-  /* The directory is the whole page on a phone: the 330px cap left it a ~123px
-     scroll window with barely one row visible. Let it grow to its content, and
-     drop the inner scroll region — the page scrolls instead, so the footer
-     (pagination) stays reachable. */
+  /* On phones the directory becomes a full-width page section, so let the page
+     scroll naturally instead of keeping a nested list scroll area. */
   .theme-metapi .models-split > .model-directory { position: static; height: auto; min-height: 0; max-height: none; }
-  .theme-metapi .models-split .list-shell-body { overflow: visible; }
+  .theme-metapi .model-directory > .entity-state-fill,
+  .theme-metapi .model-directory .list-shell,
+  .theme-metapi .model-directory .list-shell-body { overflow: visible; }
+  .theme-metapi .model-directory > .entity-state-fill,
+  .theme-metapi .model-directory .list-shell { flex: 0 0 auto; }
   .models-workspace-actions { flex-wrap: wrap; justify-content: flex-start; }
   .workspace-filter-row { padding: 14px; }
   .workspace-filter-row .directory-search { flex: 1 1 100%; width: 100%; }

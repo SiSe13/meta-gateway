@@ -152,6 +152,16 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* The model directory is a bounded master-detail pane: its list body owns the
+   scroll area, so the panel itself must keep the flex height chain intact. */
+.theme-metapi .panel.heroui-card.model-directory {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .theme-metapi .dialog-backdrop {
   position: fixed;
   inset: 0;
