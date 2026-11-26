@@ -62,7 +62,7 @@ export type ModelActionDeps = {
   pinLabel?: (pinned: boolean) => string;
 };
 
-/** How each action is ranked into sections, and the section order. */
+/** Menu order: routine actions first, configuration next, deletion last. */
 const RANKS: Record<string, number> = {
   pin: 0,
   try: 0,
@@ -74,12 +74,10 @@ const RANKS: Record<string, number> = {
   delete: 3,
 };
 
-const SECTIONS = ["actions.view", "actions.manage", "actions.selection", "actions.danger"];
-
 export function modelActions(
   route: Route,
   deps: ModelActionDeps,
-  options?: { closeContext?: boolean },
+  options?: { closeContext?: boolean; omitKeys?: string[] },
 ): ActionMenuItem[] {
   const { t, mutations } = deps;
   const busy = mutations.toggleRoute.pendingId === route.id || mutations.del.isPending;
@@ -181,11 +179,13 @@ export function modelActions(
       deps.setRemove(route);
     },
   });
+  const omitted = new Set(options?.omitKeys ?? []);
   return items
+    .filter((item) => !omitted.has(item.key))
     .sort((a, b) => (RANKS[a.key] ?? 1) - (RANKS[b.key] ?? 1))
     .map((item) => ({
       ...item,
-      group: t(SECTIONS[RANKS[item.key] ?? 1]!),
+      group: undefined,
       disabledReason: item.disabled ? t("common.working") : undefined,
     }));
 }

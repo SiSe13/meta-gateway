@@ -21,7 +21,7 @@ import (
 
 const (
 	// Repo is the GitHub slug queried for the latest release.
-	Repo = "ZiChuanLan/meta-gateway"
+	Repo = "SiSe13/meta-gateway"
 	// defaultTimeout bounds a single GitHub API call.
 	defaultTimeout = 5 * time.Second
 	// DefaultInterval is both the background cadence and the cache TTL.

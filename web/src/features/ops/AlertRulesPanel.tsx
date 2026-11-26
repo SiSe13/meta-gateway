@@ -1,12 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button as HeroButton } from "@heroui/react";
+import { Plus } from "lucide-react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { api } from "../../api/client";
 import type { AlertRule } from "../../api/types";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
-import { ConfirmDialog, Dialog, Field, InfoTip } from "../../components/ui";
+import {
+  CheckboxControl,
+  ConfirmDialog,
+  Dialog,
+  Field,
+  InfoTip,
+  SelectControl,
+} from "../../components/ui";
 import { RuleEditorFooter } from "./RuleEditorFooter";
 
 export // Alert rules: metric/operator/threshold/window/sustained → webhook.
@@ -37,12 +45,14 @@ function AlertRulesPanel() {
   return (
     <section className="panel runtime-section runtime-tool-alert-rules" id="runtime-alert-rules">
       <div className="panel-header">
-        <strong>{t("ops.alertRules.title")}</strong>
-        <InfoTip label={t("ops.alertRules.hint")} />
+        <div className="panel-title">
+          <h3>{t("ops.alertRules.title")}</h3>
+          <InfoTip label={t("ops.alertRules.hint")} />
+        </div>
         <HeroButton
           {...addButtonTitle}
           type="button"
-          className="icon-button"
+          className="icon-button runtime-rule-add"
           isIconOnly
           aria-label={t("ops.alertRules.add")}
           onPress={() =>
@@ -59,7 +69,7 @@ function AlertRulesPanel() {
             })
           }
         >
-          +
+          <Plus size={18} strokeWidth={2.25} aria-hidden="true" />
         </HeroButton>
       </div>
       <p className="muted panel-lede">{t("ops.alertRules.lede")}</p>
@@ -157,15 +167,15 @@ function AlertRuleEditor({
     >
       <div className="meta-form">
         <Field label={t("ops.alertRules.name")}>
-          <input
+          <HeroInput
             value={form.name ?? ""}
             onChange={(e) => patch({ name: e.target.value })}
             disabled={pending}
           />
         </Field>
         <Field label={t("ops.alertRules.metric")}>
-          <select
-            value={form.metric}
+          <SelectControl
+            value={form.metric ?? "request_fail_rate"}
             onChange={(e) => patch({ metric: e.target.value })}
             disabled={pending}
           >
@@ -174,12 +184,12 @@ function AlertRuleEditor({
                 {key}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </Field>
         <div className="alert-rule-row2">
           <Field label={t("ops.alertRules.operator")}>
-            <select
-              value={form.operator}
+            <SelectControl
+              value={form.operator ?? "gt"}
               onChange={(e) =>
                 patch({
                   operator: e.target.value as AlertRule["operator"],
@@ -192,10 +202,10 @@ function AlertRuleEditor({
                   {op}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </Field>
           <Field label={t("ops.alertRules.threshold")}>
-            <input
+            <HeroInput
               type="number"
               step={0.05}
               value={form.threshold ?? 0}
@@ -206,7 +216,7 @@ function AlertRuleEditor({
         </div>
         <div className="alert-rule-row3">
           <Field label={t("ops.alertRules.window")}>
-            <input
+            <HeroInput
               type="number"
               min={60}
               value={form.window_seconds ?? 3600}
@@ -215,7 +225,7 @@ function AlertRuleEditor({
             />
           </Field>
           <Field label={t("ops.alertRules.sustained")}>
-            <input
+            <HeroInput
               type="number"
               min={0}
               value={form.sustained_seconds ?? 0}
@@ -224,7 +234,7 @@ function AlertRuleEditor({
             />
           </Field>
           <Field label={t("ops.alertRules.cooldown")}>
-            <input
+            <HeroInput
               type="number"
               min={60}
               value={form.cooldown_seconds ?? 900}
@@ -234,8 +244,7 @@ function AlertRuleEditor({
           </Field>
         </div>
         <label className="check">
-          <input
-            type="checkbox"
+          <CheckboxControl
             checked={form.enabled ?? true}
             onChange={(e) => patch({ enabled: e.target.checked })}
             disabled={pending}

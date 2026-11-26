@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router-dom";
+import { Checkbox as HeroCheckbox } from "@heroui/react";
 import { useAvailability } from "../../hooks/useAvailability";
 import { AvailabilityIndicator } from "../../components/AvailabilityIndicator";
 import { Filter, Pin } from "lucide-react";
@@ -102,7 +103,10 @@ export type RouteDirectoryProps = {
   selectRow: (routeId: number) => void;
   contextMenu: ContextTarget;
   setContextMenu: (value: ContextTarget) => void;
-  modelActions: (route: Route, options?: { closeContext?: boolean }) => ActionMenuItem[];
+  modelActions: (
+    route: Route,
+    options?: { closeContext?: boolean; omitKeys?: string[] },
+  ) => ActionMenuItem[];
   /* Row busy state. */
   pending: { toggleRoute: { pendingId?: number | string | null }; del: { isPending: boolean } };
 };
@@ -320,12 +324,18 @@ export function RouteDirectory(props: RouteDirectoryProps) {
               showUpstream
               bulkMode={bulkMode}
               bulkHeader={
-                <input
-                  type="checkbox"
+                <HeroCheckbox
+                  className="model-bulk-checkbox"
                   aria-label={t("modelsPage.bulkSelectPage")}
-                  checked={pageAllSelected}
+                  isSelected={pageAllSelected}
                   onChange={selectAllPage}
-                />
+                >
+                  <HeroCheckbox.Content>
+                    <HeroCheckbox.Control>
+                      <HeroCheckbox.Indicator />
+                    </HeroCheckbox.Control>
+                  </HeroCheckbox.Content>
+                </HeroCheckbox>
               }
               onBulkCellClick={(event) => event.stopPropagation()}
               rows={[
@@ -435,14 +445,20 @@ export function RouteDirectory(props: RouteDirectoryProps) {
                     tabIndex: 0,
                     className: `is-clickable${active ? " is-selected" : ""}`,
                     bulkCell: bulkMode ? (
-                      <input
-                        type="checkbox"
+                      <HeroCheckbox
+                        className="model-bulk-checkbox"
                         aria-label={t("modelsPage.bulkSelectOne", {
                           model: item.route.model_pattern,
                         })}
-                        checked={bulkSelected.has(item.route.id)}
+                        isSelected={bulkSelected.has(item.route.id)}
                         onChange={() => toggleBulkSelected(item.route.id)}
-                      />
+                      >
+                        <HeroCheckbox.Content>
+                          <HeroCheckbox.Control>
+                            <HeroCheckbox.Indicator />
+                          </HeroCheckbox.Control>
+                        </HeroCheckbox.Content>
+                      </HeroCheckbox>
                     ) : null,
                     onClick: () => selectRow(item.route.id),
                     onContextMenu: (event: React.MouseEvent<HTMLElement>) => {

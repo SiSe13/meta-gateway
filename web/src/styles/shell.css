@@ -20,6 +20,9 @@
 .console-search kbd { margin-left: auto; display: flex; align-items: center; gap: 2px; font: 10px var(--font); opacity: .75; }
 .console-navigation { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
 .console-nav-group { display: grid; gap: 2px; }
+.console-nav-group--nested { margin-left: 2px; padding-left: 8px; border-left: 1px solid var(--line); }
+.console-nav-group--nested .console-nav-caption { padding-left: 9px; color: var(--muted-strong); font-weight: 650; }
+.console-nav-group--nested .console-nav-link { margin-left: 4px; }
 .console-nav-caption { padding: 0 12px 7px; color: var(--muted); font-size: var(--text-xs); font-weight: 550; letter-spacing: .08em; }
 .console-nav-link { display: flex; align-items: center; position: relative; gap: 11px; min-height: 35px; padding: 7px 11px; border: 1px solid transparent; border-radius: 10px; text-decoration: none; color: var(--muted-strong); font-size: 13px; font-weight: 500; transition: background var(--dur-base), color var(--dur-base), box-shadow var(--dur-base), transform var(--dur-fast); }
 .console-nav-link svg { flex: 0 0 auto; opacity: .83; }

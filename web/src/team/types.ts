@@ -37,6 +37,7 @@ export interface ModeInfo {
   mode: "personal" | "team";
   has_owner: boolean;
   role: string;
+  owner_bootstrap_available: boolean;
 }
 export interface TeamUser {
   id: number;

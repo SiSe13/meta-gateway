@@ -24,6 +24,7 @@ function backend({
   group = false,
   sitePatch = {},
   items: itemCount = 32,
+  includeThirdPartyEvidence = false,
   collectResult = { failed: 0 },
   thirdParty = {
     catalog_url: "https://watchbot.cfd/api/v1/public/dashboard",
@@ -37,6 +38,7 @@ function backend({
   /** Whatever the case under test needs the site row to say. */
   sitePatch?: Partial<typeof site>;
   items?: number;
+  includeThirdPartyEvidence?: boolean;
   collectResult?: Record<string, unknown>;
   thirdParty?: SiteObservations["third_party"];
 } = {}) {
@@ -67,6 +69,9 @@ function backend({
       { ...siteSeries, source: "traffic" as const, ratio: 0.98, samples: 55, ok: 54, failed: 1 },
       { ...siteSeries, source: "probe" as const, ratio: 1, samples: 3, ok: 3 },
       siteSeries,
+      ...(includeThirdPartyEvidence
+        ? [{ ...siteSeries, source: "watchbot" as const, ratio: 0.99, samples: 80, ok: 79 }]
+        : []),
     ],
     primary: {
       ...siteSeries,
@@ -200,6 +205,7 @@ it("keeps the collection total when search narrows the visible models", async ()
 });
 it("says what the third-party snapshot holds and when it last moved", async () => {
   backend({
+    includeThirdPartyEvidence: true,
     thirdParty: {
       catalog_url: "https://watchbot.cfd/api/v1/public/dashboard",
       attempted_at: new Date(Date.now() - 60_000).toISOString(),
@@ -215,10 +221,9 @@ it("says what the third-party snapshot holds and when it last moved", async () =
 });
 
 it("states when the third-party snapshot could not be refreshed", async () => {
-  // Third-party readings are shown as the directory publishes them, so the one
-  // thing this panel owes the operator is whether our copy of them is moving:
-  // a failed refresh names its reason instead of the readings quietly ageing.
+  // Show the sync problem only when the selected site is currently using those readings.
   backend({
+    includeThirdPartyEvidence: true,
     thirdParty: {
       catalog_url: "https://watchbot.cfd/api/v1/public/dashboard",
       attempted_at: new Date(Date.now() - 120_000).toISOString(),
@@ -231,6 +236,20 @@ it("states when the third-party snapshot could not be refreshed", async () => {
   const line = await screen.findByText(/could not be refreshed/);
   expect(line.textContent).toContain("watchbot.cfd");
   expect(line.textContent).toContain("answered 403");
+});
+
+it("hides a third-party sync warning when the selected site uses no third-party readings", async () => {
+  backend({
+    thirdParty: {
+      catalog_url: "https://watchbot.cfd/api/v1/public/dashboard",
+      attempted_at: new Date(Date.now() - 120_000).toISOString(),
+      readings: 0,
+      error: "probe source https://watchbot.cfd answered 403",
+    },
+  });
+  mount();
+  await screen.findByText("model-01");
+  expect(screen.queryByText(/could not be refreshed/)).toBeNull();
 });
 
 it("reads one site's report instead of the whole fleet's", async () => {

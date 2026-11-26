@@ -78,6 +78,29 @@ func TestOperationsEndpointsAndAdminAudit(t *testing.T) {
 	if !bytes.Contains(listRaw, []byte(backupRecord.Name)) || bytes.Contains(listRaw, []byte("ignored")) {
 		t.Fatalf("backups=%s", listRaw)
 	}
+	downloadRequest, err := http.NewRequest(http.MethodGet, server.URL+"/admin/backups/"+backupRecord.Name+"/download", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloadRequest.Header.Set("Authorization", "Bearer admin-test")
+	downloadResponse, err := http.DefaultClient.Do(downloadRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer downloadResponse.Body.Close()
+	if downloadResponse.StatusCode != http.StatusOK {
+		t.Fatalf("download status=%d", downloadResponse.StatusCode)
+	}
+	if got := downloadResponse.Header.Get("Content-Disposition"); got != `attachment; filename="`+backupRecord.Name+`"` {
+		t.Fatalf("download disposition=%q", got)
+	}
+	downloaded, err := io.ReadAll(downloadResponse.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(downloaded, []byte("SQLite format 3\x00")) {
+		t.Fatalf("downloaded data is not a SQLite database")
+	}
 }
 
 func TestAdminBodyLimitAndTrailingJSON(t *testing.T) {

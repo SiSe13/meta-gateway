@@ -1,4 +1,5 @@
 import { Play, Settings2 } from "lucide-react";
+import { Input as HeroInput } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
@@ -15,8 +16,10 @@ import {
 } from "../../lib/schedulePresets";
 import { PaginationBar } from "../../components/PaginationBar";
 import { UiDatePicker } from "../../components/UiDatePicker";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import {
   Button,
+  CheckboxControl,
   ConfirmDialog,
   DataTable,
   Dialog,
@@ -41,16 +44,24 @@ function checkinCategoryLabel(
 }
 
 function checkinDetailText(
-  log: { category: string; message?: string },
+  log: { category: string; message?: string; status?: string },
   t: (key: string, vars?: Record<string, string | number>) => string,
 ): string {
   const message = (log.message || "").trim();
   const label = checkinCategoryLabel(log.category, t);
+  if (log.status === "success") return label;
   if (!message) return label;
   // Avoid "Label — Label" when message already matches a short English category phrase.
   if (message.toLowerCase() === log.category.toLowerCase()) return label;
   if (message === label) return label;
   return `${label} — ${message}`;
+}
+
+/** 将签到来源码转换为当前语言的名称。 */
+function checkinSourceLabel(source: string, t: (key: string) => string): string {
+  if (source === "manual") return t("ops.checkin.sourceManual");
+  if (source === "scheduled") return t("ops.checkin.sourceScheduled");
+  return source;
 }
 
 function siteDisplayName(
@@ -195,39 +206,42 @@ export function CheckinsPanel() {
   return (
     <>
       <Panel
+        className="ops-list-panel checkin-history-panel"
         actions={
           <div className="checkin-log-toolbar">
             <div className="checkin-log-filters">
-              <select
-                aria-label={t("ops.checkin.siteFilter")}
+              <SearchableSelect
+                ariaLabel={t("ops.checkin.siteFilter")}
                 value={siteId}
-                onChange={(e) => setSiteId(e.target.value)}
-              >
-                <option value="">{t("ops.checkin.allSites")}</option>
-                {(sites.data ?? []).map((site) => (
-                  <option key={site.id} value={site.id}>
-                    {site.name.trim() || site.base_url || t("common.siteId", { id: site.id })}
-                  </option>
-                ))}
-              </select>
+                onChange={setSiteId}
+                options={[
+                  { value: "", label: t("ops.checkin.allSites") },
+                  ...(sites.data ?? []).map((site) => ({
+                    value: String(site.id),
+                    label: site.name.trim() || site.base_url || t("common.siteId", { id: site.id }),
+                  })),
+                ]}
+              />
               <UiDatePicker
                 ariaLabel={t("ops.checkin.dateFilter")}
                 value={date}
                 onChange={setDate}
               />
-              <select
-                aria-label={t("ops.statusFilter")}
+              <SearchableSelect
+                ariaLabel={t("ops.statusFilter")}
                 value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <option value="">{t("ops.allStatuses")}</option>
-                <option value="success">{t("status.success")}</option>
-                <option value="failed">{t("status.failed")}</option>
-                <option value="skipped">{t("status.skipped")}</option>
-              </select>
+                onChange={setStatus}
+                options={[
+                  { value: "", label: t("ops.allStatuses") },
+                  { value: "success", label: t("status.success") },
+                  { value: "failed", label: t("status.failed") },
+                  { value: "skipped", label: t("status.skipped") },
+                ]}
+              />
             </div>
             <div className="checkin-log-actions">
               <Button
+                className="checkin-run-button"
                 icon={<Play size={16} />}
                 disabled={run.isPending}
                 onClick={() => setConfirmRun(true)}
@@ -276,22 +290,27 @@ export function CheckinsPanel() {
                 t("common.time"),
               ]}
               empty={!checkinRows.length}
+              fill
             >
               {checkinPagination.pageItems.map((l) => (
                 <tr key={l.id}>
-                  <td>
+                  <td className="checkin-row-site">
                     <strong>{siteDisplayName(l.site_id, sitesById, t)}</strong>
                   </td>
-                  <td>
+                  <td className="checkin-row-status">
                     <StatusBadge value={l.status} />
                   </td>
-                  <td>{l.source}</td>
+                  <td className="checkin-row-source">
+                    <span>{checkinSourceLabel(l.source, t)}</span>
+                  </td>
                   <td>
                     <span title={l.category}>{checkinDetailText(l, t)}</span>
                   </td>
-                  <td>{l.reward || "-"}</td>
-                  <td>{t("common.ms", { n: l.latency_ms })}</td>
-                  <td>{formatDate(l.ran_at)}</td>
+                  <td className="checkin-row-reward">
+                    {l.reward ? <span>{l.reward}</span> : <span className="is-empty">—</span>}
+                  </td>
+                  <td className="checkin-row-latency">{t("common.ms", { n: l.latency_ms })}</td>
+                  <td className="checkin-row-time">{formatDate(l.ran_at)}</td>
                 </tr>
               ))}
             </DataTable>
@@ -311,6 +330,8 @@ export function CheckinsPanel() {
         )}
         {confirmRun ? (
           <ConfirmDialog
+            className="checkin-run-dialog"
+            danger={false}
             title={t("ops.runEnabled")}
             message={t("ops.runEnabledConfirm")}
             confirmLabel={t("ops.runEnabled")}
@@ -323,6 +344,7 @@ export function CheckinsPanel() {
       </Panel>
       {scheduleOpen ? (
         <Dialog
+          className="checkin-settings-dialog"
           title={t("ops.checkin.scheduleTitle")}
           onClose={() => setScheduleOpen(false)}
           busy={saveSchedule.isPending}
@@ -343,10 +365,9 @@ export function CheckinsPanel() {
           }
         >
           <p className="panel-lede muted">{t("ops.checkin.scheduleLede")}</p>
-          <label className="check">
-            <input
-              className="switch"
-              type="checkbox"
+          <label className="check checkin-schedule-toggle">
+            <CheckboxControl
+              aria-label={t("ops.checkin.scheduleEnabled")}
               disabled={saveSchedule.isPending || scheduleDraft == null}
               checked={schedule.preset !== "off"}
               onChange={(e) => {
@@ -364,11 +385,12 @@ export function CheckinsPanel() {
             <div className="form-grid is-spaced">
               <label className="field">
                 <span>{t("ops.checkin.schedulePreset")}</span>
-                <select
+                <SearchableSelect
+                  ariaLabel={t("ops.checkin.schedulePreset")}
                   disabled={saveSchedule.isPending}
                   value={schedule.preset}
-                  onChange={(e) => {
-                    const preset = e.target.value as SchedulePresetId;
+                  onChange={(value) => {
+                    const preset = value as SchedulePresetId;
                     if (!scheduleDraft) return;
                     const known = SCHEDULE_PRESETS.find((item) => item.id === preset);
                     setScheduleDraft({
@@ -379,13 +401,11 @@ export function CheckinsPanel() {
                           : (known?.cron ?? scheduleDraft.cron),
                     });
                   }}
-                >
-                  {SCHEDULE_PRESETS.filter((item) => item.id !== "off").map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {t(`ops.schedule.preset.${item.id}`)}
-                    </option>
-                  ))}
-                </select>
+                  options={SCHEDULE_PRESETS.filter((item) => item.id !== "off").map((item) => ({
+                    value: item.id,
+                    label: t(`ops.schedule.preset.${item.id}`),
+                  }))}
+                />
               </label>
               {schedule.preset === "custom" || schedule.preset === "daily" ? (
                 <label className="field">
@@ -399,7 +419,7 @@ export function CheckinsPanel() {
               ) : (
                 <div className="field">
                   <span>{t("ops.checkin.scheduleCron")}</span>
-                  <input className="mono" disabled value={schedule.cron} readOnly />
+                  <HeroInput className="mono" disabled value={schedule.cron} readOnly />
                 </div>
               )}
             </div>

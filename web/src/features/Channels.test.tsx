@@ -1010,6 +1010,9 @@ describe("Channels edit dialog user id", () => {
     /** Whether a user credential row exists at all. */
     withUserCredential?: boolean;
     checkinEnabled?: boolean;
+    storedMeta?: Record<string, unknown>;
+    checkinSupported?: boolean;
+    modelCount?: number;
   }) {
     const withUserCredential = options.withUserCredential ?? true;
     const overview = {
@@ -1017,6 +1020,7 @@ describe("Channels edit dialog user id", () => {
         id: 7,
         name: "new-api-channel",
         site_id: 3,
+        type_hint: "new-api",
         base_url: "https://api.example.com",
         models_csv: "",
         group_name: "default",
@@ -1034,7 +1038,7 @@ describe("Channels edit dialog user id", () => {
       has_api_key: true,
       site_usable: true,
       credential_usable: true,
-      model_count: 0,
+      model_count: options.modelCount ?? 0,
       discovered_model_count: 0,
       last_probe_at: "2026-08-02T00:00:00Z",
       last_probe_ok: true,
@@ -1043,7 +1047,7 @@ describe("Channels edit dialog user id", () => {
       enabled_member_count: 0,
       cooling_member_count: 0,
       failure_count: 0,
-      checkin_supported: true,
+      checkin_supported: options.checkinSupported ?? true,
       account_supported: true,
     };
     const credentialBodies: Record<string, unknown>[] = [];
@@ -1087,9 +1091,12 @@ describe("Channels edit dialog user id", () => {
                     status: "enabled",
                     checkin_enabled: options.checkinEnabled ?? false,
                     meta_json:
-                      options.storedUserID != null
+                      options.storedUserID != null || options.storedMeta
                         ? JSON.stringify({
-                            platform_user_id: options.storedUserID,
+                            ...options.storedMeta,
+                            ...(options.storedUserID != null
+                              ? { platform_user_id: options.storedUserID }
+                              : {}),
                           })
                         : undefined,
                   },
@@ -1159,6 +1166,93 @@ describe("Channels edit dialog user id", () => {
     expect(within(dialog).queryByRole("heading", { name: "Check-in" })).toBeNull();
   });
 
+  it("lets account-supported sites save a user token without check-in support", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({
+      withUserCredential: true,
+      checkinSupported: false,
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Account credential" }));
+    const credentialDialog = await screen.findByRole("dialog", { name: "Account credential" });
+    fireEvent.change(within(credentialDialog).getByLabelText("User access token"), {
+      target: { value: "updated-account-token" },
+    });
+    fireEvent.click(within(credentialDialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(credentialPuts).toHaveLength(1));
+    expect(credentialPuts[0]).toMatchObject({
+      path: "/admin/credentials/42",
+      body: { secret: "updated-account-token" },
+    });
+    expect(credentialPuts.some((request) => request.path.endsWith("/checkin"))).toBe(false);
+  });
+
+  it("keeps the account credential entry in the action menu with check-in support", async () => {
+    const { dialog } = await openEditDialog({ checkinSupported: true, modelCount: 1 });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(await screen.findByRole("menuitem", { name: "Account credential" })).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("menuitem")
+        .slice(0, 3)
+        .map((item) => item.getAttribute("aria-label")),
+    ).toEqual(["Open models", "Open logs", "Test connection"]);
+    const menuNames = screen
+      .getAllByRole("menuitem")
+      .map((item) => item.getAttribute("aria-label"));
+    expect(
+      menuNames.filter((name) =>
+        [
+          "Account credential",
+          "Check-in settings",
+          "Check access token",
+          "Create API key",
+          "Duplicate channel",
+        ].includes(name ?? ""),
+      ),
+    ).toEqual([
+      "Account credential",
+      "Check-in settings",
+      "Check access token",
+      "Create API key",
+      "Duplicate channel",
+    ]);
+  });
+
+  it("opens check-in settings from the action menu and preserves the enabled state", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({
+      storedUserID: 1544,
+      checkinEnabled: true,
+      storedMeta: { checkin_path: "/api/user/checkin" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Check-in settings" }));
+
+    const settingsDialog = await screen.findByRole("dialog", { name: "Check-in" });
+    expect(within(settingsDialog).getByRole("button", { name: "Save" })).toBeInTheDocument();
+    fireEvent.change(within(settingsDialog).getByLabelText("Check-in endpoint path"), {
+      target: { value: "/api/user/sign_in" },
+    });
+    fireEvent.click(within(settingsDialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(credentialPuts).toHaveLength(1));
+    expect(credentialPuts[0]?.path).toBe("/admin/credentials/42");
+    expect(JSON.parse(String(credentialPuts[0]?.body.meta_json))).toMatchObject({
+      platform_user_id: 1544,
+      checkin_path: "/api/user/sign_in",
+    });
+    expect(credentialPuts.some((request) => request.path.endsWith("/checkin"))).toBe(false);
+  });
+
   it("opens a separate parameter dialog and enables check-in after saving the missing id", async () => {
     const { dialog, credentialPuts } = await openEditDialog({ withUserCredential: true });
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -1170,6 +1264,7 @@ describe("Channels edit dialog user id", () => {
     fireEvent.click(checkinToggle);
     const checkinDialog = await screen.findByRole("dialog", { name: "Check-in" });
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(document.querySelector(".channel-inspector")).toBeNull();
     const field = within(checkinDialog).getByPlaceholderText("e.g. 1544");
     fireEvent.change(field, { target: { value: "2001" } });
     fireEvent.click(
@@ -1183,6 +1278,92 @@ describe("Channels edit dialog user id", () => {
     });
     expect(credentialPuts[1]?.path).toBe("/admin/credentials/42/checkin");
     expect(credentialPuts[1]?.body).toMatchObject({ enabled: true });
+  });
+
+  it("closes the setup dialog without reopening or changing the schedule", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({ withUserCredential: true });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enable scheduled check-in: new-api-channel" }),
+    );
+    const checkinDialog = await screen.findByRole("dialog", { name: "Check-in" });
+    fireEvent.click(within(checkinDialog).getByRole("button", { name: "Close" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(credentialPuts).toHaveLength(0);
+  });
+
+  it("saves a custom check-in path and method with the existing credential metadata", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({
+      withUserCredential: true,
+      storedMeta: { headers: { "new-api-user": "1544" } },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enable scheduled check-in: new-api-channel" }),
+    );
+    const checkinDialog = await screen.findByRole("dialog", { name: "Check-in" });
+    fireEvent.change(within(checkinDialog).getByLabelText("Check-in endpoint path"), {
+      target: { value: "/api/user/sign_in" },
+    });
+    fireEvent.click(within(checkinDialog).getByRole("button", { name: "Request method" }));
+    fireEvent.click(await within(checkinDialog).findByRole("option", { name: "GET" }));
+    fireEvent.change(within(checkinDialog).getByPlaceholderText("e.g. 1544"), {
+      target: { value: "1544" },
+    });
+    fireEvent.click(
+      within(checkinDialog).getByRole("button", { name: "Enable scheduled check-in" }),
+    );
+
+    await waitFor(() => expect(credentialPuts).toHaveLength(2));
+    expect(JSON.parse(String(credentialPuts[0]?.body.meta_json))).toEqual({
+      headers: { "new-api-user": "1544" },
+      platform_user_id: 1544,
+      checkin_path: "/api/user/sign_in",
+      checkin_method: "GET",
+    });
+  });
+
+  it("toggles scheduled check-in directly without opening the row details", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({ storedUserID: 1544 });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Enable scheduled check-in: new-api-channel" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        credentialPuts.some((request) => request.path === "/admin/credentials/42/checkin"),
+      ).toBe(true),
+    );
+    expect(document.querySelector(".channel-inspector")).toBeNull();
+  });
+
+  it("disables configured check-in directly without opening the setup dialog", async () => {
+    const { dialog, credentialPuts } = await openEditDialog({
+      storedUserID: 1544,
+      checkinEnabled: true,
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Disable scheduled check-in: new-api-channel" }),
+    );
+
+    await waitFor(() =>
+      expect(
+        credentialPuts.some((request) => request.path === "/admin/credentials/42/checkin"),
+      ).toBe(true),
+    );
+    expect(credentialPuts.at(-1)?.body).toMatchObject({ enabled: false });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

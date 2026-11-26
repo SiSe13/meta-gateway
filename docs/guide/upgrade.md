@@ -2,17 +2,17 @@
 
 ## V4
 
-**V4 已是正式版**（`zichuanlan/meta-gateway:latest`，GitHub Release 标记 Latest）。升级前建议先备份：
+**V4 已是正式版**（`sise13/meta-gateway:latest`，GitHub Release 标记 Latest）。升级前建议先备份：
 从控制台点「更新」会**自动创建并校验一份数据库快照**（存到 `BACKUP_DIR`，如 `/data/backups`）。
-Beta 渠道仍然存在，发布到 GitHub Pre-release 与 `zichuanlan/meta-gateway:beta`，不覆盖 `latest`。
+Beta 渠道仍然存在，发布到 GitHub Pre-release 与 `sise13/meta-gateway:beta`，不覆盖 `latest`。
 
 ### 登录方式的变化
 
 - 管理员与成员**统一从 `/console` 登录**，旧 `/app` 地址保留为兼容跳转。
-- 部署管理员初始用户名由 `ADMIN_USERNAME` 指定（默认 `admin`），密码仍是 `ADMIN_TOKEN`。
-- 升级后可在「设置 → 管理员登录设置」验证口令和 TOTP 后保存新用户名：立即生效、重启保留、**优先于环境变量**，且不能与团队账号重名。
-- 不知道旧版升级后的用户名时，可用登录页的升级说明入口，通过原管理口令和 TOTP 登录后再设置。**口令没有被重置。**
-- 个人模式不要求团队账号；团队模式先创建 owner，再启用成员、权限和额度功能。
+- 新部署在首次访问控制台时使用启动日志中的初始化码创建站长账号；升级中的旧部署仍兼容原 `ADMIN_TOKEN`。
+- 创建站长账号后，可在「设置 → 管理员登录设置」验证当前密码和 TOTP 后修改用户名：立即生效、重启保留、**优先于环境变量**，且不能与团队账号重名。
+- 旧版升级后尚未设置站长账号时，可用登录页升级说明通过原管理口令登录并设置新密码。
+- 新部署在个人模式下也会创建站长账号；切换团队模式时沿用该账号，再启用成员、权限和额度功能。旧部署若尚未创建站长账号，仍可用原 `ADMIN_TOKEN` 登录并完成迁移。
 
 ### 更新渠道
 

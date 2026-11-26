@@ -1,11 +1,12 @@
 package httpapi
 
 import (
-	"github.com/lan/meta-gateway/internal/auth"
-	"github.com/lan/meta-gateway/internal/totp"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/lan/meta-gateway/internal/auth"
+	"github.com/lan/meta-gateway/internal/totp"
 )
 
 func (h *sessionHandler) operatorProfile(w http.ResponseWriter, r *http.Request) {
@@ -38,9 +39,10 @@ func (h *sessionHandler) saveOperatorProfile(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var req struct {
-		Username string `json:"username"`
-		Token    string `json:"token"`
-		TOTP     string `json:"totp_code"`
+		Username        string `json:"username"`
+		Token           string `json:"token"`
+		CurrentPassword string `json:"current_password"`
+		TOTP            string `json:"totp_code"`
 	}
 	if err := decodeJSON(w, r, &req, 0, false); err != nil {
 		return
@@ -58,7 +60,12 @@ func (h *sessionHandler) saveOperatorProfile(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-	if !auth.ValidAdminToken(req.Token, h.adminTokens) {
+	authorized := auth.ValidAdminToken(req.Token, h.adminTokens)
+	if !authorized && req.CurrentPassword != "" {
+		account, accountErr := h.ownerAccount()
+		authorized = accountErr == nil && account != nil && checkTeamPassword(account.PasswordHash, req.CurrentPassword)
+	}
+	if !authorized {
 		writeError(w, 403, "invalid_credentials")
 		return
 	}

@@ -42,6 +42,7 @@ export function OperatorClaimPanel({
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [token, setToken] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [code, setCode] = useState("");
   const save = useMutation({
     mutationFn: () =>
@@ -49,12 +50,14 @@ export function OperatorClaimPanel({
         username: name ?? state.data?.username,
         password,
         token,
+        ...(currentPassword ? { current_password: currentPassword } : {}),
         totp_code: code,
       }),
     onSuccess: async () => {
       setPassword("");
       setConfirm("");
       setToken("");
+      setCurrentPassword("");
       setCode("");
       await qc.invalidateQueries({ queryKey: ["operator-onboarding"] });
       onSaved?.();
@@ -117,16 +120,27 @@ export function OperatorClaimPanel({
                 {t("operator.passwordMismatch")}
               </p>
             ) : null}
-            <p className="field-hint">{t("operator.confirmTokenHint")}</p>
-            <Field label={t("operator.confirmToken")}>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                required
-              />
-            </Field>
+            {state.data?.token_login ? (
+              <Field label={t("operator.confirmToken")}>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  required
+                />
+              </Field>
+            ) : (
+              <Field label={t("operator.currentPassword")}>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </Field>
+            )}
             {state.data?.totp_login ? (
               <Field label={t("app.connect.totp")}>
                 <input
@@ -146,7 +160,15 @@ export function OperatorClaimPanel({
                 {t("operator.later")}
               </Button>
             ) : null}
-            <Button type="submit" disabled={!token || !username.trim() || !password || mismatch}>
+            <Button
+              type="submit"
+              disabled={
+                !(state.data?.token_login ? token : currentPassword) ||
+                !username.trim() ||
+                !password ||
+                mismatch
+              }
+            >
               {claiming ? t("operator.claimSubmit") : t("common.save")}
             </Button>
           </div>

@@ -9,7 +9,7 @@ services:
       args:
         VERSION: ${VERSION:-dev}
         COMMIT: ${COMMIT:-unknown}
-    image: zichuanlan/meta-gateway:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:-sise13/meta-gateway}:${IMAGE_TAG:-latest}
     init: true
     ports:
       - "4100:4100"
@@ -25,12 +25,10 @@ services:
       SELFUPDATE_TRACK_TAG: "${IMAGE_TAG:-latest}"
       WATCHTOWER_TOKEN: "${WATCHTOWER_TOKEN:-meta-gateway-local-update}"
       ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
-      ADMIN_TOKEN: "${ADMIN_TOKEN:?ADMIN_TOKEN is required}"
+      # ADMIN_TOKEN is optional legacy compatibility for existing deployments.
+      ADMIN_TOKEN: "${ADMIN_TOKEN:-}"
       ADMIN_TOKENS: "${ADMIN_TOKENS:-}"
-      # The documented lock-out rescue (ADMIN_TOKEN_LOGIN=break-glass) was not
-      # wired into the container at all: the variable existed in the docs but had
-      # no way in, so a deployment that had claimed its owner account could not
-      # use the rescue it was told about.
+      # Optional recovery path for legacy deployments that still keep ADMIN_TOKEN.
       ADMIN_TOKEN_LOGIN: "${ADMIN_TOKEN_LOGIN:-}"
       MASTER_KEY: "${MASTER_KEY:?MASTER_KEY is required}"
       METRICS_TOKEN: "${METRICS_TOKEN:?METRICS_TOKEN is required}"
@@ -245,6 +243,7 @@ services:
       PROJECT_DIR: "/work"
       SERVICE: "meta-gateway"
       STATE_DIR: "/update"
+      EXPECTED_IMAGE_REPOSITORY: "${IMAGE_REPOSITORY:-sise13/meta-gateway}"
     restart: unless-stopped
 
 volumes:

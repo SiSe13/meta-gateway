@@ -1,9 +1,11 @@
 import { BellRing, ChevronRight, Play, RefreshCw, Settings2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { Input as HeroInput, Switch as HeroSwitch, TextArea as HeroTextArea } from "@heroui/react";
+import { useRef, useState } from "react";
 import { api } from "../../api/client";
 import type { KeepaliveTarget, SiteKeepaliveInput } from "../../api/types";
 import { Button, Dialog, Empty, ErrorState, Field, InfoTip, Loading } from "../../components/ui";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useAutomationMaster, type AutomationMaster } from "../../hooks/useAutomationMaster";
 import { useI18n } from "../../i18n";
@@ -29,6 +31,7 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
   // belongs to: the settings are the site's, the call is one channel's.
   const [editing, setEditing] = useState<{ siteId: number; row: KeepaliveTarget } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [eventsExpanded, setEventsExpanded] = useState(false);
 
   const status = useQuery({
     queryKey: ["keepalive", client],
@@ -76,15 +79,13 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
         : { siteId, row },
     );
 
-  // The settings form opens above the list, so it must be brought into view when
-  // the row that opened it sits at the bottom of a long dialog.
-  const settingsRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    if (editing) settingsRef.current?.scrollIntoView({ block: "nearest" });
-  }, [editing]);
-
   return (
-    <Dialog title={t("channels.keepalive.title")} onClose={onClose} busy={runRound.isPending}>
+    <Dialog
+      title={t("channels.keepalive.title")}
+      onClose={onClose}
+      busy={runRound.isPending}
+      className="keepalive-dialog"
+    >
       {/* A stable marker for the width rule: the table sizes the dialog, and the
           marker must not depend on what happens to be rendered inside it. */}
       <div className="keepalive-workspace">
@@ -100,7 +101,7 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
           <>
             <div className="toolbar keepalive-toolbar">
               <Button
-                variant="secondary"
+                variant="primary"
                 icon={<Play size={15} />}
                 disabled={runRound.isPending}
                 onClick={() => {
@@ -117,16 +118,19 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
               >
                 {t("channels.keepalive.refresh")}
               </Button>
-              <label className="check keepalive-master">
-                <input
-                  className="switch"
-                  type="checkbox"
-                  checked={master.enabled}
-                  disabled={!master.ready || master.saving}
-                  onChange={(e) => void master.setEnabled(e.target.checked)}
-                />
-                <span>{t("channels.keepalive.masterSwitch")}</span>
-              </label>
+              <HeroSwitch
+                className="keepalive-master"
+                isSelected={master.enabled}
+                isDisabled={!master.ready || master.saving}
+                onChange={(enabled) => void master.setEnabled(enabled)}
+              >
+                <HeroSwitch.Content>
+                  <HeroSwitch.Control>
+                    <HeroSwitch.Thumb />
+                  </HeroSwitch.Control>
+                  {t("channels.keepalive.masterSwitch")}
+                </HeroSwitch.Content>
+              </HeroSwitch>
               <InfoTip label={t("channels.keepalive.masterSwitchHint")} />
               <span className="muted keepalive-clock">
                 {t("channels.keepalive.serverTime")}: {formatTime(status.data.now)}
@@ -136,14 +140,13 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
             {notice ? <p className="keepalive-notice">{notice}</p> : null}
 
             {editing ? (
-              <div className="keepalive-settings" ref={settingsRef}>
-                <header className="keepalive-settings-head">
-                  <h3>
-                    {t("channels.keepalive.settingsFor", {
-                      site: editing.row.site_name || `#${editing.siteId}`,
-                    })}
-                  </h3>
-                </header>
+              <Dialog
+                title={t("channels.keepalive.settingsFor", {
+                  site: editing.row.site_name || `#${editing.siteId}`,
+                })}
+                onClose={() => setEditing(null)}
+                className="keepalive-site-settings-dialog"
+              >
                 <SiteSettings
                   siteId={editing.siteId}
                   rows={targets.filter((target) => target.site_id === editing.siteId)}
@@ -161,7 +164,7 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
                   }}
                   onCancel={() => setEditing(null)}
                 />
-              </div>
+              </Dialog>
             ) : null}
 
             {targets.length === 0 ? (
@@ -248,8 +251,14 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
               </div>
             )}
 
-            <details className="keepalive-footprint">
-              <summary>
+            <section className={`keepalive-footprint${eventsExpanded ? " is-expanded" : ""}`}>
+              <Button
+                variant="quiet"
+                className="keepalive-footprint-toggle"
+                aria-expanded={eventsExpanded}
+                aria-controls="keepalive-footprint-content"
+                onClick={() => setEventsExpanded((expanded) => !expanded)}
+              >
                 <ChevronRight
                   size={14}
                   className="keepalive-footprint-chevron"
@@ -263,8 +272,12 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
                     })}
                   </span>
                 ) : null}
-              </summary>
-              <div className="keepalive-footprint-body">
+              </Button>
+              <div
+                className="keepalive-footprint-body"
+                id="keepalive-footprint-content"
+                hidden={!eventsExpanded}
+              >
                 <p className="muted panel-lede">{t("channels.keepalive.footprintHint")}</p>
                 {events.data && events.data.length > 0 ? (
                   <ul className="keepalive-events">
@@ -288,7 +301,7 @@ export function KeepaliveDialog({ onClose }: { onClose: () => void }) {
                   <p className="muted">{t("channels.keepalive.noEvents")}</p>
                 )}
               </div>
-            </details>
+            </section>
           </>
         ) : null}
       </div>
@@ -356,7 +369,16 @@ function SiteSettings({
     a.localeCompare(b),
   );
   const autoModel = rows.map((target) => target.candidates?.[0]).find(Boolean) ?? "";
-  const listId = `keepalive-models-${siteId}`;
+  const modelOptions = [
+    {
+      value: "",
+      label: autoModel
+        ? t("channels.keepalive.fieldModelAuto", { model: autoModel })
+        : t("channels.keepalive.fieldModelNone"),
+    },
+    ...models.map((model) => ({ value: model, label: model })),
+    { value: "__custom__", label: t("select.custom") },
+  ];
 
   const save = useAdminMutation<{ masterTurned: boolean }, SiteKeepaliveInput>({
     mutationFn: async (input) => {
@@ -382,26 +404,35 @@ function SiteSettings({
       }}
     >
       <Field label={t("channels.keepalive.fieldEnabled")}>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={form.keepalive_enabled}
-            onChange={(e) => setForm((f) => ({ ...f, keepalive_enabled: e.target.checked }))}
-          />
-          <span>{t("channels.keepalive.fieldEnabledHint")}</span>
-        </label>
+        <HeroSwitch
+          className="keepalive-site-switch"
+          isSelected={form.keepalive_enabled}
+          onChange={(enabled) => setForm((f) => ({ ...f, keepalive_enabled: enabled }))}
+        >
+          <HeroSwitch.Content>
+            <HeroSwitch.Control>
+              <HeroSwitch.Thumb />
+            </HeroSwitch.Control>
+            {t("channels.keepalive.fieldEnabledHint")}
+          </HeroSwitch.Content>
+        </HeroSwitch>
       </Field>
       <Field label={t("channels.keepalive.fieldPolicy")}>
-        <select
+        <SearchableSelect
+          ariaLabel={t("channels.keepalive.fieldPolicy")}
           value={form.call_policy}
-          onChange={(e) => setForm((f) => ({ ...f, call_policy: e.target.value }))}
-        >
-          <option value="allow_probe">{t("channels.keepalive.policyAllowProbe")}</option>
-          <option value="real_calls_only">{t("channels.keepalive.policyRealCallsOnly")}</option>
-        </select>
+          onChange={(value) =>
+            setForm((f) => ({ ...f, call_policy: value as SiteKeepaliveInput["call_policy"] }))
+          }
+          options={[
+            { value: "allow_probe", label: t("channels.keepalive.policyAllowProbe") },
+            { value: "real_calls_only", label: t("channels.keepalive.policyRealCallsOnly") },
+          ]}
+        />
       </Field>
       <Field label={t("channels.keepalive.fieldIdleDays")}>
-        <input
+        <HeroInput
+          className="keepalive-input"
           type="number"
           min={0}
           max={3650}
@@ -412,7 +443,8 @@ function SiteSettings({
         />
       </Field>
       <Field label={t("channels.keepalive.fieldMargin")}>
-        <input
+        <HeroInput
+          className="keepalive-input"
           type="number"
           min={0}
           max={90}
@@ -430,21 +462,19 @@ function SiteSettings({
             : t("channels.keepalive.fieldModelNone")
         }
       >
-        <input
-          type="text"
-          list={listId}
-          placeholder={autoModel || undefined}
+        <SearchableSelect
+          ariaLabel={t("channels.keepalive.fieldModel")}
+          options={modelOptions}
           value={form.keepalive_model}
-          onChange={(e) => setForm((f) => ({ ...f, keepalive_model: e.target.value }))}
+          allowCustom
+          customLabel={t("select.custom")}
+          placeholder={autoModel || undefined}
+          onChange={(value) => setForm((f) => ({ ...f, keepalive_model: value }))}
         />
-        <datalist id={listId}>
-          {models.map((model) => (
-            <option key={model} value={model} />
-          ))}
-        </datalist>
       </Field>
       <Field label={t("channels.keepalive.fieldMaxTokens")}>
-        <input
+        <HeroInput
+          className="keepalive-input"
           type="number"
           min={0}
           max={32000}
@@ -455,7 +485,8 @@ function SiteSettings({
         />
       </Field>
       <Field label={t("channels.keepalive.fieldDailyCap")}>
-        <input
+        <HeroInput
+          className="keepalive-input"
           type="number"
           min={0}
           max={24}
@@ -469,16 +500,17 @@ function SiteSettings({
         label={t("channels.keepalive.fieldQuietHours")}
         hint={t("channels.keepalive.fieldQuietHoursHint")}
       >
-        <input
+        <HeroInput
+          className="keepalive-input"
           type="text"
           placeholder="22:00-07:00"
           value={form.keepalive_quiet_hours}
           onChange={(e) => setForm((f) => ({ ...f, keepalive_quiet_hours: e.target.value }))}
         />
       </Field>
-      <Field label={t("channels.keepalive.fieldPrompt")}>
-        <input
-          type="text"
+      <Field className="wide" label={t("channels.keepalive.fieldPrompt")}>
+        <HeroTextArea
+          className="keepalive-prompt"
           placeholder={t("channels.keepalive.fieldPromptPlaceholder")}
           value={form.keepalive_prompt}
           onChange={(e) => setForm((f) => ({ ...f, keepalive_prompt: e.target.value }))}

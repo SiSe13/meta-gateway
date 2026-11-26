@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Dialog, ErrorState, Field, Loading } from "../../components/ui";
 import { useSession } from "../../session";
@@ -76,7 +77,7 @@ function RatioEditor({
         }}
       >
         <Field label={t("billing.multiplier")} hint={t("billing.multiplierHint")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             max={1000}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
 import { Button, Dialog, ErrorState, Field } from "../../components/ui";
@@ -261,7 +262,7 @@ export function QuoteActions({
           </p>
           {!copyUSD ? (
             <Field label={t("billing.conversion")} hint={t("billing.conversionHint")}>
-              <input
+              <HeroInput
                 type="number"
                 min={0}
                 step="any"

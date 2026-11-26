@@ -1,4 +1,21 @@
-import { CheckCircle2, Download, FileJson, Search, ShieldAlert, Upload, X } from "lucide-react";
+import {
+  CheckCheck,
+  CheckCircle2,
+  Download,
+  FileJson,
+  RotateCcw,
+  Search,
+  ShieldAlert,
+  Upload,
+  X,
+} from "lucide-react";
+import {
+  Accordion,
+  Input as HeroInput,
+  Radio,
+  RadioGroup,
+  Switch as HeroSwitch,
+} from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/client";
@@ -13,7 +30,17 @@ import type {
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
-import { Button, Dialog, ErrorState, Field, Page, Panel, StatusBadge } from "../components/ui";
+import {
+  Button,
+  CheckboxControl,
+  Dialog,
+  ErrorState,
+  Field,
+  InfoTip,
+  Panel,
+  SelectControl,
+  StatusBadge,
+} from "../components/ui";
 import { useToast } from "../toast";
 import {
   scheduleFromSettings,
@@ -199,7 +226,10 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
 
   const exp = useMutation({
     mutationFn: async ({ secrets }: { secrets: boolean }) => {
-      const data = await s.exportData(secrets, selected);
+      // 密钥导出要求显式的通道 ID；空选择用于元数据导出的“全部通道”语义。
+      const channelIds =
+        secrets && exportAll ? (channels.data ?? []).map((channel) => channel.id) : selected;
+      const data = await s.exportData(secrets, channelIds);
       const blob = new Blob([JSON.stringify(data, null, 2)], {
         type: "application/json",
       });
@@ -411,9 +441,9 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
       direction === "download" ? webdavForm.download_schedule : webdavForm.upload_schedule;
     const cron = direction === "download" ? webdavForm.download_cron : webdavForm.upload_cron;
     return (
-      <>
+      <div className="webdav-schedule-fields">
         <Field label={t("exchange.webdavSchedule")} hint={t("exchange.webdavScheduleHint")}>
-          <select
+          <SelectControl
             value={schedule}
             onChange={(event) =>
               updateWebdavSchedule(direction, event.target.value as WebDAVSchedulePresetId)
@@ -434,11 +464,11 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
                 {t(`exchange.webdavSchedule.${id}`)}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </Field>
         {schedule === "custom" ? (
           <Field label={t("exchange.webdavCron")} hint={t("exchange.webdavCronHint")}>
-            <input
+            <HeroInput
               value={cron}
               onChange={(event) =>
                 setWebdavForm((prev) =>
@@ -452,7 +482,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
             />
           </Field>
         ) : null}
-      </>
+      </div>
     );
   };
 
@@ -468,7 +498,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
     const clearKey = `clear_${key}` as const;
     return (
       <Field label={label} hint={hint}>
-        <input
+        <HeroInput
           type="text"
           value={webdavForm[key]}
           onChange={(event) => {
@@ -559,36 +589,61 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
   const visibleSelected = filteredChannels.filter((c) => selected.includes(c.id)).length;
 
   const formatSection = (
-    <details className="exchange-format-details">
-      <summary>{t("exchange.formatSupport")}</summary>
-      <p className="exchange-panel-note">{t("exchange.formatSupportHint")}</p>
-      <ul className="exchange-format-list">
-        <li className="exchange-format-card">
-          <span className="exchange-format-badge is-primary">
-            {t("exchange.formatBadge.native")}
-          </span>
-          <strong>{t("exchange.formatCanonical")}</strong>
-          <code>meta-gateway-aah-exchange · v1</code>
-        </li>
-        <li className="exchange-format-card">
-          <span className="exchange-format-badge">{t("exchange.formatBadge.compat")}</span>
-          <strong>{t("exchange.formatNewApi")}</strong>
-          <code>channels · data · array</code>
-        </li>
-        <li className="exchange-format-card">
-          <span className="exchange-format-badge">{t("exchange.formatBadge.compat")}</span>
-          <strong>{t("exchange.formatAah")}</strong>
-          <code>apiCredentialProfiles</code>
-        </li>
-      </ul>
-    </details>
+    <Accordion className="exchange-format-details" variant="surface">
+      <Accordion.Item>
+        <Accordion.Heading>
+          <Accordion.Trigger>{t("exchange.formatSupport")}</Accordion.Trigger>
+        </Accordion.Heading>
+        <Accordion.Panel>
+          <Accordion.Body>
+            <p className="exchange-panel-note">{t("exchange.formatSupportHint")}</p>
+            <ul className="exchange-format-list">
+              <li className="exchange-format-card">
+                <div className="exchange-format-card-top">
+                  <span className="exchange-format-icon is-primary" aria-hidden="true">
+                    <FileJson size={17} />
+                  </span>
+                  <span className="exchange-format-badge is-primary">
+                    {t("exchange.formatBadge.native")}
+                  </span>
+                </div>
+                <strong>{t("exchange.formatCanonical")}</strong>
+                <p>{t("exchange.formatCanonicalHint")}</p>
+              </li>
+              <li className="exchange-format-card">
+                <div className="exchange-format-card-top">
+                  <span className="exchange-format-icon" aria-hidden="true">
+                    <FileJson size={17} />
+                  </span>
+                  <span className="exchange-format-badge">{t("exchange.formatBadge.compat")}</span>
+                </div>
+                <strong>{t("exchange.formatNewApi")}</strong>
+                <p>{t("exchange.formatNewApiHint")}</p>
+              </li>
+              <li className="exchange-format-card">
+                <div className="exchange-format-card-top">
+                  <span className="exchange-format-icon" aria-hidden="true">
+                    <FileJson size={17} />
+                  </span>
+                  <span className="exchange-format-badge">{t("exchange.formatBadge.compat")}</span>
+                </div>
+                <strong>{t("exchange.formatAah")}</strong>
+                <p>{t("exchange.formatAahHint")}</p>
+              </li>
+            </ul>
+          </Accordion.Body>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
   );
 
   const webdavSection = (
     <section className="exchange-support webdav-panel" aria-label={t("exchange.webdavTitle")}>
       <div className="exchange-support-head">
-        <span className="exchange-support-kicker">{t("exchange.webdavTitle")}</span>
-        <p>{t("exchange.webdavHint")}</p>
+        <div className="exchange-heading-with-tip">
+          <strong>{t("exchange.webdavTitle")}</strong>
+          <InfoTip label={t("exchange.webdavHint")} />
+        </div>
       </div>
 
       <div className="webdav-directions">
@@ -598,25 +653,27 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           }
         >
           <div className="webdav-direction-head">
-            <label className="webdav-direction-toggle">
-              <input
-                className="switch"
-                type="checkbox"
-                checked={webdavForm.download}
-                onChange={(event) =>
-                  setWebdavForm((prev) => ({
-                    ...prev,
-                    download: event.target.checked,
-                  }))
-                }
-              />
-              <strong>{t("exchange.webdavImportTitle")}</strong>
-            </label>
+            <div className="webdav-direction-toggle">
+              <HeroSwitch
+                aria-label={t("exchange.webdavImportTitle")}
+                isSelected={webdavForm.download}
+                onChange={(download) => setWebdavForm((prev) => ({ ...prev, download }))}
+              >
+                <HeroSwitch.Content>
+                  <HeroSwitch.Control>
+                    <HeroSwitch.Thumb />
+                  </HeroSwitch.Control>
+                </HeroSwitch.Content>
+              </HeroSwitch>
+              <span className="exchange-heading-with-tip">
+                <strong>{t("exchange.webdavImportTitle")}</strong>
+                <InfoTip label={t("exchange.webdavImportHint")} />
+              </span>
+            </div>
           </div>
-          <p className="field-hint">{t("exchange.webdavImportHint")}</p>
           <div className="webdav-connection">
             <Field label={t("exchange.webdavUrl")} hint={t("exchange.webdavUrlHint")}>
-              <input
+              <HeroInput
                 value={webdavForm.url}
                 onChange={(event) =>
                   setWebdavForm((prev) => ({ ...prev, url: event.target.value }))
@@ -627,7 +684,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
             </Field>
             <div className="form-grid">
               <Field label={t("exchange.webdavUsername")}>
-                <input
+                <HeroInput
                   value={webdavForm.username}
                   onChange={(event) =>
                     setWebdavForm((prev) => ({
@@ -645,60 +702,64 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
                 webdavSettings.data?.has_password ?? false,
               )}
             </div>
-            {secretField(
-              "backup_password",
-              t("exchange.webdavBackupPassword"),
-              t("exchange.webdavBackupPasswordHint"),
-              webdavSettings.data?.has_backup_password ?? false,
-              t("exchange.webdavBackupPasswordPlaceholder"),
-            )}
+            <div className="webdav-secret-schedule-grid">
+              <div className="webdav-backup-password-field">
+                {secretField(
+                  "backup_password",
+                  t("exchange.webdavBackupPassword"),
+                  t("exchange.webdavBackupPasswordHint"),
+                  webdavSettings.data?.has_backup_password ?? false,
+                  t("exchange.webdavBackupPasswordPlaceholder"),
+                )}
+              </div>
+              {webdavScheduleField("download")}
+            </div>
           </div>
-          {webdavScheduleField("download")}
           <Field label={t("exchange.webdavMode")} hint={t("exchange.webdavModeHint")}>
-            <div
+            <RadioGroup
               className="webdav-mode-grid"
-              role="radiogroup"
               aria-label={t("exchange.webdavMode")}
+              name="webdav-sync-mode"
+              value={webdavSyncMode}
+              onChange={(value) => setWebdavSyncMode(value as WebDAVSyncMode)}
             >
-              <label
+              <Radio
                 className={
                   webdavSyncMode === "incremental"
                     ? "webdav-mode-card is-selected"
                     : "webdav-mode-card"
                 }
+                value="incremental"
               >
-                <input
-                  type="radio"
-                  name="webdav-sync-mode"
-                  value="incremental"
-                  checked={webdavSyncMode === "incremental"}
-                  onChange={() => setWebdavSyncMode("incremental")}
-                />
-                <span>
-                  <strong>{t("exchange.webdavMode.incremental")}</strong>
-                  <span className="field-hint">{t("exchange.webdavMode.incrementalHint")}</span>
-                </span>
-              </label>
-              <label
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <span className="webdav-mode-copy">
+                    <strong>{t("exchange.webdavMode.incremental")}</strong>
+                    <span className="field-hint">{t("exchange.webdavMode.incrementalHint")}</span>
+                  </span>
+                </Radio.Content>
+              </Radio>
+              <Radio
                 className={
                   webdavSyncMode === "replace"
                     ? "webdav-mode-card is-danger is-selected"
                     : "webdav-mode-card is-danger"
                 }
+                value="replace"
               >
-                <input
-                  type="radio"
-                  name="webdav-sync-mode"
-                  value="replace"
-                  checked={webdavSyncMode === "replace"}
-                  onChange={() => setWebdavSyncMode("replace")}
-                />
-                <span>
-                  <strong>{t("exchange.webdavMode.replace")}</strong>
-                  <span className="field-hint">{t("exchange.webdavMode.replaceHint")}</span>
-                </span>
-              </label>
-            </div>
+                <Radio.Content>
+                  <Radio.Control>
+                    <Radio.Indicator />
+                  </Radio.Control>
+                  <span className="webdav-mode-copy">
+                    <strong>{t("exchange.webdavMode.replace")}</strong>
+                    <span className="field-hint">{t("exchange.webdavMode.replaceHint")}</span>
+                  </span>
+                </Radio.Content>
+              </Radio>
+            </RadioGroup>
           </Field>
           <div className="webdav-direction-actions">
             <Button
@@ -736,25 +797,27 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           }
         >
           <div className="webdav-direction-head">
-            <label className="webdav-direction-toggle">
-              <input
-                className="switch"
-                type="checkbox"
-                checked={webdavForm.upload}
-                onChange={(event) =>
-                  setWebdavForm((prev) => ({
-                    ...prev,
-                    upload: event.target.checked,
-                  }))
-                }
-              />
-              <strong>{t("exchange.webdavBackupTitle")}</strong>
-            </label>
+            <div className="webdav-direction-toggle">
+              <HeroSwitch
+                aria-label={t("exchange.webdavBackupTitle")}
+                isSelected={webdavForm.upload}
+                onChange={(upload) => setWebdavForm((prev) => ({ ...prev, upload }))}
+              >
+                <HeroSwitch.Content>
+                  <HeroSwitch.Control>
+                    <HeroSwitch.Thumb />
+                  </HeroSwitch.Control>
+                </HeroSwitch.Content>
+              </HeroSwitch>
+              <span className="exchange-heading-with-tip">
+                <strong>{t("exchange.webdavBackupTitle")}</strong>
+                <InfoTip label={t("exchange.webdavBackupHint")} />
+              </span>
+            </div>
           </div>
-          <p className="field-hint">{t("exchange.webdavBackupHint")}</p>
           <div className="webdav-connection">
             <Field label={t("exchange.webdavUrl")} hint={t("exchange.webdavUrlHint")}>
-              <input
+              <HeroInput
                 value={webdavForm.upload_url}
                 onChange={(event) =>
                   setWebdavForm((prev) => ({
@@ -768,7 +831,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
             </Field>
             <div className="form-grid">
               <Field label={t("exchange.webdavUsername")}>
-                <input
+                <HeroInput
                   value={webdavForm.upload_username}
                   onChange={(event) =>
                     setWebdavForm((prev) => ({
@@ -788,15 +851,19 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
                 webdavSettings.data?.has_upload_password ?? false,
               )}
             </div>
-            {secretField(
-              "upload_backup_password",
-              t("exchange.webdavBackupPassword"),
-              t("exchange.webdavBackupPasswordHint"),
-              webdavSettings.data?.has_upload_backup_password ?? false,
-              t("exchange.webdavBackupPasswordPlaceholder"),
-            )}
+            <div className="webdav-secret-schedule-grid">
+              <div className="webdav-backup-password-field">
+                {secretField(
+                  "upload_backup_password",
+                  t("exchange.webdavBackupPassword"),
+                  t("exchange.webdavBackupPasswordHint"),
+                  webdavSettings.data?.has_upload_backup_password ?? false,
+                  t("exchange.webdavBackupPasswordPlaceholder"),
+                )}
+              </div>
+              {webdavScheduleField("upload")}
+            </div>
           </div>
-          {webdavScheduleField("upload")}
           <div className="webdav-direction-actions">
             <Button
               variant="secondary"
@@ -862,38 +929,41 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
   );
 
   const exportPanel = (
-    <Panel
-      title={t("exchange.exportTitle")}
-      actions={
+    <section className="exchange-subpanel exchange-export-subpanel">
+      <header className="exchange-subpanel-header">
+        <h3>{t("exchange.exportTitle")}</h3>
         <span className="exchange-count-pill">
           {exportAll
             ? t("exchange.allChannels")
             : t("exchange.selectedCount", { n: selected.length })}
         </span>
-      }
-    >
-      <p className="exchange-panel-copy">{t("exchange.exportHint")}</p>
-      <p className="exchange-panel-note">{t("exchange.exportCountHint")}</p>
-
+      </header>
       <div className="exchange-toolbar">
-        <label className="exchange-search">
+        <div className="exchange-search">
           <Search size={14} aria-hidden="true" />
-          <input
+          <HeroInput
             value={channelQuery}
             onChange={(e) => setChannelQuery(e.target.value)}
             placeholder={t("exchange.searchChannels")}
             aria-label={t("exchange.searchChannels")}
           />
-        </label>
-        <div className="toolbar">
+        </div>
+        <div className="toolbar exchange-selection-actions">
           <Button
-            variant="secondary"
+            className="exchange-select-visible"
+            icon={<CheckCheck size={15} />}
             disabled={!filteredChannels.length}
             onClick={() => toggleAllVisible(true)}
           >
             {t("exchange.selectVisible")}
           </Button>
-          <Button variant="quiet" disabled={!selected.length} onClick={() => setSelected([])}>
+          <Button
+            variant="secondary"
+            className="exchange-clear-selection"
+            icon={<RotateCcw size={14} />}
+            disabled={!selected.length}
+            onClick={() => setSelected([])}
+          >
             {t("exchange.clearSelection")}
           </Button>
         </div>
@@ -901,7 +971,11 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
 
       <div className="selection-list">
         <label className="check">
-          <input type="checkbox" checked={exportAll} onChange={() => setSelected([])} />
+          <CheckboxControl
+            checked={exportAll}
+            onChange={() => setSelected([])}
+            aria-label={t("exchange.allChannels")}
+          />
           <span>{t("exchange.allChannels")}</span>
         </label>
         {channels.isPending ? (
@@ -915,9 +989,9 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
         ) : (
           filteredChannels.map((c) => (
             <label className="check" key={c.id}>
-              <input
-                type="checkbox"
-                checked={selected.includes(c.id)}
+              <CheckboxControl
+                checked={exportAll || selected.includes(c.id)}
+                aria-label={`${c.name} #${c.id}`}
                 onChange={(e) =>
                   setSelected(
                     e.target.checked ? [...selected, c.id] : selected.filter((id) => id !== c.id),
@@ -946,7 +1020,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
       {exp.error && <ErrorState error={exp.error} />}
       <div className="toolbar exchange-actions">
         <Button
-          variant="secondary"
+          variant="primary"
           icon={<Download size={16} />}
           disabled={exp.isPending || channels.isPending}
           onClick={() => exp.mutate({ secrets: false })}
@@ -962,12 +1036,15 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           {t("exchange.exportSecrets")}
         </Button>
       </div>
-    </Panel>
+    </section>
   );
 
   const importPanel = (
-    <Panel title={t("exchange.importTitle")}>
-      <div
+    <section className="exchange-subpanel exchange-import-subpanel">
+      <header className="exchange-subpanel-header">
+        <h3>{t("exchange.importTitle")}</h3>
+      </header>
+      <Button
         className={["drop-zone", dragging ? "is-dragging" : "", document !== null ? "is-ready" : ""]
           .filter(Boolean)
           .join(" ")}
@@ -989,14 +1066,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           setDragging(false);
           void choose(e.dataTransfer.files?.[0]);
         }}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            input.current?.click();
-          }
-        }}
+        aria-label={t("exchange.chooseFile")}
       >
         {document !== null ? <CheckCircle2 size={28} /> : <FileJson size={28} />}
         <strong>{fileName || t("exchange.chooseFile")}</strong>
@@ -1013,7 +1083,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           accept="application/json,.json"
           onChange={(e) => void choose(e.target.files?.[0])}
         />
-      </div>
+      </Button>
 
       {fileName ? (
         <div className="exchange-file-bar">
@@ -1036,7 +1106,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           <strong>{t("exchange.encryptedTitle")}</strong>
           <p className="exchange-panel-note">{t("exchange.encryptedHint")}</p>
           <Field label={t("exchange.unlockPassword")}>
-            <input
+            <HeroInput
               type="password"
               autoComplete="off"
               value={unlockPassword}
@@ -1266,7 +1336,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
           })()}
         </div>
       )}
-    </Panel>
+    </section>
   );
 
   const secretWarningDialog = secretWarning ? (
@@ -1299,18 +1369,16 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
     <>
       {formatSection}
       {webdavSection}
-      <div className="exchange-grid">
-        {exportPanel}
-        {importPanel}
-      </div>
+      <Panel title={t("app.nav.exchange")} className="exchange-workspace">
+        <div className="exchange-grid">
+          {importPanel}
+          {exportPanel}
+        </div>
+      </Panel>
       {secretWarningDialog}
     </>
   );
 
   if (embedded) return <div className="exchange-embedded">{body}</div>;
-  return (
-    <Page title={t("exchange.title")} description={t("exchange.description")}>
-      {body}
-    </Page>
-  );
+  return <main className="page exchange-page">{body}</main>;
 }

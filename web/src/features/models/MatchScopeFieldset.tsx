@@ -1,4 +1,5 @@
 import { useI18n } from "../../i18n";
+import { Radio, RadioGroup } from "@heroui/react";
 import type { ModelChannelMatch, ModelMatchMode } from "../../api/types";
 
 /**
@@ -33,17 +34,23 @@ export function MatchScopeFieldset({
   return (
     <fieldset className="match-mode">
       <legend className="ops-panel-context">{t("modelsPage.autoMatch.modeLabel")}</legend>
-      {options.map(({ mode, label }) => (
-        <label className="check" key={mode}>
-          <input
-            type="radio"
-            name={radioName}
-            checked={value === mode}
-            onChange={() => onChange(mode)}
-          />
-          <span>{label}</span>
-        </label>
-      ))}
+      <RadioGroup
+        className="match-mode-options"
+        name={radioName}
+        value={value}
+        onChange={(next) => onChange(next as ModelMatchMode)}
+      >
+        {options.map(({ mode, label }) => (
+          <Radio key={mode} value={mode}>
+            <Radio.Content>
+              <Radio.Control>
+                <Radio.Indicator />
+              </Radio.Control>
+              <span>{label}</span>
+            </Radio.Content>
+          </Radio>
+        ))}
+      </RadioGroup>
       {value !== "exact" ? (
         <p className="ops-panel-context">
           {t("modelsPage.autoMatch.modeRewriteHint", { name: pattern })}

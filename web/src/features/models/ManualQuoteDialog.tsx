@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Dialog, ErrorState, Field } from "../../components/ui";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import { useSession } from "../../session";
 import { useI18n } from "../../i18n";
 import { useUnsavedChanges } from "../../lib/unsavedChanges";
@@ -85,21 +87,31 @@ export function ManualQuoteDialog({
     >
       <p className="panel-hint">{t("billing.manualHint")}</p>
       <Field label={t("billing.unit")}>
-        <select value={unit} onChange={(e) => setUnit(e.target.value)}>
-          <option value="site_credit">{t("billing.credit")}</option>
-          <option value="USD">USD</option>
-          <option value="CNY">CNY</option>
-        </select>
+        <SearchableSelect
+          ariaLabel={t("billing.unit")}
+          value={unit}
+          onChange={setUnit}
+          options={[
+            { value: "site_credit", label: t("billing.credit") },
+            { value: "USD", label: "USD" },
+            { value: "CNY", label: "CNY" },
+          ]}
+        />
       </Field>
       <Field label={t("billing.upstreamGroup")}>
-        <input value={group} maxLength={64} onChange={(e) => setGroup(e.target.value)} />
+        <HeroInput value={group} maxLength={64} onChange={(e) => setGroup(e.target.value)} />
       </Field>
       <Field label={t("billing.mode")}>
-        <select value={mode} onChange={(e) => setMode(e.target.value)}>
-          <option value="token">{t("billing.token")}</option>
-          <option value="request">{t("billing.request")}</option>
-          <option value="hybrid">{t("billing.hybrid")}</option>
-        </select>
+        <SearchableSelect
+          ariaLabel={t("billing.mode")}
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: "token", label: t("billing.token") },
+            { value: "request", label: t("billing.request") },
+            { value: "hybrid", label: t("billing.hybrid") },
+          ]}
+        />
       </Field>
       <div className="billing-rate-grid">
         {mode !== "request"
@@ -110,7 +122,7 @@ export function ManualQuoteDialog({
               "billing.nativeWrite",
             ].map((key, i) => (
               <Field key={key} label={t(key)}>
-                <input
+                <HeroInput
                   type="number"
                   min={0}
                   step="any"
@@ -125,7 +137,7 @@ export function ManualQuoteDialog({
           : null}
         {mode !== "token" ? (
           <Field label={t("billing.nativeFee")}>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step="any"

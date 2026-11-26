@@ -134,6 +134,21 @@ func TestJSONCheckinNormalizationAndErrors(t *testing.T) {
 	}
 }
 
+func TestJSONCheckinAdapterReadsQuotaAwardedReward(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"success":true,"data":{"quota_awarded":1250}}`)
+	}))
+	defer server.Close()
+
+	result, err := NewJSONCheckinAdapter("new-api", server.Client(), true).Checkin(context.Background(), CheckinInput{
+		BaseURL: server.URL,
+		Secret:  "session-secret",
+	})
+	if err != nil || result.Reward != "1250" {
+		t.Fatalf("reward=%q err=%v", result.Reward, err)
+	}
+}
+
 func TestJSONCheckinAdapterLimitsCancellationAndHeaders(t *testing.T) {
 	t.Run("oversized", func(t *testing.T) {
 		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -211,5 +226,61 @@ func TestJSONCheckinAdapterStripsTrailingV1(t *testing.T) {
 	})
 	if err != nil || result.Category != "checked_in" {
 		t.Fatalf("result=%+v err=%v", result, err)
+	}
+}
+
+func TestJSONCheckinAdapterHonorsEndpointAndMethodOverride(t *testing.T) {
+	var gotMethod, gotPath, gotBody string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		_, _ = io.WriteString(w, `{"success":true}`)
+	}))
+	defer server.Close()
+
+	result, err := NewJSONCheckinAdapter("new-api", server.Client(), true).Checkin(t.Context(), CheckinInput{
+		BaseURL: server.URL + "/v1", Secret: "secret", CheckinPath: "/custom/daily", CheckinMethod: http.MethodPost,
+		Body: `{"date":"today"}`,
+	})
+	if err != nil || result.Outcome != CheckinSuccess {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/custom/daily" || gotBody != `{"date":"today"}` {
+		t.Fatalf("request = %s %s %s", gotMethod, gotPath, gotBody)
+	}
+}
+
+func TestJSONCheckinAdapterFallsBackToCookieSignIn(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		switch r.URL.Path {
+		case "/api/user/checkin":
+			if r.Header.Get("Authorization") != "" {
+				http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+			http.NotFound(w, r)
+		case "/api/user/sign_in":
+			if r.Header.Get("Cookie") != "session=session-token" || r.Header.Get("X-Requested-With") != "XMLHttpRequest" {
+				t.Errorf("missing browser session headers: cookie=%q xrw=%q", r.Header.Get("Cookie"), r.Header.Get("X-Requested-With"))
+			}
+			_, _ = io.WriteString(w, `{"success":true,"message":"checked in"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	result, err := NewJSONCheckinAdapter("new-api", server.Client(), true).Checkin(t.Context(), CheckinInput{
+		BaseURL: server.URL, Secret: "session-token", PlatformUserID: 123,
+	})
+	if err != nil || result.Outcome != CheckinSuccess {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if len(paths) < 2 || paths[len(paths)-1] != "/api/user/sign_in" {
+		t.Fatalf("fallback sequence = %#v", paths)
 	}
 }

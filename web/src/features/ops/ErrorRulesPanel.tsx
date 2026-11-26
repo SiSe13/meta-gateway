@@ -1,12 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button as HeroButton } from "@heroui/react";
+import { GitBranch, Plus } from "lucide-react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { api } from "../../api/client";
 import type { ErrorPassRule } from "../../api/types";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
-import { ConfirmDialog, Dialog, Field, InfoTip } from "../../components/ui";
+import {
+  CheckboxControl,
+  ConfirmDialog,
+  Dialog,
+  Field,
+  InfoTip,
+  SelectControl,
+} from "../../components/ui";
 import { RuleEditorFooter } from "./RuleEditorFooter";
 
 export // Error passthrough rules: status/keyword → passthrough / rewrite /
@@ -37,14 +45,15 @@ function ErrorRulesPanel() {
   return (
     <section className="panel runtime-section runtime-tool-error-rules" id="runtime-error-rules">
       <div className="panel-header">
-        <strong>{t("ops.errorRules.title")}</strong>
-        {/* The actions and their meanings are mechanics: they belong behind the
-            (i), not as three wrapped lines above the list they describe. */}
-        <InfoTip label={t("ops.errorRules.hint")} />
+        <div className="panel-title">
+          <h3>{t("ops.errorRules.title")}</h3>
+          {/* Keep the explanation beside its title; the add action stays at the far edge. */}
+          <InfoTip label={t("ops.errorRules.hint")} />
+        </div>
         <HeroButton
           {...addButtonTitle}
           type="button"
-          className="icon-button"
+          className="icon-button runtime-rule-add"
           isIconOnly
           aria-label={t("ops.errorRules.add")}
           onPress={() =>
@@ -60,12 +69,17 @@ function ErrorRulesPanel() {
             })
           }
         >
-          +
+          <Plus size={16} strokeWidth={2.25} aria-hidden="true" />
         </HeroButton>
       </div>
       <p className="muted panel-lede">{t("ops.errorRules.lede")}</p>
       {items.length === 0 ? (
-        <p className="is-quiet panel-note">{t("ops.errorRules.empty")}</p>
+        <div className="runtime-rule-empty-state">
+          <span className="runtime-rule-empty-icon" aria-hidden="true">
+            <GitBranch size={18} />
+          </span>
+          <p>{t("ops.errorRules.empty")}</p>
+        </div>
       ) : (
         <div className="error-rules-list">
           {items.map((rule) => (
@@ -151,14 +165,14 @@ function ErrorRuleEditor({
     >
       <div className="meta-form">
         <Field label={t("ops.errorRules.name")}>
-          <input
+          <HeroInput
             value={form.name ?? ""}
             onChange={(e) => patch({ name: e.target.value })}
             disabled={pending}
           />
         </Field>
         <Field label={t("ops.errorRules.status")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             max={599}
@@ -168,7 +182,7 @@ function ErrorRuleEditor({
           />
         </Field>
         <Field label={t("ops.errorRules.keyword")}>
-          <input
+          <HeroInput
             value={form.keyword ?? ""}
             placeholder="rate limit, insufficient_quota…"
             onChange={(e) => patch({ keyword: e.target.value })}
@@ -176,7 +190,7 @@ function ErrorRuleEditor({
           />
         </Field>
         <Field label={t("ops.errorRules.modelGlob")}>
-          <input
+          <HeroInput
             value={form.model_glob ?? ""}
             placeholder="gpt-*"
             onChange={(e) => patch({ model_glob: e.target.value })}
@@ -184,7 +198,7 @@ function ErrorRuleEditor({
           />
         </Field>
         <Field label={t("ops.errorRules.action")}>
-          <select
+          <SelectControl
             value={form.action ?? "passthrough"}
             onChange={(e) =>
               patch({
@@ -196,11 +210,11 @@ function ErrorRuleEditor({
             <option value="passthrough">{t("ops.errorRules.actionPassthrough")}</option>
             <option value="rewrite">{t("ops.errorRules.actionRewrite")}</option>
             <option value="ignore_monitor">{t("ops.errorRules.actionIgnore")}</option>
-          </select>
+          </SelectControl>
         </Field>
         {form.action === "rewrite" ? (
           <Field label={t("ops.errorRules.rewriteTo")}>
-            <input
+            <HeroInput
               type="number"
               min={100}
               max={599}
@@ -211,8 +225,7 @@ function ErrorRuleEditor({
           </Field>
         ) : null}
         <label className="check is-tight">
-          <input
-            type="checkbox"
+          <CheckboxControl
             checked={form.enabled ?? true}
             onChange={(e) => patch({ enabled: e.target.checked })}
             disabled={pending}

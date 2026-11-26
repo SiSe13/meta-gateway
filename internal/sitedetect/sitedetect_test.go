@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestDetectByTitle(t *testing.T) {
@@ -147,6 +148,31 @@ func TestDetectUnknownSite(t *testing.T) {
 	}
 	if result.Family != "" {
 		t.Fatalf("expected no match, got %+v", result)
+	}
+}
+
+func TestDetectNetworkProbesRunConcurrently(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(350 * time.Millisecond)
+		if r.URL.Path == "/" {
+			_, _ = w.Write([]byte(`<title>Generic Provider</title>`))
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	t.Cleanup(server.Close)
+
+	started := time.Now()
+	result, err := Detect(context.Background(), server.Client(), server.URL)
+	elapsed := time.Since(started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Family != "" {
+		t.Fatalf("expected unknown provider, got %+v", result)
+	}
+	if elapsed >= 900*time.Millisecond {
+		t.Fatalf("detection took %s; expected independent probes to run concurrently", elapsed)
 	}
 }
 

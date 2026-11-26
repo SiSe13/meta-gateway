@@ -11,9 +11,14 @@ beforeEach(() => {
   localStorage.setItem("meta-gateway.locale", "en");
 });
 
-function setup(mode: "personal" | "team", hasOwner: boolean) {
+function setup(mode: "personal" | "team", hasOwner: boolean, ownerBootstrapAvailable = true) {
   const calls: Array<[string, RequestInit | undefined]> = [];
-  let current: ModeInfo = { mode, has_owner: hasOwner, role: "owner" };
+  let current: ModeInfo = {
+    mode,
+    has_owner: hasOwner,
+    role: "owner",
+    owner_bootstrap_available: ownerBootstrapAvailable,
+  };
   const request: TeamRequest = async <T,>(path: string, init?: RequestInit) => {
     calls.push([path, init]);
     if (path === "/admin/mode" && (!init || init.method === undefined)) return current as T;
@@ -42,21 +47,27 @@ describe("operating mode", () => {
     // The switch is what creates the owner, so it must not be gated on one
     // existing — that gate is what used to force a second account for the
     // operator, under a name they could not even reuse.
-    const select = await screen.findByLabelText("Operating mode");
-    expect(select).toHaveValue("personal");
-    expect(select.querySelector('option[value="team"]')).not.toBeDisabled();
+    const select = await screen.findByRole("button", { name: "Operating mode" });
+    expect(select).toHaveTextContent("Personal");
+    fireEvent.click(select);
+    expect(await screen.findByRole("option", { name: "Team" })).toBeEnabled();
     expect(
-      screen.getByText(/creates the owner from the deployment administrator/i),
+      screen.getByText(/create the owner account with the first-run setup code/i),
     ).toBeInTheDocument();
-    // The manual form stays, but only as the fallback for a deployment with no
-    // admin secret to derive a first password from.
+    expect(screen.queryByRole("heading", { name: "Create owner account" })).toBeNull();
+  });
+
+  it("shows manual owner creation only when deployment admin credentials cannot seed it", async () => {
+    setup("personal", false, false);
+    await screen.findByRole("button", { name: "Operating mode" });
     expect(screen.getByRole("heading", { name: "Create owner account" })).toBeInTheDocument();
   });
 
   it("switches the instance to team mode through the settings panel", async () => {
     const calls = setup("personal", true);
-    const select = await screen.findByLabelText("Operating mode");
-    fireEvent.change(select, { target: { value: "team" } });
+    const select = await screen.findByRole("button", { name: "Operating mode" });
+    fireEvent.click(select);
+    fireEvent.click(await screen.findByRole("option", { name: "Team" }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(

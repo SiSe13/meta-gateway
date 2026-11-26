@@ -1,6 +1,16 @@
 import { type FocusEvent } from "react";
-import { ChevronDown, Pencil, Plus, Target, Trash2, Wand2 } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import {
+  Check,
+  ChevronDown,
+  ListChecks,
+  Pencil,
+  Plus,
+  Target,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
+import { Button as HeroButton, Checkbox as HeroCheckbox, Input as HeroInput } from "@heroui/react";
 import type { Route, RoutingCandidate } from "../../api/types";
 import { ActionMenu } from "../../components/ActionMenu";
 import { Button, Empty, InfoTip } from "../../components/ui";
@@ -174,7 +184,8 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                 {t("routing.bulkSelected", { count: selectedMemberIds.size })}
               </span>
               <Button
-                variant="secondary"
+                variant="primary"
+                icon={<Check size={14} />}
                 disabled={selectedMemberIds.size === 0}
                 onClick={() => bulkToggleMembers.mutate({ enabled: true })}
               >
@@ -182,15 +193,20 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
               </Button>
               <Button
                 variant="secondary"
+                icon={<X size={14} />}
                 disabled={selectedMemberIds.size === 0}
                 onClick={() => bulkToggleMembers.mutate({ enabled: false })}
               >
                 {t("routing.bulkDisable")}
               </Button>
-              <Button variant="secondary" onClick={selectAllMembers}>
+              <Button
+                variant="secondary"
+                icon={<ListChecks size={14} />}
+                onClick={selectAllMembers}
+              >
                 {t("routing.bulkSelectAll")}
               </Button>
-              <Button variant="secondary" onClick={clearMemberSelection}>
+              <Button variant="quiet" onClick={clearMemberSelection}>
                 {t("routing.bulkClear")}
               </Button>
             </div>
@@ -259,7 +275,7 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                   );
                 })}
                 {groupDraft ? (
-                  <input
+                  <HeroInput
                     className="member-group-input"
                     autoFocus
                     value={groupDraft.value}
@@ -291,17 +307,19 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                 )}
               </div>
               {groupDraft?.mode === "new" ? (
-                <label className="member-group-copy">
-                  <input
-                    type="checkbox"
-                    checked={groupDraft.copyDefault ?? false}
-                    onChange={(event) =>
-                      setGroupDraft({ ...groupDraft, copyDefault: event.target.checked })
-                    }
-                    onBlur={groupEditorBlur}
-                  />
-                  <span>{t("routing.groupCopyDefault")}</span>
-                </label>
+                <HeroCheckbox
+                  className="member-group-copy"
+                  isSelected={groupDraft.copyDefault ?? false}
+                  onChange={(event) => setGroupDraft({ ...groupDraft, copyDefault: event })}
+                  onBlur={groupEditorBlur}
+                >
+                  <HeroCheckbox.Content>
+                    <HeroCheckbox.Control>
+                      <HeroCheckbox.Indicator />
+                    </HeroCheckbox.Control>
+                    {t("routing.groupCopyDefault")}
+                  </HeroCheckbox.Content>
+                </HeroCheckbox>
               ) : null}
             </div>
             <span className="bar-spacer" />

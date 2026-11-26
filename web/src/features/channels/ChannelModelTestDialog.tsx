@@ -1,5 +1,5 @@
 import { CheckCircle2, Loader2, Play, Search, Square, XCircle } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { useMemo, useRef, useState } from "react";
 import { api } from "../../api/client";
 import { Button, Dialog } from "../../components/ui";
@@ -186,6 +186,7 @@ export function ChannelModelTestDialog({
 
   return (
     <Dialog
+      className="channel-model-test-dialog"
       title={t("channels.testDialog.title", { name: channelName })}
       onClose={close}
       actions={
@@ -214,7 +215,8 @@ export function ChannelModelTestDialog({
       <div className="channel-model-test-bar">
         <div className="probe-search">
           <Search size={13} />
-          <input
+          <HeroInput
+            className="channel-model-test-search-input"
             type="search"
             value={query}
             placeholder={t("channels.testDialog.search")}
@@ -223,7 +225,8 @@ export function ChannelModelTestDialog({
         </div>
         <label className="channel-model-test-knob" title={t("channels.testDialog.maxTokensHint")}>
           <span>{t("channels.testDialog.maxTokens")}</span>
-          <input
+          <HeroInput
+            className="channel-model-test-token-input"
             type="number"
             min={1}
             max={MAX_TOKENS_CEILING}
@@ -232,16 +235,19 @@ export function ChannelModelTestDialog({
             onChange={(event) => setMaxTokens(Number(event.target.value))}
           />
         </label>
-        <HeroButton
-          type="button"
-          variant="ghost"
-          className="unify-covered-toggle"
-          aria-pressed={onlyFailures}
-          isDisabled={tally.failed === 0}
-          onPress={() => setOnlyFailures((current) => !current)}
-        >
-          {onlyFailures ? t("channels.testDialog.showAll") : t("channels.testDialog.onlyFailures")}
-        </HeroButton>
+        {tally.failed > 0 ? (
+          <HeroButton
+            type="button"
+            variant="ghost"
+            className="unify-covered-toggle"
+            aria-pressed={onlyFailures}
+            onPress={() => setOnlyFailures((current) => !current)}
+          >
+            {onlyFailures
+              ? t("channels.testDialog.showAll")
+              : t("channels.testDialog.onlyFailures")}
+          </HeroButton>
+        ) : null}
       </div>
 
       {/* The running total sits under the controls that produce it, so raising
@@ -277,17 +283,18 @@ export function ChannelModelTestDialog({
                     {verdict.error}
                   </span>
                 ) : null}
-                <HeroButton
-                  type="button"
-                  variant="ghost"
-                  className="unify-covered-toggle channel-model-test-run"
-                  isDisabled={running || verdict?.status === "testing"}
-                  onPress={() => void run([model.name])}
-                >
-                  {verdict?.status === "ok"
-                    ? t("channels.testDialog.retest")
-                    : t("channels.testDialog.test")}
-                </HeroButton>
+                {!running ? (
+                  <HeroButton
+                    type="button"
+                    variant="ghost"
+                    className="unify-covered-toggle channel-model-test-run"
+                    onPress={() => void run([model.name])}
+                  >
+                    {verdict?.status === "ok"
+                      ? t("channels.testDialog.retest")
+                      : t("channels.testDialog.test")}
+                  </HeroButton>
+                ) : null}
               </li>
             );
           })}

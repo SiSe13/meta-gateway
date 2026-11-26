@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "../i18n";
 import { PAGE_SIZE_OPTIONS } from "../hooks/useClientPagination";
+import { SearchableSelect } from "./SearchableSelect";
 import { Button } from "./ui";
 
 type PaginationBarProps = {
@@ -47,20 +48,17 @@ export function PaginationBar({
         })}
       </p>
       <div className="pagination-controls">
-        <label className="pagination-size">
-          <span className="sr-only">{t("pagination.pageSize")}</span>
-          <select
-            value={pageSize}
-            aria-label={t("pagination.pageSize")}
-            onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {t("pagination.perPage", { n: size })}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="pagination-size">
+          <SearchableSelect
+            ariaLabel={t("pagination.pageSize")}
+            value={String(pageSize)}
+            options={PAGE_SIZE_OPTIONS.map((size) => ({
+              value: String(size),
+              label: t("pagination.perPage", { n: size }),
+            }))}
+            onChange={(value) => onPageSizeChange(Number(value))}
+          />
+        </div>
         <div className="pagination-pages">
           <Button
             variant="quiet"

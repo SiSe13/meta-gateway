@@ -132,9 +132,16 @@ export function SearchableSelect({
     // Constrain the flex panel to its measured content height. A max-height on
     // its own does not create a scrollport, so the wheel can bubble to the
     // dialog behind the portal and dismiss the picker while the list stays put.
-    const contentHeight =
-      panelRef.current.scrollHeight || panelRef.current.getBoundingClientRect().height || 300;
-    const height = Math.min(contentHeight, maxHeight);
+    const computedStyle = window.getComputedStyle(panelRef.current);
+    const borderHeight =
+      (Number.parseFloat(computedStyle.borderTopWidth) || 0) +
+      (Number.parseFloat(computedStyle.borderBottomWidth) || 0);
+    // scrollHeight 包含内边距但不包含边框；面板使用 border-box，设高度时需补回边框，
+    // 否则少量选项也会因差这 1–2px 触发列表滚动条。
+    const naturalHeight = panelRef.current.scrollHeight
+      ? panelRef.current.scrollHeight + borderHeight
+      : panelRef.current.getBoundingClientRect().height || 300;
+    const height = Math.min(naturalHeight, maxHeight);
     let top = anchor.bottom + 8;
     if (top + height > window.innerHeight - 8) top = anchor.top - height - 8;
     setPanelStyle({

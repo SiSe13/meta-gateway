@@ -2,11 +2,14 @@ import { AlertTriangle, ChevronDown, Info, LoaderCircle, X } from "lucide-react"
 import {
   Button as HeroButton,
   Card,
+  Checkbox as HeroCheckbox,
   Modal as HeroModal,
+  Switch as HeroSwitch,
   Tabs as HeroTabs,
   useOverlayState,
 } from "@heroui/react";
 import {
+  Children,
   cloneElement,
   createContext,
   isValidElement,
@@ -20,6 +23,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { SearchableSelect } from "./SearchableSelect";
 import { useI18n } from "../i18n";
 import { formatErrorObject } from "../formatError";
 import { registerOverlay } from "./overlayStack";
@@ -123,6 +127,101 @@ export function IconButton({
     >
       {children}
     </HeroButton>
+  );
+}
+
+/** 用统一的可搜索 UI 下拉框承接表单里原先的原生 select。 */
+export function SelectControl({
+  value,
+  onChange,
+  children,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  value: string | number;
+  onChange: React.ChangeEventHandler<HTMLSelectElement>;
+  children: ReactNode;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  const options = Children.toArray(children)
+    .filter(isValidElement)
+    .map((child) => {
+      const props = child.props as { value?: string | number; children?: ReactNode };
+      return { value: String(props.value ?? ""), label: String(props.children ?? "") };
+    });
+  return (
+    <SearchableSelect
+      ariaLabel={ariaLabel}
+      value={String(value)}
+      disabled={disabled}
+      options={options}
+      onChange={(next) =>
+        onChange({ target: { value: next } } as React.ChangeEvent<HTMLSelectElement>)
+      }
+    />
+  );
+}
+
+/** 统一渲染项目表单中使用的 UI 复选框，并兼容原生 change 事件回调。 */
+export function CheckboxControl({
+  checked,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  return (
+    <HeroCheckbox
+      aria-label={ariaLabel}
+      isSelected={checked}
+      isDisabled={disabled}
+      onChange={(selected) =>
+        onChange({ target: { checked: selected } } as React.ChangeEvent<HTMLInputElement>)
+      }
+    >
+      <HeroCheckbox.Content>
+        <HeroCheckbox.Control>
+          <HeroCheckbox.Indicator />
+        </HeroCheckbox.Control>
+        {ariaLabel ? <span className="sr-only">{ariaLabel}</span> : null}
+      </HeroCheckbox.Content>
+    </HeroCheckbox>
+  );
+}
+
+/** 使用项目 UI 开关呈现设置页中的布尔项。 */
+export function SwitchControl({
+  checked,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  disabled?: boolean;
+  "aria-label"?: string;
+}) {
+  return (
+    <HeroSwitch
+      aria-label={ariaLabel}
+      isSelected={checked}
+      isDisabled={disabled}
+      onChange={(selected) =>
+        onChange({ target: { checked: selected } } as React.ChangeEvent<HTMLInputElement>)
+      }
+    >
+      <HeroSwitch.Content>
+        <HeroSwitch.Control>
+          <HeroSwitch.Thumb />
+        </HeroSwitch.Control>
+        {ariaLabel ? <span className="sr-only">{ariaLabel}</span> : null}
+      </HeroSwitch.Content>
+    </HeroSwitch>
   );
 }
 
@@ -377,16 +476,20 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel,
+  className,
   pending,
   error,
+  danger = true,
   onConfirm,
   onClose,
 }: {
   title: string;
   message: string;
   confirmLabel?: string;
+  className?: string;
   pending?: boolean;
   error?: unknown;
+  danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -394,15 +497,16 @@ export function ConfirmDialog({
   return (
     <Dialog
       title={title}
+      className={className}
       onClose={onClose}
-      danger
+      danger={danger}
       busy={pending}
       actions={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
             {t("common.cancel")}
           </Button>
-          <Button variant="danger" loading={pending} onClick={onConfirm}>
+          <Button variant={danger ? "danger" : "primary"} loading={pending} onClick={onConfirm}>
             {pending ? t("common.working") : (confirmLabel ?? t("common.delete"))}
           </Button>
         </>
@@ -659,14 +763,17 @@ export function DataTable({
   headers,
   children,
   empty,
+  fill = false,
 }: {
   headers: ReactNode[];
   children: ReactNode;
   empty?: boolean;
+  /** 填满父级纵向布局中的剩余高度。 */
+  fill?: boolean;
 }) {
   if (empty) return <Empty />;
   return (
-    <div className="table-wrap" data-columns={headers.length}>
+    <div className={`table-wrap${fill ? " is-fill" : ""}`} data-columns={headers.length}>
       <table>
         <thead>
           <tr>

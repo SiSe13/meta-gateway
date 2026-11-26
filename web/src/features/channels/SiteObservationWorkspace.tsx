@@ -396,6 +396,11 @@ export function SiteObservationWorkspace({
   const siteModels = selected
     ? items.filter((item) => item.site_id === selected.site_id).length
     : 0;
+  const selectedUsesThirdParty = items.some(
+    (item) =>
+      item.site_id === selected?.site_id &&
+      item.evidence.some((series) => series.source === "watchbot"),
+  );
   const reason = siteModels === 0 ? zeroReason(selected) : null;
   // What the bulk bar acts on: the routes the picked models already reach, and
   // the ones they do not reach yet.
@@ -528,7 +533,8 @@ export function SiteObservationWorkspace({
           <Link to="/settings?tab=runtime">{t("observation.schedule")}</Link>
         </p>
       ) : null}
-      {observations.data?.third_party ? (
+      {observations.data?.third_party &&
+      (!observations.data.third_party.error || selectedUsesThirdParty) ? (
         <p
           className={
             observations.data.third_party.error

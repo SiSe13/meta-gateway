@@ -28,7 +28,16 @@ func (h *TeamHandler) getMode(w http.ResponseWriter, r *http.Request) {
 	if p := teamActor(r); p != nil && p.User != nil {
 		role = p.User.Role
 	}
-	teamJSON(w, 200, map[string]any{"mode": s.Mode, "has_owner": count > 0, "role": role})
+	ownerBootstrapAvailable := false
+	if h.deploymentAdmin != nil {
+		username, password := h.deploymentAdmin()
+		username = strings.ToLower(strings.TrimSpace(username))
+		ownerBootstrapAvailable = teamUsername.MatchString(username) && len(password) > 0 && len(password) <= 1024
+	}
+	teamJSON(w, 200, map[string]any{
+		"mode": s.Mode, "has_owner": count > 0, "role": role,
+		"owner_bootstrap_available": ownerBootstrapAvailable,
+	})
 }
 
 func (h *TeamHandler) patchMode(w http.ResponseWriter, r *http.Request) {

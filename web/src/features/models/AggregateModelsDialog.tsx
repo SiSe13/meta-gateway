@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { Check, Layers, Trash2, X } from "lucide-react";
 import { api } from "../../api/client";
 import type { ModelAggregate } from "../../api/types";
-import { Button, Dialog, Empty } from "../../components/ui";
+import { Button, CheckboxControl, Dialog, Empty } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -143,7 +143,7 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
           <p className="unify-intro">{t("modelsPage.aggregates.createIntro")}</p>
           <label className="field">
             <span>{t("modelsPage.aggregates.name")}</span>
-            <input
+            <HeroInput
               value={name}
               placeholder={t("modelsPage.aggregates.namePlaceholder")}
               onChange={(event) => setName(event.target.value)}
@@ -151,7 +151,7 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
           </label>
           <label className="field">
             <span>{t("modelsPage.aggregates.note")}</span>
-            <input value={note} onChange={(event) => setNote(event.target.value)} />
+            <HeroInput value={note} onChange={(event) => setNote(event.target.value)} />
           </label>
           <section className="unify-section">
             <h3>{t("modelsPage.aggregates.pickTitle")}</h3>
@@ -168,8 +168,7 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
                   return (
                     <div key={model} className="aggregate-pick">
                       <label className="check">
-                        <input
-                          type="checkbox"
+                        <CheckboxControl
                           checked={checked}
                           onChange={(event) =>
                             setPicked((current) => {
@@ -202,8 +201,7 @@ export function AggregateModelsDialog({ onClose }: { onClose: () => void }) {
                             .filter((channel) => channel.status === "enabled")
                             .map((channel) => (
                               <label className="check" key={channel.id}>
-                                <input
-                                  type="checkbox"
+                                <CheckboxControl
                                   checked={(picked[model] ?? []).includes(channel.id)}
                                   onChange={(event) =>
                                     setPicked((current) => {

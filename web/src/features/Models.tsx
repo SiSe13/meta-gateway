@@ -11,7 +11,6 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type FocusEvent } from "react";
 import { BillingRuleDialog } from "./models/BillingRulePanel";
@@ -26,7 +25,7 @@ import type {
 } from "../api/types";
 import { ActionMenu } from "../components/ActionMenu";
 import { TelemetryStrip } from "../components/TelemetryStrip";
-import { Button, ConfirmDialog, Dialog, Empty, Page, Panel } from "../components/ui";
+import { Button, ConfirmDialog, Dialog, Empty, IconButton, Page, Panel } from "../components/ui";
 import { useAdminMutation } from "../hooks/useAdminMutation";
 import { useToast } from "../toast";
 import { useClientPagination } from "../hooks/useClientPagination";
@@ -306,49 +305,24 @@ function ModelsWorkspace({
   });
   const bulkBusy = bulkToggleRoutes.isPending || bulkDeleteRoutes.isPending;
 
-  // URL → selection: restore the selected route when the URL changes (direct
-  // links, back/forward, page refresh). Depends only on params/rows so a user
-  // click (which changes only `selected`) can never be overwritten by the
-  // stale URL captured before the click renders.
+  // 数据加载完成后统一恢复列表选中项，并把最终结果同步回 URL，避免刷新时多个 effect 抢写选择。
   useEffect(() => {
+    if (overviews.isPending) return;
     const routeParam = positiveId(params.get("route"));
-    if (routeParam && rows.some((item) => item.route.id === routeParam)) {
-      setSelected(routeParam);
-    }
-  }, [params, rows]);
+    const fromURL = rows.find((item) => item.route.id === routeParam);
+    const fromModel = initialModel
+      ? rows.find((item) => item.route.model_pattern === initialModel)
+      : undefined;
+    const fromTab = rows.find((item) => item.route.id === selected);
+    const nextSelected = (fromURL ?? fromModel ?? fromTab ?? rows[0])?.route.id ?? null;
 
-  // Selection fallback: when no valid selection exists (empty filter results,
-  // deleted route, first visit), pick the first visible row. Does not read the
-  // URL, so it can never fight the user's click with a stale route param.
-  useEffect(() => {
-    if (!rows.length) {
-      if (selected !== null) setSelected(null);
-      return;
-    }
-    if (selected && rows.some((item) => item.route.id === selected)) return;
-    const first = rows[0];
-    if (first) setSelected(first.route.id);
-  }, [rows, selected]);
+    if (selected !== nextSelected) setSelected(nextSelected);
 
-  // Selection → URL: keep the URL in sync so switching pages restores the
-  // selection. Writes only when the URL differs; once written, the restore
-  // effect above reads the same value and bails out.
-  useEffect(() => {
-    if (!selected) return;
     const next = new URLSearchParams(params);
-    if (next.get("route") === String(selected)) return;
-    next.set("route", String(selected));
-    setSearchParams(next, { replace: true });
-  }, [params, selected, setSearchParams]);
-
-  useEffect(() => {
-    if (!initialModel || !overviews.data?.length) return;
-    const match = overviews.data.find((item) => item.route.model_pattern === initialModel);
-    if (match) {
-      setSelected(match.route.id);
-      setQuery(initialModel);
-    }
-  }, [initialModel, overviews.data, setQuery]);
+    if (nextSelected === null) next.delete("route");
+    else next.set("route", String(nextSelected));
+    if (next.toString() !== params.toString()) setSearchParams(next, { replace: true });
+  }, [initialModel, overviews.isPending, params, rows, selected, setSearchParams]);
 
   const selectedOverview = overviews.data?.find((item) => item.route.id === selected) ?? null;
   const selectedRoute = selectedOverview?.route ?? null;
@@ -454,7 +428,7 @@ function ModelsWorkspace({
     invalidateKeys: [...ROUTING_INVALIDATE_KEYS],
     toastOnError: false,
     onSuccess: (route) => {
-      setSelected(route.id);
+      selectRow(route.id);
       setEdit(null);
     },
   });
@@ -732,7 +706,7 @@ function ModelsWorkspace({
     mutations: { toggleRoute, del, save },
   };
 
-  const modelActions = (route: Route, options?: { closeContext?: boolean }) =>
+  const modelActions = (route: Route, options?: { closeContext?: boolean; omitKeys?: string[] }) =>
     routeActions(
       route,
       {
@@ -917,30 +891,27 @@ function ModelsWorkspace({
               count: missing.data.items.length,
             })}
           </span>
-          <HeroButton
-            type="button"
-            variant="ghost"
+          <Button
+            variant="quiet"
             className="missing-models-focus"
-            onPress={() => {
+            onClick={() => {
               const first = missing.data!.items[0];
               if (first) setQuery(first.model);
             }}
           >
             {t("modelsPage.missingModelsFocus")}
-          </HeroButton>
-          <HeroButton
-            type="button"
-            variant="ghost"
+          </Button>
+          <IconButton
+            label={t("common.dismiss")}
             className="missing-models-close"
-            aria-label={t("common.dismiss")}
-            ref={(element) => element?.setAttribute("title", t("common.dismiss"))}
-            onPress={() => {
+            title={t("common.dismiss")}
+            onClick={() => {
               storeMissingDismissed();
               setMissingDismissed(true);
             }}
           >
             <X size={12} />
-          </HeroButton>
+          </IconButton>
         </div>
       ) : null}
 
@@ -1018,7 +989,9 @@ function ModelsWorkspace({
                 onOpenBilling: () => setBillingOpen(true),
                 saveRoutingMode,
                 toggleRoute,
-                actions: modelActions(selectedRoute),
+                // The detail panel already exposes these two actions as prominent
+                // buttons, so keep the overflow menu focused on less frequent work.
+                actions: modelActions(selectedRoute, { omitKeys: ["try", "bulk"] }),
                 candidates: selectedMembers,
               }}
               policy={{

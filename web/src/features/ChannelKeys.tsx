@@ -1,14 +1,18 @@
 import { ChevronDown, ChevronUp, Eye, HeartPulse, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button as HeroButton } from "@heroui/react";
+import {
+  Button as HeroButton,
+  Input as HeroInput,
+  Switch as HeroSwitch,
+  TextArea as HeroTextArea,
+} from "@heroui/react";
 import { api } from "../api/client";
 import type { Channel, ChannelKeyTestResult, Credential } from "../api/types";
 import { ModelPicker } from "../components/ModelPicker";
 import { SecretRevealDialog } from "../components/SecretRevealDialog";
-import { Button, ConfirmDialog, Field, InfoTip } from "../components/ui";
+import { Button, CheckboxControl, ConfirmDialog, Dialog, Field, InfoTip } from "../components/ui";
 import { useAdminMutation } from "../hooks/useAdminMutation";
-import { Drawer } from "../components/Drawer";
 import { useI18n } from "../i18n";
 import { apiKeyLooksWrong, keyHintFor, splitApiKeys } from "../lib/apiKeyPaste";
 import { useSession } from "../session";
@@ -48,11 +52,9 @@ function matchesModel(entry: string, model: string): boolean {
 }
 
 /**
- * Overlay drawer with the full API-key management UI for one channel.
- * Opened from the channel editor and covering it so the management surface
- * remains easy to use on narrow screens.
+ * Centered dialog with the full API-key management UI for one channel.
  */
-export function ChannelKeysDrawer({
+export function ChannelKeysDialog({
   channel,
   apiKeys,
   pending,
@@ -227,24 +229,17 @@ export function ChannelKeysDrawer({
   };
 
   return (
-    <Drawer
+    <Dialog
+      className="channel-keys-dialog"
       title={`${t("channels.apiKeysTitle")} · ${channel.name}`}
-      width={780}
       onClose={onClose}
-      footer={
-        <Button variant="secondary" onClick={onClose}>
-          {t("common.close")}
-        </Button>
-      }
     >
       <section className="credential-key-panel">
         <div className="credential-key-panel-head">
-          <div>
-            <strong>{t("channels.apiKeysTitle")}</strong>
-            <p>{t("channels.apiKeysHint")}</p>
-          </div>
+          <p>{t("channels.apiKeysHint")}</p>
           <Button
             variant="secondary"
+            className="credential-key-sync-button"
             disabled={pending || Boolean(syncKeysPending)}
             onClick={onSyncKeys}
           >
@@ -254,20 +249,21 @@ export function ChannelKeysDrawer({
 
         {apiKeys.length > 0 ? (
           <div className="credential-key-bulk">
-            <label className="check credential-key-bulk-all">
-              <input
-                type="checkbox"
+            <div className="check credential-key-bulk-all">
+              <CheckboxControl
+                aria-label={t("channels.keySelectAll")}
                 checked={allSelected}
                 disabled={pending}
                 onChange={toggleAll}
               />
               <span>{t("channels.keySelectAll")}</span>
-            </label>
+            </div>
             <span className="muted credential-key-bulk-count">
               {t("channels.keySelectedCount", { n: selected.size })}
             </span>
             <Button
               variant="quiet"
+              className="credential-key-test-button"
               icon={<HeartPulse size={14} />}
               disabled={pending || testingIds.size > 0 || deleteSelected.isPending}
               title={t("channels.keyTestHint")}
@@ -297,7 +293,7 @@ export function ChannelKeysDrawer({
             <Button
               variant="quiet"
               icon={<Trash2 size={14} />}
-              className="credential-key-bulk-delete"
+              className="credential-key-bulk-delete credential-key-delete-button"
               disabled={pending || selected.size === 0 || deleteSelected.isPending}
               onClick={() => setConfirmingBatch(true)}
             >
@@ -343,15 +339,14 @@ export function ChannelKeysDrawer({
                     .join(" ")}
                 >
                   <div className="credential-key-row-head">
-                    <label className="credential-key-select">
-                      <input
-                        type="checkbox"
+                    <span className="credential-key-select">
+                      <CheckboxControl
                         checked={selected.has(item.id)}
                         disabled={pending}
                         aria-label={t("channels.keySelectOne", { name: label })}
                         onChange={() => toggleSelected(item.id)}
                       />
-                    </label>
+                    </span>
                     <div className="credential-key-main">
                       <strong>{label}</strong>
                       <small>
@@ -395,18 +390,19 @@ export function ChannelKeysDrawer({
                           );
                         })}
                       </div>
-                      <label
+                      <HeroSwitch
                         className={`credential-key-status ${enabled ? "is-enabled" : "is-disabled"}`}
+                        isSelected={enabled}
+                        isDisabled={pending}
+                        onChange={(nextEnabled) => onToggleKey(item.id, nextEnabled)}
                       >
-                        <input
-                          type="checkbox"
-                          checked={enabled}
-                          disabled={pending}
-                          onChange={(event) => onToggleKey(item.id, event.target.checked)}
-                        />
-                        <span className="credential-key-status-dot" aria-hidden="true" />
-                        <span>{enabled ? t("common.enabled") : t("common.disabled")}</span>
-                      </label>
+                        <HeroSwitch.Content>
+                          <HeroSwitch.Control>
+                            <HeroSwitch.Thumb />
+                          </HeroSwitch.Control>
+                          {enabled ? t("common.enabled") : t("common.disabled")}
+                        </HeroSwitch.Content>
+                      </HeroSwitch>
                       <span className="credential-key-action-group">
                         {item.has_secret ? (
                           <HeroButton
@@ -553,7 +549,7 @@ export function ChannelKeysDrawer({
 
         <Field label={t("channels.apiKeyAdd")} hint={t("channels.apiKeyAddHint")}>
           <div className="credential-key-add-row">
-            <input
+            <HeroInput
               className="credential-key-name-input"
               value={apiKeyName}
               onChange={(e) => setApiKeyName(e.target.value)}
@@ -566,9 +562,8 @@ export function ChannelKeysDrawer({
                 }
               }}
             />
-            <textarea
+            <HeroTextArea
               className="credential-key-secret-input"
-              rows={2}
               spellCheck={false}
               autoComplete="off"
               value={apiKey}
@@ -588,7 +583,8 @@ export function ChannelKeysDrawer({
               }}
             />
             <Button
-              variant="secondary"
+              variant="primary"
+              className="credential-key-add-submit"
               disabled={pending || Boolean(addApiKeyPending) || pendingPaste.keys.length === 0}
               onClick={submitAdd}
             >
@@ -659,6 +655,6 @@ export function ChannelKeysDrawer({
           onConfirm={() => deleteSelected.mutate([...selected])}
         />
       ) : null}
-    </Drawer>
+    </Dialog>
   );
 }

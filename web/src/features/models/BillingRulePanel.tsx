@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "../../api/client";
-import { Button, Dialog, Empty, ErrorState, Field, Loading } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  Empty,
+  ErrorState,
+  Field,
+  Loading,
+  SelectControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
 import { formatUnitPrice, relativeTime } from "../../lib/format";
@@ -309,7 +318,6 @@ function BillingEditor({
   const [revision, setRevision] = useState(view.revision);
   const dirty = JSON.stringify(draft) !== baseline;
   const guardLeave = useUnsavedChanges(dirty);
-  const timezoneId = useId();
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -475,7 +483,7 @@ function BillingEditor({
             label={t("billing.state")}
             hint={t(scope === "member" ? "billing.inheritHint" : "billing.inheritHintModel")}
           >
-            <select
+            <SelectControl
               value={draft.state}
               onChange={(e) =>
                 setDraft({ ...draft, state: e.target.value as BillingRule["state"] })
@@ -488,12 +496,12 @@ function BillingEditor({
               <option value="explicit">
                 {t(scope === "member" ? "billing.explicit" : "billing.explicitModel")}
               </option>
-            </select>
+            </SelectControl>
           </Field>
           {draft.state === "explicit" ? (
             <>
               <Field label={t("billing.mode")}>
-                <select
+                <SelectControl
                   value={draft.mode}
                   onChange={(e) =>
                     setDraft({
@@ -506,13 +514,13 @@ function BillingEditor({
                   <option value="token">{t("billing.token")}</option>
                   <option value="request">{t("billing.request")}</option>
                   <option value="hybrid">{t("billing.hybrid")}</option>
-                </select>
+                </SelectControl>
               </Field>
               <div className="billing-rate-grid">
                 {draft.mode !== "request"
                   ? tokenFields.map((key, i) => (
                       <Field key={key} label={t(fieldLabels[i]!)}>
-                        <input
+                        <HeroInput
                           type="number"
                           min={0}
                           step="any"
@@ -536,7 +544,7 @@ function BillingEditor({
                   : null}
                 {draft.mode !== "token" ? (
                   <Field label={t("billing.fee")}>
-                    <input
+                    <HeroInput
                       type="number"
                       min={0}
                       step="any"
@@ -550,15 +558,10 @@ function BillingEditor({
             </>
           ) : null}
           <Field label={t("billing.timezone")}>
-            <input
+            <HeroInput
               value={draft.timezone}
               onChange={(e) => setDraft({ ...draft, timezone: e.target.value })}
-              list={timezoneId}
             />
-            <datalist id={timezoneId}>
-              <option value="UTC" />
-              <option value="Asia/Shanghai" />
-            </datalist>
           </Field>
           {draft.state === "explicit" ? (
             <details className="billing-advanced">

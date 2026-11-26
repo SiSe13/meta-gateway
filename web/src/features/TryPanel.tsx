@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
+import { Input as HeroInput, TextArea as HeroTextArea } from "@heroui/react";
 import { api } from "../api/client";
 import type { Route, RoutingCandidate } from "../api/types";
+import { SearchableSelect } from "../components/SearchableSelect";
 import { Button, Field, ErrorState } from "../components/ui";
 import { useI18n } from "../i18n";
 import { upstreamChoices } from "./models/routingPolicy";
@@ -99,29 +101,33 @@ export function TryPanel({
         <span>{multiUpstream ? t("try.hintMulti") : t("try.hint")}</span>
       </div>
       <Field label={t("common.model")}>
-        <input value={model} onChange={(e) => setModel(e.target.value)} className="mono" />
+        <HeroInput value={model} onChange={(e) => setModel(e.target.value)} className="mono" />
       </Field>
       {upstreams.length > 0 ? (
         <Field
           label={t("try.upstream")}
           hint={multiUpstream ? t("try.upstreamHintMulti") : t("try.upstreamHintOne")}
         >
-          <select
-            aria-label={t("try.upstream")}
-            value={memberId}
-            onChange={(e) => setMemberId(Number(e.target.value) || 0)}
-          >
-            <option value={0}>{t("try.upstreamAuto")}</option>
-            {upstreams.map((upstream) => (
-              <option key={upstream.memberId} value={upstream.memberId}>
-                {upstream.label}
-              </option>
-            ))}
-          </select>
+          <SearchableSelect
+            ariaLabel={t("try.upstream")}
+            value={String(memberId)}
+            options={[
+              { value: "0", label: t("try.upstreamAuto") },
+              ...upstreams.map((upstream) => ({
+                value: String(upstream.memberId),
+                label: upstream.label,
+              })),
+            ]}
+            onChange={(value) => setMemberId(Number(value) || 0)}
+          />
         </Field>
       ) : null}
       <Field label={t("try.prompt")}>
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+        <HeroTextArea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          aria-label={t("try.prompt")}
+        />
       </Field>
       {error ? <ErrorState error={error} /> : null}
       {!error && meta ? <div className="result-strip result-strip-info">{meta}</div> : null}

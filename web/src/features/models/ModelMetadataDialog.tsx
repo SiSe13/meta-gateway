@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
+import { SearchableSelect } from "../../components/SearchableSelect";
 import type { ModelMetadata } from "../../api/types";
 import { Button, Dialog, Field } from "../../components/ui";
 import { useI18n } from "../../i18n";
@@ -49,7 +51,7 @@ function ModelMetadataDialog({
     >
       <div className="meta-form">
         <Field label={t("modelsPage.metaCtx")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             step={1000}
@@ -59,7 +61,7 @@ function ModelMetadataDialog({
           />
         </Field>
         <Field label={t("modelsPage.metaInput")}>
-          <input
+          <HeroInput
             value={form.input_modalities}
             placeholder="text,image,audio"
             onChange={(e) => patch({ input_modalities: e.target.value })}
@@ -67,7 +69,7 @@ function ModelMetadataDialog({
           />
         </Field>
         <Field label={t("modelsPage.metaOutput")}>
-          <input
+          <HeroInput
             value={form.output_modalities}
             placeholder="text,audio"
             onChange={(e) => patch({ output_modalities: e.target.value })}
@@ -75,20 +77,19 @@ function ModelMetadataDialog({
           />
         </Field>
         <Field label={t("modelsPage.metaThinking")}>
-          <select
-            value={form.supports_thinking}
-            onChange={(e) => patch({ supports_thinking: Number(e.target.value) })}
+          <SearchableSelect
+            ariaLabel={t("modelsPage.metaThinking")}
+            value={String(form.supports_thinking)}
+            onChange={(value) => patch({ supports_thinking: Number(value) })}
             disabled={pending}
-          >
-            {thinkingOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={thinkingOptions.map((option) => ({
+              value: String(option.value),
+              label: option.label,
+            }))}
+          />
         </Field>
         <Field label={t("modelsPage.metaVendor")}>
-          <input
+          <HeroInput
             value={form.vendor}
             placeholder="DeepSeek, Google, OpenAI…"
             onChange={(e) => patch({ vendor: e.target.value })}
@@ -96,7 +97,7 @@ function ModelMetadataDialog({
           />
         </Field>
         <Field label={t("modelsPage.metaNotes")}>
-          <input
+          <HeroInput
             value={form.notes}
             onChange={(e) => patch({ notes: e.target.value })}
             disabled={pending}

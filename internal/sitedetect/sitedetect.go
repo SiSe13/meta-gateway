@@ -125,7 +125,8 @@ func compatHeaderRegex(header string) *regexp.Regexp {
 	return regexp.MustCompile(`(?i)\b` + pattern + `\b`)
 }
 
-// Detect runs the full chain against baseURL with a short overall budget.
+// Detect runs the full chain against baseURL. Network probes run concurrently
+// under one short deadline so a slow landing page cannot stall type detection.
 func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 12 * time.Second}
@@ -150,9 +151,53 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 		return result, nil
 	}
 
-	// ② Root page <title>.
-	title, err := fetchTitle(ctx, client, baseURL)
-	if err == nil && title != "" {
+	// ②–④ These probes are independent. Running them serially made an unknown
+	// relay wait for three network round-trips, and the shared outbound client
+	// intentionally has no global timeout. Bound the whole detection and keep
+	// the same evidence priority when interpreting their responses below.
+	probeCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	type probeResult struct {
+		kind   string
+		title  string
+		body   []byte
+		status int
+		err    error
+	}
+	probes := make(chan probeResult, 3)
+	go func() {
+		title, err := fetchTitle(probeCtx, client, baseURL)
+		probes <- probeResult{kind: "title", title: title, err: err}
+	}()
+	go func() {
+		body, status, err := fetch(probeCtx, client, baseURL+"/api/v1/auth/me")
+		probes <- probeResult{kind: "sub2api", body: body, status: status, err: err}
+	}()
+	go func() {
+		body, status, err := fetch(probeCtx, client, baseURL+"/api/user/self")
+		probes <- probeResult{kind: "new-api", body: body, status: status, err: err}
+	}()
+	var title string
+	var authMeBody, userSelfBody []byte
+	var authMeStatus, userSelfStatus int
+	var authMeErr, userSelfErr error
+	for received := 0; received < 3; {
+		select {
+		case probe := <-probes:
+			received++
+			switch probe.kind {
+			case "title":
+				title = probe.title
+			case "sub2api":
+				authMeBody, authMeStatus, authMeErr = probe.body, probe.status, probe.err
+			case "new-api":
+				userSelfBody, userSelfStatus, userSelfErr = probe.body, probe.status, probe.err
+			}
+		case <-probeCtx.Done():
+			received = 3
+		}
+	}
+	if title != "" {
 		result.Title = title
 		for _, rule := range rules {
 			if rule.regex.MatchString(title) {
@@ -184,12 +229,12 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 	//
 	// A bare 401 on this path is explicitly NOT enough: measured, DeepSeek answers
 	// plain text "Authentication Fails (governor)" and used to be labelled sub2api.
-	if body, status, err := fetch(ctx, client, baseURL+"/api/v1/auth/me"); err == nil && status == http.StatusUnauthorized {
+	if authMeErr == nil && authMeStatus == http.StatusUnauthorized {
 		var authMe struct {
 			Code    json.RawMessage `json:"code"`
 			Message string          `json:"message"`
 		}
-		if jsonErr := json.Unmarshal(body, &authMe); jsonErr == nil && len(authMe.Code) > 0 && authMe.Message != "" {
+		if jsonErr := json.Unmarshal(authMeBody, &authMe); jsonErr == nil && len(authMe.Code) > 0 && authMe.Message != "" {
 			result.Family = "sub2api"
 			result.SiteType = "SUB2API"
 			result.Evidence = "sub2api-endpoint"
@@ -198,9 +243,8 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 	}
 
 	// ④ New-API family: /api/user/self auth error text + compat header names.
-	body, status, err := fetch(ctx, client, baseURL+"/api/user/self")
-	if err == nil && (status == http.StatusUnauthorized || status == http.StatusForbidden) {
-		msg := string(body)
+	if userSelfErr == nil && (userSelfStatus == http.StatusUnauthorized || userSelfStatus == http.StatusForbidden) {
+		msg := string(userSelfBody)
 		lower := strings.ToLower(msg)
 		// ④a Compat-header reverse inference: white-label forks reference
 		// their own user-id header in the error message (AAH step 4).
@@ -235,12 +279,12 @@ func Detect(ctx context.Context, client *http.Client, baseURL string) (*Result, 
 		// (governor)`. That rule labelled Zhipu as `new-api`, and because the
 		// connection dialog applied detection on blur it silently replaced an
 		// operator's explicit "智谱 GLM" pick — and its correct preset base URL.
-		if status == http.StatusUnauthorized {
+		if userSelfStatus == http.StatusUnauthorized {
 			var envelope struct {
 				Success *bool  `json:"success"`
 				Message string `json:"message"`
 			}
-			if jsonErr := json.Unmarshal(body, &envelope); jsonErr == nil && envelope.Success != nil && envelope.Message != "" {
+			if jsonErr := json.Unmarshal(userSelfBody, &envelope); jsonErr == nil && envelope.Success != nil && envelope.Message != "" {
 				result.Family = "new-api"
 				result.SiteType = "NEW_API"
 				result.Evidence = "user-self-401"

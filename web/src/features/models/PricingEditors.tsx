@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { InfoTip, Button } from "../../components/ui";
 import { useI18n } from "../../i18n";
 import type { PriceTier, PriceWindow } from "../../api/types";
@@ -178,7 +178,7 @@ export function PriceTiersEditor({
         <div className="pricing-row pricing-row-tier" key={index}>
           <label>
             <span>{t("pricing.tierCeiling")}</span>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step={1}
@@ -192,7 +192,7 @@ export function PriceTiersEditor({
           </label>
           <label>
             <span>{t(displayScale === 1000 ? "billing.input" : "pricing.tierPrompt")}</span>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step="any"
@@ -205,7 +205,7 @@ export function PriceTiersEditor({
           </label>
           <label>
             <span>{t(displayScale === 1000 ? "billing.output" : "pricing.tierCompletion")}</span>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step="any"
@@ -218,7 +218,7 @@ export function PriceTiersEditor({
           </label>
           <label>
             <span>{t(displayScale === 1000 ? "billing.cacheRead" : "pricing.tierCache")}</span>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step="any"
@@ -231,7 +231,7 @@ export function PriceTiersEditor({
           </label>
           <label>
             <span>{t("pricing.tierPerRequest")}</span>
-            <input
+            <HeroInput
               type="number"
               min={0}
               step="any"
@@ -299,7 +299,7 @@ export function PriceWindowsEditor({
           <div className="pricing-row pricing-row-window">
             <label>
               <span>{t("pricing.windowFrom")}</span>
-              <input
+              <HeroInput
                 type="number"
                 min={0}
                 max={23}
@@ -310,7 +310,7 @@ export function PriceWindowsEditor({
             </label>
             <label>
               <span>{t("pricing.windowTo")}</span>
-              <input
+              <HeroInput
                 type="number"
                 min={0}
                 max={23}
@@ -321,7 +321,7 @@ export function PriceWindowsEditor({
             </label>
             <label>
               <span>{t("pricing.windowMultiplier")}</span>
-              <input
+              <HeroInput
                 type="number"
                 min={0.000001}
                 max={1000}

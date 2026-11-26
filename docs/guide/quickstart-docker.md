@@ -6,7 +6,7 @@
 # docker-compose.yml
 services:
   meta-gateway:
-    image: zichuanlan/meta-gateway:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:-sise13/meta-gateway}:${IMAGE_TAG:-latest}
     container_name: meta-gateway
     restart: unless-stopped
     ports:
@@ -14,7 +14,6 @@ services:
     volumes:
       - ./data:/data
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN required}
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY 32-char required}
       METRICS_TOKEN: ${METRICS_TOKEN:-mg-metrics-secret}
 ```
@@ -24,24 +23,22 @@ services:
 ## 生成密钥并启动
 
 ```bash
-export ADMIN_TOKEN=$(openssl rand -hex 16)
 export MASTER_KEY=$(openssl rand -hex 16)   # 32 字符加密主密钥
 docker compose up -d
 ```
 
-启动后访问 `http://localhost:4100/console/`，输入 `ADMIN_TOKEN` 进入控制台。
+启动后访问 `http://localhost:4100/console/`，按服务端启动日志中的一次性初始化码设置站长账号和密码。
 
 ## 单行 docker run
 
 ```bash
 docker run -d --name meta-gateway \
   -p 4100:4100 \
-  -e ADMIN_TOKEN=your-secure-admin-token \
   -e MASTER_KEY=your-32-char-encryption-key-here!! \
   -e SELFUPDATE_TRACK_TAG=latest \
   -v ./data:/data \
   --restart unless-stopped \
-  zichuanlan/meta-gateway:latest
+  sise13/meta-gateway:latest
 ```
 
 > [!NOTE]
@@ -50,11 +47,11 @@ docker run -d --name meta-gateway \
 > 用 `docker run` 部署时它不会自动存在，**建议带上**；否则控制台会误以为你还没应用部署文件而弹一次提示
 > （提示可以“稍后”关掉，不影响使用）。
 
-## 三个必填项
+## 启动配置
 
 | 变量 | 作用 | 注意 |
 | --- | --- | --- |
-| `ADMIN_TOKEN` | 控制台管理员登录口令 | **不是** `METRICS_TOKEN`；两者不要复用 |
+| `ADMIN_TOKEN` | 旧版部署兼容口令 | 可省略；新部署首次访问控制台时用启动日志中的初始化码创建站长账号 |
 | `MASTER_KEY` | 凭证库 AES-GCM 主密钥 | **必须 ≥ 32 字符**；丢了就再也解不开已存的凭据与 cookie |
 | `METRICS_TOKEN` | Prometheus `/metrics` 抓取凭据 | 可留空，但留空后 `/metrics` 需要 `TRUSTED_SCRAPER_CIDRS` 才可访问 |
 

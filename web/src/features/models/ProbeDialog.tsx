@@ -1,5 +1,5 @@
 import { Play, Search, Square } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput, TextArea as HeroTextArea } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
@@ -327,7 +327,7 @@ export function ProbeDialog({ onClose }: { onClose: () => void }) {
 
       <label className="field">
         <span>{t("modelsPage.probe.prompt")}</span>
-        <textarea
+        <HeroTextArea
           className="probe-prompt"
           rows={2}
           disabled={running}
@@ -341,7 +341,7 @@ export function ProbeDialog({ onClose }: { onClose: () => void }) {
       <div className="field-row">
         <label className="field">
           <span>{t("modelsPage.probe.maxTokens")}</span>
-          <input
+          <HeroInput
             type="number"
             min={1}
             max={256}
@@ -353,7 +353,7 @@ export function ProbeDialog({ onClose }: { onClose: () => void }) {
         </label>
         <label className="field">
           <span>{t("modelsPage.probe.concurrency")}</span>
-          <input
+          <HeroInput
             type="number"
             min={1}
             max={16}
@@ -365,7 +365,7 @@ export function ProbeDialog({ onClose }: { onClose: () => void }) {
         </label>
         <label className="field">
           <span>{t("modelsPage.probe.autoDisable")}</span>
-          <input
+          <HeroInput
             type="number"
             min={0}
             max={10}
@@ -552,7 +552,7 @@ function PickList({
 
       <div className="probe-search">
         <Search size={13} />
-        <input
+        <HeroInput
           type="search"
           value={query}
           disabled={disabled}
@@ -601,7 +601,7 @@ function PickList({
         ) : (
           visible.map((option) => (
             <label className="check probe-picker-item" key={option.value}>
-              <input
+              <HeroInput
                 type="checkbox"
                 disabled={disabled}
                 checked={selected.includes(option.value)}

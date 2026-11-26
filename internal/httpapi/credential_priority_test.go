@@ -146,3 +146,49 @@ func TestCredentialListReportsPriorityAndModels(t *testing.T) {
 		t.Fatalf("status-only update reset the tier: %v", updated)
 	}
 }
+
+func TestCreateCredentialSkipsDuplicateAPIKeyForSameSite(t *testing.T) {
+	srv, db, _ := revealTestServer(t)
+	status, site, _ := adminCall(t, srv.URL, "POST", "/admin/sites", map[string]any{
+		"name": "duplicate-key", "base_url": "https://up.example", "platform": "new-api",
+		"status": "enabled",
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create site status %d", status)
+	}
+	siteID := int64(site["id"].(float64))
+	path := fmt.Sprintf("/admin/sites/%d/credentials", siteID)
+	status, first, _ := adminCall(t, srv.URL, "POST", path, map[string]any{
+		"kind": "api_key", "secret": "same-key", "status": "enabled",
+		"meta_json": `{"name":"original"}`, "priority": domain.CredentialPriorityPreferred,
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create first credential status %d", status)
+	}
+
+	status, duplicate, _ := adminCall(t, srv.URL, "POST", path, map[string]any{
+		"kind": "api_key", "secret": "same-key", "status": "enabled",
+		"meta_json": `{"name":"new label"}`, "priority": domain.CredentialPriorityBackup,
+	})
+	if status != http.StatusOK || duplicate["duplicate"] != true {
+		t.Fatalf("duplicate create status=%d body=%v, want 200 with duplicate marker", status, duplicate)
+	}
+	if duplicate["id"] != first["id"] || duplicate["meta_json"] != `{"name":"original"}` || duplicate["priority"] != float64(domain.CredentialPriorityPreferred) {
+		t.Fatalf("duplicate should preserve the existing credential: first=%v duplicate=%v", first, duplicate)
+	}
+	credentials, err := db.Credential.ListBySite(siteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 1 {
+		t.Fatalf("credential count = %d, want 1", len(credentials))
+	}
+
+	// Other credential kinds are intentionally outside API Key deduplication.
+	status, _, _ = adminCall(t, srv.URL, "POST", path, map[string]any{
+		"kind": "access_token", "secret": "same-key", "status": "enabled",
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("same text under another credential kind status %d, want %d", status, http.StatusCreated)
+	}
+}

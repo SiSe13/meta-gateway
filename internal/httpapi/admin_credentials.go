@@ -108,6 +108,34 @@ func (h *AdminHandler) createCredential(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "secret or cookie is required")
 		return
 	}
+	// 同一站点的 API Key 使用相同明文时复用已有记录，避免重复加入中继池。
+	// 只对 api_key 去重，账户令牌、Cookie 等凭据允许与 API Key 具有相同文本。
+	if strings.EqualFold(strings.TrimSpace(req.Kind), "api_key") && req.Secret != "" {
+		existing, listErr := h.db.Credential.ListBySite(siteID)
+		if listErr != nil {
+			writeStoreError(w, listErr)
+			return
+		}
+		for _, candidate := range existing {
+			if !strings.EqualFold(strings.TrimSpace(candidate.Kind), "api_key") || len(candidate.SecretEnc) == 0 {
+				continue
+			}
+			plain, decryptErr := h.enc.Decrypt(string(candidate.SecretEnc))
+			if decryptErr != nil || string(plain) != req.Secret {
+				continue
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"id": candidate.ID, "site_id": candidate.SiteID, "kind": candidate.Kind,
+				"auth_mode": normalizeCredentialAuthMode(candidate.AuthMode),
+				"has_secret": true, "has_cookie": len(candidate.CookieEnc) > 0,
+				"meta_json": candidate.MetaJSON, "status": candidate.Status,
+				"checkin_enabled": candidate.CheckinEnabled, "models_csv": candidate.ModelsCSV,
+				"priority": candidate.Priority, "created_at": candidate.CreatedAt,
+				"duplicate": true,
+			})
+			return
+		}
+	}
 	var encSecret, encCookie string
 	var err error
 	if req.Secret != "" {

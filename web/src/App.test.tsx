@@ -122,6 +122,7 @@ function stubAdminFetch(
     routes?: unknown[];
     mode?: { mode: string; has_owner: boolean; role: string };
     oauth?: { id: string; label: string }[];
+    setupRequired?: boolean;
     /** Whether the sign-in page should offer the upgrade entry (the admin
      *  token still works as a password). Defaults to on, which is the state an
      *  upgrading deployment is in. */
@@ -131,6 +132,8 @@ function stubAdminFetch(
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input).split("?")[0];
     const method = init?.method ?? "GET";
+    if (path === "/admin/setup/status")
+      return jsonResponse({ required: overrides.setupRequired ?? false });
     // The public options document: the CSRF cookie the invitation and
     // recovery POSTs post against, plus the configured providers.
     if (path === "/auth/options") {
@@ -232,6 +235,7 @@ describe("channel-first shell", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const path = String(input);
         requests.push(path);
+        if (path === "/admin/setup/status") return jsonResponse({ required: false });
         if (path === "/admin/session")
           return jsonResponse({ user: { role: "member" }, csrf: "test-csrf" });
         if (path.includes("display-settings")) return jsonResponse({ symbol: "$", rate: 1 });
@@ -247,10 +251,26 @@ describe("channel-first shell", () => {
     await flushAsyncWork();
     expect(document.querySelector(".gateway-transition")).toBeNull();
     expect(
-      requests.filter((path) => path.startsWith("/admin/") && path !== "/admin/session"),
+      requests.filter(
+        (path) =>
+          path.startsWith("/admin/") && path !== "/admin/session" && path !== "/admin/setup/status",
+      ),
     ).toEqual([]);
     expect(localStorage.getItem("meta-gateway.admin-token")).toBeNull();
     expect(document.querySelector(".deck-telemetry, .console-health")).toBeNull();
+  });
+
+  it("asks for a one-time setup code and creates the administrator on first launch", async () => {
+    vi.stubGlobal("fetch", stubAdminFetch({ setupRequired: true, upgradeLogin: false }));
+    renderApp(["/"]);
+
+    expect(await screen.findByLabelText("One-time setup code")).toBeInTheDocument();
+    expect(screen.getByLabelText("Username")).toHaveValue("admin");
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+    expect(screen.getByLabelText("Confirm new password")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Set up administrator and open console" }),
+    ).toBeDisabled();
   });
 
   it("hides account navigation for deployment admins and redirects account bookmarks", async () => {
@@ -562,14 +582,14 @@ describe("channel-first shell", () => {
 
     cleanup();
     renderApp(["/settings"]);
-    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Settings" })).not.toBeInTheDocument();
     expect(
       document.querySelector('.console-navigation a[href="/console/settings?tab=runtime"]'),
     ).toBeInTheDocument();
 
     cleanup();
     renderApp(["/backups"]);
-    expect(await screen.findByRole("heading", { name: "Backups" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Database backups" })).toBeInTheDocument();
   });
 
   it("routes the console on the data-router shape main.tsx ships", async () => {
@@ -622,6 +642,37 @@ describe("channel-first shell", () => {
     expect(fetcher.mock.calls.some(([path]) => String(path).includes("/model-pricing"))).toBe(
       false,
     );
+  });
+
+  it("restores the model named in the URL before the tab's older selection", async () => {
+    localStorage.setItem("meta-gateway.admin-token", "admin-layout-token");
+    sessionStorage.setItem("models.selected", JSON.stringify(1));
+    vi.stubGlobal(
+      "fetch",
+      stubAdminFetch({
+        routes: Array.from({ length: 5 }, (_, index) => {
+          const id = index + 1;
+          return {
+            route: {
+              id,
+              model_pattern: `model-${id}`,
+              enabled: true,
+              routing_mode: "auto",
+              model_group: "default",
+            },
+            members: [],
+          };
+        }),
+      }),
+    );
+
+    renderApp(["/models?route=5"]);
+    await screen.findByRole("heading", { level: 2, name: "model-5" });
+    await waitFor(() => {
+      expect(
+        document.querySelector(".model-directory-table tr.is-selected strong")?.textContent,
+      ).toBe("model-5");
+    });
   });
 
   it("opens the plugin page from a plugin-answered model row", async () => {

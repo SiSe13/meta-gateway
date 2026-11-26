@@ -18,8 +18,10 @@ cd web && npm ci && npm run build && cd ..
 go build -o bin/meta-gateway ./cmd/server
 
 # 启动开发环境
-ADMIN_TOKEN=test MASTER_KEY=test-key-32-chars-long!!!!!!! METRICS_TOKEN=test ./bin/meta-gateway
+MASTER_KEY=test-key-32-chars-long!!!!!!! METRICS_TOKEN=test ./bin/meta-gateway
 ```
+
+首次启动后从服务端日志读取一次性初始化码，在控制台创建站长账号和密码。只有需要验证旧部署兼容登录时才设置 `ADMIN_TOKEN`。
 
 ## 提交规范
 

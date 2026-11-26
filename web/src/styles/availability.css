@@ -370,6 +370,8 @@
 }
 .observation-toggle {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 36px;
   padding: 5px 10px;
   border: 1px solid var(--line);
@@ -408,8 +410,9 @@
   box-shadow: inset 0 0 0 3px var(--primary-soft);
 }
 .site-observation-workspace .observation-switches {
+  align-items: center;
   gap: 8px;
-  margin: 0 0 16px;
+  margin: 12px 0 16px;
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 11px;

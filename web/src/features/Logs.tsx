@@ -1175,6 +1175,26 @@ export function LogsView({
                 {t("common.clearFilters")}
               </Button>
             )}
+            <div className="log-quick-filters">
+              <div className="log-filter-switches">
+                <HeroSwitch
+                  className="log-filter-toggle"
+                  isSelected={failedOnly}
+                  aria-label={t("logsPage.failedOnly")}
+                  onChange={(selected) => setFilter({ status: selected ? "failed" : null })}
+                >
+                  <HeroSwitch.Content>{t("logsPage.failedOnly")}</HeroSwitch.Content>
+                </HeroSwitch>
+                <HeroSwitch
+                  className="log-filter-toggle"
+                  isSelected={slowOnly}
+                  aria-label={t("logsPage.slowOnly")}
+                  onChange={setSlowOnly}
+                >
+                  <HeroSwitch.Content>{t("logsPage.slowOnly")}</HeroSwitch.Content>
+                </HeroSwitch>
+              </div>
+            </div>
             <div
               className="log-exact-filters"
               id="proxy-log-exact-filters"
@@ -1208,26 +1228,6 @@ export function LogsView({
               </div>
             </div>
           </form>
-          <div className="log-quick-filters">
-            <div className="log-filter-switches">
-              <HeroSwitch
-                className="log-filter-toggle"
-                isSelected={failedOnly}
-                aria-label={t("logsPage.failedOnly")}
-                onChange={(selected) => setFilter({ status: selected ? "failed" : null })}
-              >
-                <HeroSwitch.Content>{t("logsPage.failedOnly")}</HeroSwitch.Content>
-              </HeroSwitch>
-              <HeroSwitch
-                className="log-filter-toggle"
-                isSelected={slowOnly}
-                aria-label={t("logsPage.slowOnly")}
-                onChange={setSlowOnly}
-              >
-                <HeroSwitch.Content>{t("logsPage.slowOnly")}</HeroSwitch.Content>
-              </HeroSwitch>
-            </div>
-          </div>
 
           <EntityState
             isLoading={logs.isPending}

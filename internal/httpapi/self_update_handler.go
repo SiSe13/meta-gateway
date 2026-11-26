@@ -95,6 +95,8 @@ func (h *SelfUpdateHandler) apply(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusConflict
 		case errors.Is(err, selfupdate.ErrTrackMismatch):
 			status = http.StatusConflict
+		case errors.Is(err, selfupdate.ErrForeignImage):
+			status = http.StatusConflict
 		case errors.Is(err, selfupdate.ErrNoContainer):
 			status = http.StatusConflict
 		}

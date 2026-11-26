@@ -37,7 +37,7 @@ export const en: Dict = {
   "billing.reason.range_exceeded": "Estimate out of range",
   "billing.reload": "Reload rule",
   "billing.title": "Charge settings · {name}",
-  "billing.open": "Charge settings",
+  "billing.open": "Model billing rules",
   "billing.description":
     "A price set here only affects later requests; changing it never rewrites past bills.",
   "billing.currentPrice": "Charging now: {rates}",
@@ -533,7 +533,7 @@ export const en: Dict = {
   "actions.danger": "Destructive actions",
   "actions.accountUnavailable":
     "Account details are unavailable. Wait for them to load or verify the account again.",
-  "modelsPage.tools": "More tools",
+  "modelsPage.tools": "Model management",
   "modelsPage.tools.capabilitiesHint":
     "Set capability tags used by the console and routing features.",
   "modelsPage.tools.aggregatesHint": "Expose several upstream models under one new public name.",
@@ -710,14 +710,19 @@ export const en: Dict = {
   "operator.confirmNewPassword": "Confirm new password",
   "operator.passwordMismatch": "The two passwords do not match.",
   "operator.confirmToken": "Current deployment token (ADMIN_TOKEN)",
+  "operator.currentPassword": "Current password",
   "operator.confirmTokenHint":
-    "To confirm it is you: the deployment's ADMIN_TOKEN, plus the verification code when two-factor is enabled.",
+    "To confirm it is you: enter the current administrator password, plus the verification code when two-factor is enabled.",
   "operator.claimSubmit": "Set up the account",
   "operator.claimed":
     "The administrator account is active. Sign in with the new username and password from now on.",
   "operator.saveFailed":
     "Save failed. Check username availability, deployment token and verification code.",
   "operator.loadFailed": "Unable to read administrator settings. Please retry.",
+  "setup.firstRunHint":
+    "Set up the administrator account on first launch. The one-time setup code is in the server startup log.",
+  "setup.code": "One-time setup code",
+  "setup.createOwner": "Set up administrator and open console",
   "operator.later": "Set up later",
   "updates.timeout":
     "Update completion was not confirmed in time. Check container health and logs before retrying.",
@@ -963,7 +968,7 @@ export const en: Dict = {
   "dashboard.hoursAgo": "{n}h ago",
   "dashboard.daysAgo": "{n}d ago",
   "app.connect.title": "Meta Gateway",
-  "app.connect.subtitle": "Use ADMIN_TOKEN to open the multi-channel relay console.",
+  "app.connect.subtitle": "Sign in with your owner account to manage the gateway.",
   "app.connect.token": "Admin token",
   "app.connect.adminTab": "Administrator",
   "app.connect.memberTab": "Member account",
@@ -985,7 +990,7 @@ export const en: Dict = {
   "app.nav.logs": "Proxy logs",
   "app.nav.systemLogs": "System logs",
   "app.nav.checkins": "Check-in",
-  "app.nav.exchange": "Exchange",
+  "app.nav.exchange": "Import / Export",
   "app.nav.store": "Extensions",
   "app.nav.open": "Open navigation",
   "app.nav.close": "Close navigation",
@@ -1120,6 +1125,7 @@ export const en: Dict = {
   "channels.quickDetails": "Details",
   "channels.used": "Used",
   "channels.checkinColumn": "Check-in",
+  "channels.userCredentialSettings": "Account credential",
   "channels.checkinEnabled": "Enabled",
   "channels.checkinDisabled": "Not enabled",
   "channels.quickRefresh": "Refresh",
@@ -1187,7 +1193,7 @@ export const en: Dict = {
   "channels.editSecretPlaceholder": "Type a new value to replace it; clearing the field removes it",
   "channels.userToken": "User access token",
   "channels.userTokenHint":
-    "New API / site login token. Used for check-in and /api/user/*. Leave blank to keep current.",
+    "Site account login token for account features such as check-in. Leave blank to keep current.",
   "channels.priorityHint":
     "Connection-level default order; higher numbers are tried first. A model with independent priority no longer follows this value.",
   "channels.weightHint":
@@ -1364,6 +1370,8 @@ export const en: Dict = {
   "channels.apiKeyPasteCount": "{n} key(s) ready to add",
   "channels.apiKeyPasteDuplicates": "{n} duplicate(s) removed",
   "channels.apiKeyPasteAdded": "{n} submitted",
+  "channels.apiKeyDuplicateSkipped":
+    "This API key already exists; skipped and kept the existing settings",
 
   "channels.editBaseUrlInherited":
     "This connection uses the site base URL. Saving updates the site URL for this upstream.",
@@ -1372,10 +1380,20 @@ export const en: Dict = {
   "channels.checkinMasterAutoOn":
     "Also turned on the check-in master switch, or this account would never be checked in.",
   "channels.checkinRun": "Check in now",
+  "channels.checkinSettings": "Check-in settings",
   "channels.checkinSection": "Check-in",
+  "channels.checkinPath": "Check-in endpoint path",
+  "channels.checkinPathHint":
+    "Default: {path}. Enter a path on this site only; change it to match the site's actual endpoint.",
+  "channels.checkinPathInvalid":
+    "Enter a site-relative path beginning with /; do not include a host, query, or fragment.",
+  "channels.checkinMethod": "Request method",
+  "channels.checkinMethodHint":
+    "POST is used by default. Choose GET only if the site's check-in endpoint requires it.",
+  "channels.checkinMethodDefault": "Default (POST)",
   "channels.checkinLogs": "Logs",
   "channels.checkinNeedsUserCredential":
-    "Fill in an Access Token or Cookie above to enable daily check-in for this connection.",
+    "Enter the site account Access Token or Cookie to enable daily check-in.",
   "channels.checkinScheduledHint":
     "This credential checks in daily on the schedule set in the Check-in page.",
   "channels.checkinOffHint": "Scheduled check-in is off for this credential.",
@@ -1396,9 +1414,15 @@ export const en: Dict = {
   "channels.createKey": "Create API key",
   "channels.createKeyTitle": "Create API key",
   "channels.createKeyHint": "Create a new API key on",
+  "channels.createKeyPurpose":
+    "The new key is saved in this site's credentials so the gateway can call its models. Groups come from this site; only returned groups can be selected.",
   "channels.createKeyGroup": "Token group",
-  "channels.createKeyGroupHint": "Pick a group from the upstream account, or type a new one.",
+  "channels.createKeyGroupHint":
+    "This is a token group on the upstream site, not a downstream gateway token group.",
   "channels.createKeyGroupPlaceholder": "Select group…",
+  "channels.createKeyGroupsLoading": "Loading token groups from this site…",
+  "channels.createKeyGroupsEmpty":
+    "This site returned no available groups, so API key creation is unavailable.",
   "channels.createKeyGroupsUnavailable":
     "Could not fetch token groups from the upstream. The connection may be unreachable or the token invalid — creation is disabled until the connection is restored.",
   "channels.createKeyConfirm": "Create",
@@ -1434,7 +1458,13 @@ export const en: Dict = {
   "channels.accountState.unknown": "Not checked",
   "channels.balance": "Balance",
   "channels.balanceUsed": "Balance / Used",
-  "channels.balanceHint": "Converted to site currency via the site's quota_per_unit.",
+  "channels.balanceHint":
+    "Fetched immediately after saving account credentials, then refreshed on the cadence set in Runtime Settings → Health Checks. Converted via the site's quota_per_unit.",
+  "channels.balanceRefreshDelayed":
+    "Credentials were saved, but balance refresh did not start. The page will retry on its next check.",
+  "channels.balanceUnavailable": "Not fetched",
+  "channels.balanceUnavailableHint":
+    "No site balance has been returned yet. Click the row’s ⋯ menu → Account credential to set a valid user Access Token/Cookie. Balance lookup is unavailable for API-key-only setups or sites without a balance endpoint.",
   "channels.balanceTotal": "of {total}",
   "channels.modelsTitle": "Models",
   "channels.healthTitle": "Health (24h)",
@@ -1457,7 +1487,8 @@ export const en: Dict = {
     "Access Token and Cookie are account credentials; API keys are for model sync and relay.",
   "channels.userTokenPresentHint":
     "User token is stored (shown masked). Type a new value to rotate it, or clear the field to remove it.",
-  "channels.userTokenEmptyPlaceholder": "Paste access_token for account/check-in",
+  "channels.userTokenEmptyPlaceholder":
+    "Paste the access_token used to read account details and balance",
   "channels.userCookie": "User Cookie",
   "channels.userCookieHint":
     "Optional session Cookie for account GET endpoints when Access Token is unavailable.",
@@ -1561,7 +1592,7 @@ export const en: Dict = {
     "Per-model billing; the serving route member's own price takes precedence. Cache-read 0 uses the input price. Prices are stored in USD; display currency changes presentation only.",
   "modelsPage.metaNotes": "Notes",
   "modelsPage.missingModels": "{count} channel-exposed models are not covered by any route",
-  "modelsPage.missingModelsFocus": "Show first",
+  "modelsPage.missingModelsFocus": "Filter missing models",
   "modelsPage.detailKicker": "Model",
   "modelsPage.emptyKicker": "GET STARTED",
   "modelsPage.emptyTitle": "Sync models from a connection",
@@ -1578,7 +1609,7 @@ export const en: Dict = {
   "modelsPage.selectHint": "Select a model to edit its route, members, and model-level overrides.",
   "modelsPage.scopeHint":
     "Changes here affect the selected model. Connection priority and weight remain defaults.",
-  "modelsPage.probe.action": "Probe models",
+  "modelsPage.probe.action": "Test channel model access",
   "modelsPage.probe.actionHint":
     "Send a real request to the selected channels and models to see which ones actually answer",
   "modelsPage.probe.title": "Model probing",
@@ -1822,11 +1853,11 @@ export const en: Dict = {
   "modelsPage.probe.colStatus": "Status",
   "modelsPage.probe.colLatency": "Latency",
   "modelsPage.probe.colError": "Error",
-  "modelsPage.unify.action": "Unify names",
+  "modelsPage.unify.action": "Standardize model names",
   "modelsPage.pin": "Pin to top",
   "modelsPage.unpin": "Unpin",
   "modelsPage.pinnedBadge": "Pinned",
-  "modelsPage.aggregates.action": "Aggregate models",
+  "modelsPage.aggregates.action": "Combine upstream models",
   "modelsPage.aggregates.title": "Aggregate models",
   "modelsPage.aggregates.intro":
     "Fan several existing models out under one new public name: clients call only the aggregate, and the gateway forwards each member's own upstream model name (the original names keep working). Members route, fail over and bill exactly like ordinary route members.",
@@ -1889,7 +1920,7 @@ export const en: Dict = {
     "Created {routes} route(s) and {members} member(s); {skipped} already present; deleted {deleted} original name(s).",
   "modelsPage.unify.showCovered": "Show {count} covered channel(s)",
   "modelsPage.unify.collapseCovered": "Collapse covered",
-  "modelsPage.unify.history.action": "Unify history",
+  "modelsPage.unify.history.action": "Name cleanup history",
   "modelsPage.unify.history.actionHint":
     "Review applied unifications — revert a whole group or rebuild a single deleted name",
   "modelsPage.unify.history.title": "Unify history",
@@ -1931,8 +1962,8 @@ export const en: Dict = {
   "modelsPage.bulkSelected": "{n} routes selected",
   "modelsPage.bulkSelectPage": "Select page",
   "modelsPage.bulkSelectOne": "Select {model}",
-  "modelsPage.bulkEnableSelected": "Enable selected",
-  "modelsPage.bulkDisableSelected": "Disable selected",
+  "modelsPage.bulkEnableSelected": "Enable selected routes",
+  "modelsPage.bulkDisableSelected": "Disable selected routes",
   "modelsPage.bulkDeleteSelected": "Delete selected",
   "modelsPage.bulkDeleteConfirm":
     "Delete the {n} selected model routes? Their member bindings are removed too. This cannot be undone.",
@@ -1956,7 +1987,7 @@ export const en: Dict = {
     "Refreshing the model list is the sync; auto mode wires routes for you, manual mode asks you to adopt each model.",
   "modelsPage.rowActionsHint":
     "Use the row action menu to test, enable, inspect logs, or edit this model.",
-  "modelsPage.autoMatchAdd": "Auto-attach",
+  "modelsPage.autoMatchAdd": "Add available channels to this model",
   "modelsPage.autoMatchAddHint":
     "Scan every enabled channel and attach the ones that really serve this model to the current group, in one step.",
   "modelsPage.autoMatch.title": "Attach every channel serving this model",
@@ -2244,8 +2275,6 @@ export const en: Dict = {
   "logsPage.title": "Logs",
   "logsPage.systemTitle": "System logs",
   "logsPage.systemDescription": "Administrative actions and security audit events.",
-  "systemLogs.guide":
-    "This page records administrative actions: who did what, to which object, and whether the request succeeded. The HTTP status explains the request result; the last column gives the failure reason. Success means the admin request was handled, not that the related channel or model is currently available.",
   "systemLogs.cleanupButton": "Clean up logs now",
   "systemLogs.cleanupTitle": "Clean up expired system logs",
   "systemLogs.cleanupMessage":
@@ -2383,7 +2412,7 @@ export const en: Dict = {
     "Send a /v1 request and its routing and channel choice appear here in real time; in-flight requests can be interrupted.",
   "maintain.kicker": "Settings",
 
-  "try.open": "Try",
+  "try.open": "Test model",
   "try.title": "Try chat completion",
   "try.hint":
     "Sends one non-streaming chat through gateway routing for this model. No client token needed — uses your admin session.",
@@ -2402,7 +2431,7 @@ export const en: Dict = {
   "try.viaChannel": "via {name} (#{id})",
   "try.viaAuto": "via routing",
   "try.prompt": "Prompt",
-  "try.send": "Send",
+  "try.send": "Send test request",
   "try.responseDetails": "View upstream response",
   "app.ready": "Gateway ready",
   "app.notReady": "Gateway unavailable",
@@ -2432,8 +2461,12 @@ export const en: Dict = {
   "exchange.formatBadge.native": "Native",
   "exchange.formatBadge.compat": "Compat",
   "exchange.formatCanonical": "Meta Gateway exchange",
+  "exchange.formatCanonicalHint":
+    "Native format; import files exported from Meta Gateway directly.",
   "exchange.formatNewApi": "New API channels",
+  "exchange.formatNewApiHint": "Recognizes channel lists and common wrapped JSON structures.",
   "exchange.formatAah": "All API Hub backup",
+  "exchange.formatAahHint": "Compatible with backup files exported from All API Hub.",
   "exchange.selectedCount": "{n} selected",
   "exchange.searchChannels": "Search channels…",
   "exchange.clearSelection": "Clear",
@@ -2744,8 +2777,8 @@ export const en: Dict = {
   "routing.pinChip": "PINNED",
   "routing.bulkSelect": "Bulk select",
   "routing.bulkSelected": "{count} selected",
-  "routing.bulkEnable": "Enable selected",
-  "routing.bulkDisable": "Disable selected",
+  "routing.bulkEnable": "Enable selected channels",
+  "routing.bulkDisable": "Disable selected channels",
   "routing.bulkSelectAll": "Select all",
   "routing.bulkClear": "Clear selection",
   "routing.bulkToggleSelect": "Select this channel",
@@ -2877,6 +2910,8 @@ export const en: Dict = {
   "ops.checkin.siteFilter": "Filter site",
   "ops.checkin.allSites": "All sites",
   "ops.checkin.dateFilter": "Check-in date",
+  "ops.checkin.sourceManual": "Manual",
+  "ops.checkin.sourceScheduled": "Scheduled",
   "ops.checkin.scheduleTitle": "Scheduled check-in",
   "ops.checkin.scheduleLede": "Runs check-in for enabled sites' session credentials on a schedule.",
   "ops.checkin.scheduleHint":
@@ -2942,7 +2977,8 @@ export const en: Dict = {
   "ops.creatingBackup": "Creating...",
   "ops.backupCreated": "Backup {name} ready ({size}, {time})",
   "ops.noBackups": "No backups have been created.",
-  "ops.backups.title": "Backup inventory",
+  "ops.backups.title": "Database backups",
+  "ops.downloadBackup": "Download",
   "ops.backups.titleHelp":
     "Online SQLite backups are created by the gateway. Restore is performed offline while the service is stopped.",
   "ops.restoreNote": "Restore is intentionally offline. Use {cmd} while the server is stopped.",
@@ -2969,9 +3005,6 @@ export const en: Dict = {
     "Edit and save to apply global runtime policy without restarting the gateway. Deployment paths and secrets are not editable here.",
   "ops.runtime.writableSummary":
     "Global routing, resilience, limits, recovery, alerts, and audit policy. Model-specific changes belong on Models.",
-  "ops.runtime.checkinScope":
-    "Global scheduler switch; credential-level enablement remains on Connections.",
-  "ops.runtime.openCheckin": "Open check-in",
   "ops.runtime.save": "Save & apply",
   "ops.runtime.saved": "Saved and applied without restart.",
   "ops.runtime.unsaved": "Unsaved changes",
@@ -2981,22 +3014,22 @@ export const en: Dict = {
   "ops.runtime.keepMine": "Keep my changes",
   "ops.runtime.reloadServer": "Reload server settings",
   "ops.runtime.resetEnv": "Reset to environment",
+  "ops.runtime.resetEnvHint":
+    "Clear console overrides so runtime parameters use environment variables or system defaults again.",
   "ops.runtime.ratePerMinute": "Per minute",
   "ops.runtime.rateBurst": "Burst",
-  "ops.runtime.serverReadonly": "Deployment-only. Change HTTP_ADDR / DATA_DIR and restart.",
   "ops.runtime.source": "Source",
   "ops.runtime.sourceAdmin": "Admin override",
   "ops.runtime.sourceEnvironment": "Environment",
   "ops.runtime.updatedAt": "Updated",
-  "ops.runtime.section.relay": "Relay failover",
-  "ops.runtime.section.checkin": "Scheduled check-in",
-  "ops.runtime.section.limits": "Rate limits",
+  "ops.runtime.section.relay": "Request failover",
+  "ops.runtime.section.limits": "Request rate limits",
   "ops.runtime.section.audit": "Audit retention",
-  "ops.runtime.section.routing": "Routing",
-  "ops.runtime.section.stableFirst": "Stable-first pool",
+  "ops.runtime.section.routing": "Routing strategy",
+  "ops.runtime.section.stableFirst": "New-channel stability trial",
   "ops.runtime.section.maintenance": "Database cleanup schedule",
-  "ops.runtime.section.alerts": "Alerts",
-  "ops.runtime.section.cooldown": "Failure cooldown & auto-disable",
+  "ops.runtime.section.alerts": "Notification channels",
+  "ops.runtime.section.cooldown": "Fault protection & auto-recovery",
   "ops.runtime.faultProtection": "Enable fault protection",
   "ops.runtime.faultProtectionHint":
     "When enabled, retryable 429/5xx failures use fixed cooldown and can auto-disable a channel. Transport failures (refused/timeouts) skip the cooldown on the first strike but cool down when they repeat. When disabled, retries and failover still work but failures are not remembered.",
@@ -3010,15 +3043,15 @@ export const en: Dict = {
   "ops.runtime.errorAware": "Error-aware routing",
   "ops.runtime.errorAwareHint":
     "Penalize channels with a high smoothed failure propensity; share recovers as successes accumulate.",
-  "ops.runtime.stableFirst": "Stable-first grayscale pool",
+  "ops.runtime.stableFirst": "New-channel stability trial",
   "ops.runtime.stableFirstHint":
-    "New channels first receive 1/N of requests as a trial; after enough consecutive successes they are promoted to full share.",
-  "ops.runtime.stableFirstDenominator": "Gray draw denominator (1/N)",
+    "New channels receive a small share of traffic first; after enough consecutive successes, they join normal traffic distribution.",
+  "ops.runtime.stableFirstDenominator": "Trial traffic share (1/N)",
   "ops.runtime.stableFirstDenominatorHint":
-    "N in 1/N: 25 = 1 in 25 requests (4%) goes to trial channels.",
-  "ops.runtime.stableFirstPromote": "Promotion threshold (successful requests)",
+    "A larger N means less trial traffic. For example, 25 sends about 1 in 25 requests to the new channel.",
+  "ops.runtime.stableFirstPromote": "Successes before normal traffic",
   "ops.runtime.stableFirstPromoteHint":
-    "Consecutive successes on a trial channel before it is promoted to full share.",
+    "After this many consecutive successes, the channel joins normal traffic distribution.",
   "ops.runtime.concurrencyGuard": "Concurrency burst guard",
   "ops.runtime.concurrencyGuardHint":
     "Tracks in-flight relays per channel and nearly skips saturated channels so a sudden spike spreads across the fleet.",
@@ -3068,9 +3101,10 @@ export const en: Dict = {
   "ops.maintenance.cron": "Maintenance schedule",
   "ops.maintenance.cronHint":
     "Five-field cron for the daily maintenance pass (default 0 4 * * *); empty = disabled.",
-  "ops.runtime.section.sync": "Model sync",
-  "ops.runtime.section.probe": "Scheduled model probing",
-  "ops.runtime.probeLede": "Calls models on a schedule to catch broken members early.",
+  "ops.runtime.section.sync": "Model discovery & sync",
+  "ops.runtime.section.probe": "Model availability probes",
+  "ops.runtime.probeLede":
+    "Sends real requests to models on a schedule to detect unavailable channel members early.",
   "ops.runtime.probeIntro":
     "Probing spends upstream quota; the cadence and scope are set under 模型 → 模型工具 → 模型探测.",
   "ops.runtime.probeCron": "Probe schedule",
@@ -3095,8 +3129,9 @@ export const en: Dict = {
   "ops.runtime.probeAutoDisable": "Disable after N failures",
   "ops.runtime.probeAutoDisableHint":
     "A member failing this many times in a row is pulled from routing, and returns as soon as a probe succeeds. 0 = record only. Members you disabled by hand are never re-enabled.",
-  "ops.runtime.section.siteProbe": "Site probe",
-  "ops.runtime.siteProbeLede": "Reads the probe data sites publish themselves; no tokens spent.",
+  "ops.runtime.section.siteProbe": "Public status data collection",
+  "ops.runtime.siteProbeLede":
+    "Reads public upstream service-status data without making model requests or spending tokens.",
   "ops.runtime.siteProbeIntro":
     "The source is a site's own Uptime Kuma status page or New-API price table. The cadence has to follow how fast those pages change: a status page polling every minute shows nothing new on a 15-minute round, while one publishing a heartbeat every 15 minutes gains nothing from a faster one.",
   "ops.runtime.siteProbeInterval": "Collection interval (seconds)",
@@ -3105,15 +3140,15 @@ export const en: Dict = {
   "ops.runtime.siteProbeJitter": "Collection jitter (seconds)",
   "ops.runtime.siteProbeJitterHint":
     "Upper bound on the random delay added to each round, so a fleet of gateways does not hit one status page in the same second. Cannot exceed the interval.",
-  "ops.runtime.section.siteNews": "Site news",
+  "ops.runtime.section.siteNews": "Site announcements",
   "ops.runtime.siteNewsLede":
-    "Reads what each upstream site publishes on its own notice board; no tokens spent.",
+    "Periodically reads public announcements from upstream sites without spending tokens.",
   "ops.runtime.siteNewsIntro":
     "Boards come from the sites' own public /api/status (New-API family), read on a fixed cadence and cached locally: the overview renders stored messages only, so opening it never waits on twenty-odd sites. Platforms whose board cannot be derived are skipped.",
   "ops.runtime.siteNewsInterval": "Collection interval (seconds)",
   "ops.runtime.siteNewsIntervalHint":
     "How often every readable board is fetched. 0 turns the scheduled read off (the overview's refresh button keeps working); a running cadence needs at least 60 seconds. A change lands immediately; no restart needed.",
-  "ops.runtime.section.keepalive": "Keepalive",
+  "ops.runtime.section.keepalive": "Account keepalive settings",
   "ops.runtime.openKeepalive": "Open connections",
   "ops.runtime.keepaliveLede": "Keeps accounts inside their no-call window, without a timer.",
   "ops.runtime.keepaliveIntro":
@@ -3177,16 +3212,17 @@ export const en: Dict = {
   "ops.runtime.recoveryInterval": "Recovery interval (s)",
   "ops.runtime.recoveryIntervalHint":
     "Probe auto-disabled channels every N seconds and restore them when the upstream recovers.",
-  "ops.runtime.section.sticky": "Sticky sessions",
-  "ops.runtime.stickyEnabled": "Enable sticky sessions",
+  "ops.runtime.section.sticky": "Session affinity",
+  "ops.runtime.stickyEnabled": "Keep the same channel for a session",
   "ops.runtime.stickyEnabledHint":
-    "Same-conversation requests prefer the channel that served them last (prompt-cache friendly). Disabled = normal routing; existing bindings are discarded on toggle.",
-  "ops.runtime.stickyTTL": "Sticky TTL (minutes)",
-  "ops.runtime.stickyTTLHint": "How long a session binding stays valid without renewal (1-1440).",
-  "ops.runtime.section.server": "Service & network",
+    "Requests in the same conversation prefer the last successful channel, which can help reuse upstream caches. Turning this off uses normal routing; changing this setting clears existing session bindings.",
+  "ops.runtime.stickyTTL": "Session channel retention (minutes)",
+  "ops.runtime.stickyTTLHint":
+    "How long a session binding remains valid without renewal (1–1440 minutes).",
+  "ops.runtime.section.server": "Service connectivity & network",
   "ops.runtime.section.deployment": "Deployment parameters (env)",
   "ops.runtime.deploymentLede":
-    'The environment variables this process read at startup and the value each one produced, read-only. "default" means the variable is not in the container — compose never passed it, or .env does not set it; where Runtime settings override one, the override wins. Changing a variable needs a deployment file edit and a container rebuild.',
+    "Read-only environment variables loaded when this process started. Update the deployment configuration and recreate the container to apply changes.",
   "ops.runtime.paramFilter": "Filter variables",
   "ops.runtime.paramFromEnv": "env",
   "ops.runtime.paramDefault": "default",
@@ -3196,9 +3232,17 @@ export const en: Dict = {
   "ops.runtime.deploymentEnvOnly": "Environment only",
   "ops.runtime.sectionNav": "Sections",
   "ops.runtime.sectionPicker": "Settings section",
-  "ops.runtime.navGroup.forwarding": "Forwarding & routing",
-  "ops.runtime.navGroup.automation": "Health & automation",
-  "ops.runtime.navGroup.data": "Data & operations",
+  "ops.runtime.navGroup.forwarding": "Requests & routing",
+  "ops.runtime.navGroup.automation": "Channel health & automation",
+  "ops.runtime.navGroup.data": "System & security",
+  "ops.runtime.menu.routingStrategy": "Routing & session strategy",
+  "ops.runtime.menu.healthRecovery": "Fault protection & health checks",
+  "ops.runtime.menu.modelOps": "Model sync & probes",
+  "ops.runtime.menu.siteMonitoring": "Site status monitoring",
+  "ops.runtime.menu.auditDatabase": "Audit & data maintenance",
+  "ops.runtime.menu.alertManagement": "Alerts & notifications",
+  "ops.runtime.menu.accountSecurity": "Accounts & security",
+  "ops.runtime.menu.systemRecovery": "System recovery & reset",
   "ops.runtime.section.totp": "Two-factor auth",
   "ops.runtime.section.dbMaintenance": "Database upkeep",
   "ops.runtime.section.users": "Multi-user & members",
@@ -3213,14 +3257,13 @@ export const en: Dict = {
     "When disabled, each request uses only its first selected channel. The retry limit is retained for when this is enabled again; same-channel API-key rotation is unchanged.",
   "ops.runtime.updateCheck": "Check for updates",
   "ops.runtime.updateCheckHint":
-    "Periodically query GitHub for the latest release and flag new versions in the top bar. Off = no outbound calls at all. Env: UPDATE_CHECK_ENABLED.",
+    "Periodically check this project's repository for releases and show a notice when a newer version is available. Off = no version-check requests. Env: UPDATE_CHECK_ENABLED.",
   "ops.runtime.multiUserLede": "Member accounts, credit and sign-in methods.",
   "ops.runtime.multiUserHint":
     "Its switch lives on the area's own overview board, so a one-person gateway never has to look at it.",
   "ops.runtime.openUsers": "Open user management",
-  "ops.runtime.group.danger": "Danger zone",
-  "ops.runtime.group.dangerDesc": "Irreversible actions. Take a backup first.",
   "ops.runtime.buildVersion": "Build",
+  "ops.runtime.instanceInfo": "Running instance",
   "ops.runtime.updateNow": "Check now",
   "ops.runtime.updateManualSummary": "Or update manually (copy a command)",
   "ops.runtime.oneClickUpdate": "Update to {version}",
@@ -3268,22 +3311,16 @@ export const en: Dict = {
   "ops.runtime.cooldown": "Fixed cooldown",
   "ops.runtime.cooldownHint":
     "Fixed pause after a retryable upstream status such as 429/5xx. Transport jitter is not cooled or counted. Env: COOLDOWN_SECONDS.",
-  "ops.runtime.checkinEnabled": "Scheduler",
-  "ops.runtime.checkinEnabledHint":
-    "Global cron runner. Per-credential schedule is still toggled on Connections. Env: CHECKIN_ENABLED.",
-  "ops.runtime.checkinCron": "Cron",
-  "ops.runtime.checkinCronHint":
-    "Every day at the chosen time. Timezone follows CHECKIN_TZ (defaults to UTC inside containers). Env: CHECKIN_CRON.",
   "ops.runtime.checkinTime": "Check-in time",
   "ops.runtime.checkinHour": "Hour",
   "ops.runtime.checkinMinute": "Minute",
   "ops.runtime.checkinDaily": "Daily",
-  "ops.runtime.relayRate": "Relay rate limit",
+  "ops.runtime.relayRate": "Relay API rate limit",
   "ops.runtime.relayRateHint":
-    "Proxy traffic cap: N requests per minute, burst allows a one-off spike of N.",
+    "Limits requests to the relay API: at most N per minute, with a burst allowance for short spikes.",
   "ops.runtime.adminRate": "Admin rate limit",
   "ops.runtime.adminRateHint":
-    "Admin console cap: N requests per minute, burst allows a one-off spike of N.",
+    "Limits requests to admin APIs: at most N per minute, with a burst allowance for short spikes.",
   "ops.runtime.auditDays": "Retention days",
   "ops.runtime.auditDaysHint": "Audit records older than N days are pruned.",
   "ops.runtime.auditRows": "Retention max rows",
@@ -3294,7 +3331,7 @@ export const en: Dict = {
   "ops.runtime.pluginsDir": "Plugins directory",
   "ops.runtime.metricsToken": "Metrics token",
   "ops.runtime.metricsTokenNone": "not configured",
-  "ops.errorRules.title": "Error passthrough rules",
+  "ops.errorRules.title": "Upstream error handling rules",
   "ops.factoryReset.title": "Factory reset",
   "ops.factoryReset.hint":
     "Wipe all business data (channels, keys, routes, models, logs, quotas, histories, rules). Sites, runtime settings, TOTP and backups are kept.",
@@ -3302,8 +3339,9 @@ export const en: Dict = {
   "ops.factoryReset.typeConfirm": "Type RESET to confirm",
   "ops.factoryReset.confirm": "Wipe everything",
   "ops.factoryReset.done": "Factory reset complete — the gateway is back to a clean slate.",
-  "ops.alertRules.title": "Alert rules",
-  "ops.alertRules.lede": "Alerts on metric thresholds through the configured channels.",
+  "ops.alertRules.title": "Metric alert rules",
+  "ops.alertRules.lede":
+    "Send an alert through your configured channels when a metric meets its rule conditions.",
   "ops.alertRules.hint":
     "Metric rules are evaluated every 60s; alerts go through the configured webhook / bark / serverchan / telegram / smtp channels.",
   "ops.alertRules.empty":
@@ -3320,10 +3358,11 @@ export const en: Dict = {
   "ops.alertRules.window": "Window (s)",
   "ops.alertRules.sustained": "Sustained (s)",
   "ops.alertRules.cooldown": "Cooldown (s)",
-  "ops.guard.title": "Sensitive prompt guards",
-  "ops.guard.lede": "Regex rules for the string values in chat bodies.",
+  "ops.guard.title": "Prompt content protection",
+  "ops.guard.lede":
+    "Use regular expressions to inspect conversation text and replace content, reject requests, or skip selected channels.",
   "ops.guard.hint":
-    "mask replaces matches, reject refuses the request (400), exclude skips the listed channels for matched requests.",
+    "Replace masks matched text; reject returns HTTP 400; skip channels routes matching requests away from selected channels.",
   "ops.guard.empty": "No guard rules yet.",
   "ops.guard.deleteTitle": "Delete guard rule",
   "ops.guard.deleteConfirm":
@@ -3338,13 +3377,14 @@ export const en: Dict = {
   "ops.guard.actionExclude": "Exclude channels",
   "ops.guard.replacement": "Replacement text",
   "ops.guard.excludeChannels": "Channel ids (comma-separated)",
-  "ops.errorRules.lede": "Overrides the default failover for upstream 4xx errors.",
+  "ops.errorRules.lede":
+    "Choose how to handle selected upstream 4xx errors. Unmatched errors keep the default failover behavior.",
   "ops.errorRules.hint":
-    "Matches on status code plus an error-body keyword: passthrough returns the error directly, rewrite changes its status code, ignore_monitor keeps failover but skips breaker, cooldown and counters. Rules apply to the very next request.",
-  "ops.errorRules.empty": "No rules — all 4xx errors fail over to the next channel.",
+    "Matches by status code and an error-body keyword. Actions can return the error without switching channels, rewrite its status code, or keep failover while skipping breaker, cooldown and failure counters. Changes apply immediately.",
+  "ops.errorRules.empty": "No rules yet. Upstream 4xx errors use the default failover behavior.",
   "ops.errorRules.deleteTitle": "Delete error rule",
   "ops.errorRules.deleteConfirm":
-    "This error rule will be removed and matching errors will fall back to the default failover behaviour. This cannot be undone.",
+    "This error rule will be removed and matching errors will use the default failover behavior. This cannot be undone.",
   "ops.errorRules.add": "Add rule",
   "ops.errorRules.edit": "Edit rule",
   "ops.errorRules.name": "Name",
@@ -3366,8 +3406,7 @@ export const en: Dict = {
   "ops.runtime.totpDisableHint": "Enter a current code to turn 2FA off.",
   "ops.runtime.totpDisable": "Disable 2FA",
 
-  "exchange.title": "Exchange",
-  "exchange.description": "Move channel assets through the versioned Meta Gateway exchange format.",
+  "exchange.title": "Import / Export",
   "exchange.exportTitle": "Export channels",
   "exchange.exportHint":
     "Metadata exports are safe to inspect but cannot be imported. Secret exports are importable and must be handled as credentials.",
@@ -3880,7 +3919,7 @@ export const en: Dict = {
   "observation.schedule": "Change schedule",
   "observation.thirdParty": "Third-party directory {host}: {count} readings · last synced {when}",
   "observation.thirdPartyFailed":
-    "Third-party directory {host} could not be refreshed ({when}): {error}",
+    "Third-party directory {host} could not be refreshed ({when}): {error}. This only affects third-party readings, not direct site collection; the existing snapshot is kept.",
   "observation.thirdPartyWaiting": "Third-party directory {host}: no successful sync yet",
   "observation.thirdPartyNever": "never",
   "observation.thirdPartyUnknown": "an unrecorded address",

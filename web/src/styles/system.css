@@ -66,7 +66,7 @@ tbody td small { display: block; margin-top: 4px; color: var(--muted); font-size
 .list-shell-footer { flex: 0 0 auto; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .list-shell-footer .pagination-bar { margin: 0; padding: 0; border: 0; background: transparent; font: 12px var(--font); }
 .list-shell-footer .pagination-bar p, .list-shell-footer .pagination-range { font: 12px var(--font); color: var(--muted); }
-.list-shell-footer .pagination-bar select { height: 30px; font: 12px var(--font); border-color: var(--line); }
+.list-shell-footer .pagination-size .searchable-select-trigger { min-height: 30px; font: 12px var(--font); border-color: var(--line); }
 /* List footer and first-run surface. Hoisted from the console feature sheet so
    the second front end (the team user app, which imports only this layer) gets
    the same anatomy instead of a third copy; every value is unchanged, so the
@@ -93,16 +93,8 @@ tbody td small { display: block; margin-top: 4px; color: var(--muted); font-size
   align-items: center;
   gap: 12px;
 }
-.pagination-size select {
-  height: 32px;
-  padding: 0 10px;
-  background: var(--surface);
-  border: 1px solid var(--line-light);
-  border-radius: var(--radius);
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-family: var(--font);
-}
+.pagination-size { min-width: 104px; }
+.pagination-size .searchable-select-trigger { min-height: 32px; padding: 0 10px; border-radius: var(--radius); font: 12px var(--font); }
 .pagination-pages {
   display: flex;
   align-items: center;
@@ -152,16 +144,7 @@ tbody td small { display: block; margin-top: 4px; color: var(--muted); font-size
   align-items: center;
   gap: 8px;
 }
-.pagination-size select {
-  height: 32px;
-  min-width: 104px;
-  padding: 0 8px;
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 12px;
-}
+.pagination-size .searchable-select-trigger { min-height: 32px; min-width: 104px; padding-inline: 8px; }
 .pagination-pages {
   display: inline-flex;
   align-items: center;

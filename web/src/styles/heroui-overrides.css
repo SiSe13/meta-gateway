@@ -195,6 +195,54 @@
   box-shadow: var(--shadow-lg);
 }
 
+:root[data-appearance="metapi"] .dialog.channel-models-dialog {
+  width: min(1000px, calc(100vw - 40px));
+  max-width: min(1000px, calc(100vw - 40px));
+  max-height: min(96dvh, 1100px);
+}
+
+:root[data-appearance="metapi"] .dialog.channel-keys-dialog {
+  width: min(1080px, calc(100vw - 40px));
+  max-width: min(1080px, calc(100vw - 40px));
+  max-height: min(92dvh, 960px);
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog [data-slot="modal-body"] {
+  padding-top: 10px;
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-status-filter {
+  min-height: 32px;
+  gap: 3px;
+  padding: 2px;
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-status-filter button {
+  min-height: 27px;
+  height: 27px;
+  padding-inline: 9px;
+  font-size: 11px;
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-status-count {
+  min-width: 15px;
+  padding: 2px 4px;
+  font-size: 10px;
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-add-input {
+  min-height: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+:root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-action {
+  height: 32px;
+  min-height: 32px;
+  padding-inline: 10px;
+  font-size: 11px;
+}
+
 :root[data-appearance="metapi"] .dialog [data-slot="modal-header"] {
   display: flex;
   flex: 0 0 auto;
@@ -227,7 +275,97 @@
   gap: 8px;
   padding: 16px 24px;
   border-top: 1px solid var(--line);
+}
+
+:root[data-appearance="metapi"] .dialog.channels-add-dialog [data-slot="modal-footer"] {
+  justify-content: center;
+  border-top: 0;
+  background: transparent;
+}
+
+:root[data-appearance="metapi"] .dialog.channels-add-dialog .overlay-actions {
+  justify-content: center;
+}
+
+:root[data-appearance="metapi"] .dialog.checkin-settings-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-width: min(620px, calc(100vw - 32px));
+}
+
+:root[data-appearance="metapi"] .dialog.checkin-settings-dialog [data-slot="modal-footer"] {
+  background: transparent;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog {
+  width: min(500px, calc(100vw - 40px));
+  max-width: min(500px, calc(100vw - 40px));
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog [data-slot="modal-body"] {
+  padding: 22px 28px 18px;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog .dialog-hint {
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog .create-key-purpose {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-light);
+  border-radius: 10px;
   background: var(--surface-subtle);
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog .create-key-group-state {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog [data-slot="modal-footer"] {
+  justify-content: center;
+  padding: 12px 28px 22px;
+  background: transparent;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog .overlay-actions {
+  justify-content: center;
+  gap: 12px;
+}
+
+:root[data-appearance="metapi"] .dialog.create-upstream-key-dialog .overlay-actions .button {
+  min-width: 92px;
+  min-height: 38px;
+  border-radius: 999px;
+}
+
+:root[data-appearance="metapi"] .dialog.system-logs-cleanup-dialog {
+  width: min(560px, calc(100vw - 40px));
+  max-width: min(560px, calc(100vw - 40px));
+}
+
+:root[data-appearance="metapi"] .dialog.system-logs-cleanup-dialog [data-slot="modal-body"] {
+  padding: 16px 24px;
+}
+
+:root[data-appearance="metapi"] .dialog.system-logs-cleanup-dialog .dialog-body p {
+  margin: 0;
+}
+
+:root[data-appearance="metapi"] .dialog.system-logs-cleanup-dialog [data-slot="modal-footer"] {
+  justify-content: center;
+  padding: 10px 24px 14px;
+  background: transparent;
+}
+
+:root[data-appearance="metapi"] .dialog.system-logs-cleanup-dialog .overlay-actions {
+  justify-content: center;
 }
 
 /* Keep key creation roomy and make every field use the same measured box. */
@@ -368,6 +506,18 @@
     max-width: min(700px, calc(100vw - 32px));
     max-height: calc(100dvh - 24px);
     border-radius: 14px;
+  }
+
+  :root[data-appearance="metapi"] .dialog.channel-models-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  :root[data-appearance="metapi"] .dialog.channel-keys-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
   }
 
   :root[data-appearance="metapi"] .dialog [data-slot="modal-header"],

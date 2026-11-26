@@ -1,9 +1,17 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput, TextArea as HeroTextArea } from "@heroui/react";
 import type { ModelMatchMode, Route, RoutingCandidate } from "../../api/types";
 import { api } from "../../api/client";
-import { Button, Dialog, ErrorState, Field, InfoTip } from "../../components/ui";
+import {
+  Button,
+  CheckboxControl,
+  Dialog,
+  ErrorState,
+  Field,
+  InfoTip,
+  SelectControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
 import { MatchScopeFieldset } from "./MatchScopeFieldset";
@@ -115,15 +123,14 @@ export function RouteDialog({
         <span>{t("modelsPage.addRouteHint")}</span>
       </div>
       <Field label={t("routing.exactModel")}>
-        <input
+        <HeroInput
           value={form.model_pattern ?? ""}
           onChange={(event) => setForm({ ...form, model_pattern: event.target.value })}
           placeholder="gpt-4o-mini"
         />
       </Field>
       <label className="check">
-        <input
-          type="checkbox"
+        <CheckboxControl
           checked={form.enabled ?? false}
           onChange={(event) => setForm({ ...form, enabled: event.target.checked })}
         />
@@ -132,8 +139,7 @@ export function RouteDialog({
       {isCreate ? (
         <>
           <label className="check">
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={autoMatch}
               onChange={(event) => setAutoMatch(event.target.checked)}
             />
@@ -173,8 +179,7 @@ export function RouteDialog({
                 <div className="selection-list scroll-list">
                   {matchItems.map((item) => (
                     <label className="check" key={item.channel_id}>
-                      <input
-                        type="checkbox"
+                      <CheckboxControl
                         checked={selectedMatches.has(item.channel_id)}
                         onChange={() => toggleMatch(item.channel_id)}
                       />
@@ -203,7 +208,7 @@ export function RouteDialog({
       </div>
       <div className="form-grid">
         <Field label={t("routing.retryRounds")} hint={t("routing.retryRoundsHint")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             max={100}
@@ -219,7 +224,7 @@ export function RouteDialog({
           />
         </Field>
         <Field label={t("routing.channelRetry")} hint={t("routing.channelRetryHint")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             max={5}
@@ -250,7 +255,7 @@ export function RouteDialog({
             <span>{t("modelsPage.overrideHint")}</span>
           </div>
           <Field label={t("modelsPage.modelGroup")} hint={t("modelsPage.modelGroupHint")}>
-            <input
+            <HeroInput
               value={form.model_group ?? ""}
               placeholder={t("modelsPage.modelGroupAuto")}
               onChange={(event) => patch({ model_group: event.target.value })}
@@ -258,7 +263,7 @@ export function RouteDialog({
           </Field>
           <div className="form-grid">
             <Field label={t("channels.maxReasoningEffort")}>
-              <select
+              <SelectControl
                 value={form.max_reasoning_effort ?? ""}
                 onChange={(event) =>
                   patch({
@@ -272,10 +277,10 @@ export function RouteDialog({
                     {level}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("channels.maxConcurrent")}>
-              <input
+              <HeroInput
                 type="number"
                 min={0}
                 placeholder={t("modelsPage.inherit")}
@@ -292,7 +297,7 @@ export function RouteDialog({
             </Field>
           </div>
           <Field label={t("channels.proxyUrl")}>
-            <input
+            <HeroInput
               type="url"
               value={form.proxy_url ?? ""}
               placeholder="http://127.0.0.1:7897"
@@ -304,7 +309,7 @@ export function RouteDialog({
             />
           </Field>
           <Field label={t("channels.headerOverride")}>
-            <textarea
+            <HeroTextArea
               className="mono"
               value={form.header_override ?? ""}
               placeholder='{"User-Agent":"…"}'
@@ -316,7 +321,7 @@ export function RouteDialog({
             />
           </Field>
           <Field label={t("channels.systemPrompt")}>
-            <textarea
+            <HeroTextArea
               value={form.system_prompt ?? ""}
               onChange={(event) =>
                 patch({
@@ -326,7 +331,7 @@ export function RouteDialog({
             />
           </Field>
           <Field label={t("channels.retryConfig")}>
-            <textarea
+            <HeroTextArea
               className="mono"
               value={form.retry_config ?? ""}
               onChange={(event) =>
@@ -338,8 +343,7 @@ export function RouteDialog({
           </Field>
           <Field label={t("routing.imageEditShim")} hint={t("routing.imageEditShimHint")}>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={form.image_edit_shim ?? false}
                 onChange={(event) => patch({ image_edit_shim: event.target.checked })}
               />
@@ -347,7 +351,7 @@ export function RouteDialog({
             </label>
           </Field>
           <Field label={t("channels.payloadRules")}>
-            <textarea
+            <HeroTextArea
               className="mono"
               value={form.payload_rules ?? ""}
               onChange={(event) =>
@@ -359,7 +363,7 @@ export function RouteDialog({
           </Field>
           <div className="form-grid">
             <Field label={t("modelsPage.stickySession")} hint={t("modelsPage.stickySessionHint")}>
-              <select
+              <SelectControl
                 value={form.sticky_session == null ? "inherit" : form.sticky_session ? "on" : "off"}
                 onChange={(event) =>
                   patch({
@@ -375,10 +379,10 @@ export function RouteDialog({
                 </option>
                 <option value="on">{t("common.enabled")}</option>
                 <option value="off">{t("common.disabled")}</option>
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("modelsPage.grayEnabled")}>
-              <select
+              <SelectControl
                 value={form.stable_first == null ? "inherit" : form.stable_first ? "on" : "off"}
                 onChange={(event) =>
                   patch({
@@ -390,10 +394,10 @@ export function RouteDialog({
                 <option value="inherit">{t("modelsPage.inherit")}</option>
                 <option value="on">{t("common.enabled")}</option>
                 <option value="off">{t("common.disabled")}</option>
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("modelsPage.grayDenominator")}>
-              <input
+              <HeroInput
                 type="number"
                 min={2}
                 max={1000}
@@ -408,7 +412,7 @@ export function RouteDialog({
               />
             </Field>
             <Field label={t("modelsPage.grayPromote")}>
-              <input
+              <HeroInput
                 type="number"
                 min={1}
                 max={100000}
@@ -427,8 +431,7 @@ export function RouteDialog({
       ) : null}
       {members.length > 0 ? (
         <label className="check">
-          <input
-            type="checkbox"
+          <CheckboxControl
             checked={pinPriority}
             onChange={(event) => setPinPriority(event.target.checked)}
           />

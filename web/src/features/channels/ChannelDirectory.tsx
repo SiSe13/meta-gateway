@@ -1,7 +1,7 @@
-import { Boxes, Cable, Eye, Plus, Search } from "lucide-react";
+import { Boxes, Cable, Eye, KeyRound, Plus, Search, SlidersHorizontal } from "lucide-react";
 import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
-import type { ChannelOverview, FinanceItem } from "../../api/types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ChannelOverview, Credential, FinanceItem } from "../../api/types";
 import type { ActionMenuItem } from "../../components/ActionMenu";
 import { ActionMenu } from "../../components/ActionMenu";
 import { rowContextPoint, rowKeyboardContextPoint } from "../../components/contextMenu";
@@ -9,7 +9,7 @@ import { EmptyHero } from "../../components/EmptyHero";
 import { EntityState } from "../../components/EntityState";
 import { ListShell } from "../../components/ListShell";
 import { PaginationBar } from "../../components/PaginationBar";
-import { Button, DataTable, Panel } from "../../components/ui";
+import { Button, DataTable, InfoTip, Panel } from "../../components/ui";
 import { ChannelStatusBadges } from "./badges";
 import { Pin } from "lucide-react";
 import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
@@ -17,9 +17,11 @@ import { capabilityFlags } from "./helpers";
 import type { ConnectionHealthFilter } from "./helpers";
 import { useSession } from "../../session";
 import { api } from "../../api/client";
-import { nativeAmount } from "../models/pricingTypes";
 import { useState } from "react";
 import { CheckinSettingsDialog } from "./CheckinSettingsDialog";
+import { parseCredentialMeta } from "../credentialMeta";
+import { userCredentialFor } from "./channelCredentials";
+import { useToast } from "../../toast";
 
 /**
  * The connections directory: the search and filters, the table, its bulk bar and
@@ -38,6 +40,36 @@ import { CheckinSettingsDialog } from "./CheckinSettingsDialog";
  * back.
  */
 type Text = (key: string, vars?: Record<string, string | number>) => string;
+
+/** 按菜单分组稳定排序，让账号配置先于依赖它们的检查和创建操作。 */
+function orderChannelMenuItems(items: ActionMenuItem[]) {
+  const itemOrder: Record<string, number> = {
+    "account-credential": 0,
+    "checkin-settings": 1,
+    "check-account": 2,
+    "create-key": 3,
+    "sync-keys": 4,
+    duplicate: 5,
+    edit: 6,
+    toggle: 7,
+  };
+  const groups = new Map<string, ActionMenuItem[]>();
+  for (const item of items) {
+    const group = item.danger ? "__danger__" : (item.group ?? "");
+    const current = groups.get(group) ?? [];
+    current.push(item);
+    groups.set(group, current);
+  }
+  return [...groups.values()].flatMap((group) =>
+    group
+      .map((item, index) => ({ item, index }))
+      .sort(
+        (a, b) =>
+          (itemOrder[a.item.key] ?? 50) - (itemOrder[b.item.key] ?? 50) || a.index - b.index,
+      )
+      .map(({ item }) => item),
+  );
+}
 
 /** The slice of a mutation/query hook this directory reads. */
 type Pending = { pendingId?: number | string | null };
@@ -103,6 +135,7 @@ export type ChannelDirectoryProps = {
   addAction: React.ReactNode;
   maintenanceActions: React.ReactNode;
   setCheckin: (input: { credentialId: number; enabled: boolean }) => Promise<unknown>;
+  toggleCheckin: (input: { credentialId: number; enabled: boolean }) => void;
   /* Row interaction. */
   openAdd: () => void;
   selectRow: (id: number) => void;
@@ -121,32 +154,56 @@ export type ChannelDirectoryProps = {
     probe: Pending;
     accountProbe: Pending;
     syncKeys: Pending;
+    checkin: Pending;
     toggle: Pending;
     del: Pending;
   };
 };
 
 export function ChannelDirectory(props: ChannelDirectoryProps) {
+  const [checkingCheckinFor, setCheckingCheckinFor] = useState<number | null>(null);
   const [checkinSettings, setCheckinSettings] = useState<{
     overview: ChannelOverview;
     enabled: boolean;
+    manageCheckin: boolean;
   } | null>(null);
   const { client } = useSession();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const service = api(client!);
+  const runtime = useQuery({
+    queryKey: ["runtime-settings"],
+    queryFn: ({ signal }) => service.runtimeSettings(signal),
+    enabled: Boolean(client),
+    retry: false,
+  });
+  const healthSweepEnabled = runtime.data?.editable?.health_sweep_enabled ?? false;
+  const healthSweepInterval = runtime.data?.editable?.health_sweep_interval_seconds ?? 300;
   const finance = useQuery({
     queryKey: ["finance"],
     queryFn: ({ signal }) => api(client!).finance(signal),
     enabled: Boolean(client),
     retry: false,
     staleTime: 120_000,
-    refetchInterval: (query) => (query.state.data?.refreshing ? 1_500 : false),
+    // 余额沿用健康巡检的间隔，避免独立增加上游查询；刷新中短轮询结果。
+    refetchInterval: (query) =>
+      query.state.data?.refreshing
+        ? 1_500
+        : healthSweepEnabled
+          ? healthSweepInterval * 1_000
+          : false,
   });
   const financeByChannel = new Map<number, FinanceItem>(
     (finance.data?.items ?? []).map((item) => [item.channel_id, item]),
   );
   const formatUpstreamQuota = (value: number, item: FinanceItem) => {
-    if (!item.unit) return t("billing.quotaPoints", { value });
     const amount = item.quota_per_unit > 0 ? value / item.quota_per_unit : value;
-    return nativeAmount(amount, item.unit, t("billing.credit"));
+    const formatted = amount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    if (!item.unit) return t("billing.quotaPoints", { value: formatted });
+    return item.unit.kind === "iso" ? `${formatted} ${item.unit.code}` : formatted;
   };
   const {
     t,
@@ -180,6 +237,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
     addAction,
     maintenanceActions,
     setCheckin,
+    toggleCheckin,
     openAdd,
     selectRow,
     setInspectorOpen,
@@ -346,14 +404,14 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
               headers={[
                 ...(bulkMode ? [bulkHeader] : []),
                 t("common.name"),
-                t("channels.groupColumn"),
-                t("common.status"),
+                <span className="channel-group-heading">{t("channels.groupColumn")}</span>,
+                <span className="channel-status-heading">{t("common.status")}</span>,
                 <span className="channel-model-count-heading">
                   {t("channels.modelsSummaryColumn")}
                 </span>,
-                t("common.latency"),
-                t("channels.balanceUsed"),
-                t("channels.checkinColumn"),
+                <span className="channel-latency-heading">{t("common.latency")}</span>,
+                <span className="channel-finance-heading">{t("channels.balanceUsed")}</span>,
+                <span className="channel-checkin-heading">{t("channels.checkinColumn")}</span>,
                 <span className="channel-actions-heading">{t("common.actions")}</span>,
               ]}
             >
@@ -361,6 +419,10 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                 const ch = overview.channel;
                 const financeItem = financeByChannel.get(ch.id);
                 const caps = capabilityFlags(overview);
+                const cachedCredentials = ch.site_id
+                  ? (queryClient.getQueryData<Credential[]>(["credentials", ch.site_id]) ?? [])
+                  : [];
+                const checkinCredential = userCredentialFor(overview, cachedCredentials);
                 const rowActions = connectionActions(overview);
                 const editAction = rowActions.find((item) => item.key === "edit");
                 const toggleAction = rowActions.find((item) => item.key === "toggle");
@@ -373,14 +435,48 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                   pending.probe.pendingId === ch.id ||
                   pending.accountProbe.pendingId === ch.id ||
                   pending.syncKeys.pendingId === ch.id ||
+                  (checkinCredential != null &&
+                    pending.checkin.pendingId === checkinCredential.id) ||
+                  checkingCheckinFor === ch.id ||
                   pending.toggle.pendingId === ch.id ||
                   pending.del.pendingId === ch.id;
+                moreActions.push({
+                  key: "account-credential",
+                  label: t("channels.userCredentialSettings"),
+                  icon: <KeyRound size={14} />,
+                  group: t("actions.manage"),
+                  disabled: rowBusy,
+                  onSelect: () =>
+                    setCheckinSettings({ overview, enabled: false, manageCheckin: false }),
+                });
+                if (overview.checkin_supported) {
+                  moreActions.push({
+                    key: "checkin-settings",
+                    label: t("channels.checkinSettings"),
+                    icon: <SlidersHorizontal size={14} />,
+                    group: t("actions.manage"),
+                    disabled: rowBusy,
+                    onSelect: () =>
+                      setCheckinSettings({
+                        overview,
+                        enabled: overview.checkin_enabled,
+                        manageCheckin: true,
+                      }),
+                  });
+                }
                 return (
                   <tr
                     key={ch.id}
                     tabIndex={0}
                     className={`is-clickable${active ? " is-selected" : ""}`}
-                    onClick={() => {
+                    onClick={(event) => {
+                      // 操作控件即使没有拦住冒泡，也不能触发行级详情抽屉。
+                      if (
+                        event.target instanceof Element &&
+                        event.target.closest("button, a, input, select, textarea, [role='button']")
+                      ) {
+                        return;
+                      }
                       selectRow(ch.id);
                       setInspectorOpen(true);
                     }}
@@ -408,7 +504,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                         />
                       </td>
                     ) : null}
-                    <td>
+                    <td className="channel-name-cell">
                       <strong>{ch.name}</strong>
                       {pinnedIds?.has(String(ch.id)) ? (
                         <span className="pin-chip" title={t("channels.pinnedBadge")}>
@@ -416,22 +512,17 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                         </span>
                       ) : null}
                     </td>
-                    <td>
+                    <td className="channel-group-cell">
                       <span className="capability-chip is-group">
                         {ch.group_name || t("routing.groupDefault")}
                       </span>
                     </td>
-                    <td className="status-col">
+                    <td className="status-col channel-status-cell">
                       <div className="capability-stack is-compact">
                         <ChannelStatusBadges overview={overview} />
                         {caps.tokenProblem ? (
                           <span className="capability-chip is-warn">
                             {t("channels.badge.tokenProblem")}
-                          </span>
-                        ) : null}
-                        {caps.modelsReady ? (
-                          <span className="capability-chip is-models">
-                            {t("channels.badge.models")}
                           </span>
                         ) : null}
                       </div>
@@ -448,12 +539,12 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                         <strong>{overview.model_count}</strong>
                       </span>
                     </td>
-                    <td>
+                    <td className="channel-latency-cell">
                       {overview.last_checked_at
                         ? t("common.ms", { n: overview.last_latency_ms })
                         : "—"}
                     </td>
-                    <td className="channel-finance-cell">
+                    <td className="channel-finance-cell channel-finance-data-cell">
                       {financeItem?.balance_known ? (
                         <div className="channel-finance-values">
                           <strong>{formatUpstreamQuota(financeItem.balance, financeItem)}</strong>
@@ -463,10 +554,16 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                           </span>
                         </div>
                       ) : (
-                        <span className="muted">—</span>
+                        <span className="channel-finance-unavailable">
+                          <span>{t("channels.balanceUnavailable")}</span>
+                          <InfoTip label={t("channels.balanceUnavailableHint")} />
+                        </span>
                       )}
                     </td>
-                    <td>
+                    <td
+                      className="channel-checkin-cell"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       {overview.checkin_supported ? (
                         <button
                           type="button"
@@ -481,22 +578,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                           onClick={(event) => {
                             // 签到按钮位于可点击行内，阻止行点击抢先打开详情。
                             event.stopPropagation();
-                            const checkinAction = rowActions.find(
-                              (item) => item.key === "checkin-toggle",
-                            );
-                            if (
-                              overview.has_user_credential &&
-                              overview.has_platform_user_id &&
-                              checkinAction &&
-                              !checkinAction.disabled
-                            ) {
-                              checkinAction.onSelect();
-                              return;
-                            }
-                            setCheckinSettings({
-                              overview,
-                              enabled: !overview.checkin_enabled,
-                            });
+                            void toggleCheckinFromRow(overview);
                           }}
                         >
                           {overview.checkin_enabled
@@ -504,68 +586,68 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                             : t("channels.checkinDisabled")}
                         </button>
                       ) : (
-                        <span className="capability-chip is-muted">
-                          {t("channels.checkinDisabled")}
-                        </span>
+                        <span className="capability-chip is-muted">—</span>
                       )}
                     </td>
                     <td
                       className="actions row-actions channel-actions-cell"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="channel-row-quick-actions">
-                        <Button
-                          variant="quiet"
-                          className="channel-row-action-details"
-                          icon={<Eye size={14} />}
-                          title={t("channels.quickDetails")}
-                          aria-label={`${t("channels.quickDetails")}: ${ch.name}`}
-                          onClick={() => {
-                            selectRow(ch.id);
-                            setInspectorOpen(true);
+                      <div className="channel-action-controls">
+                        <div className="channel-row-quick-actions">
+                          <Button
+                            variant="quiet"
+                            className="channel-row-action-details"
+                            icon={<Eye size={14} />}
+                            title={t("channels.quickDetails")}
+                            aria-label={`${t("channels.quickDetails")}: ${ch.name}`}
+                            onClick={() => {
+                              selectRow(ch.id);
+                              setInspectorOpen(true);
+                            }}
+                          >
+                            {t("channels.quickDetails")}
+                          </Button>
+                          {editAction ? (
+                            <Button
+                              variant="quiet"
+                              className="channel-row-action-edit"
+                              icon={editAction.icon}
+                              disabled={rowBusy || editAction.disabled}
+                              title={editAction.label}
+                              aria-label={`${t("common.edit")}: ${ch.name}`}
+                              onClick={editAction.onSelect}
+                            >
+                              {t("common.edit")}
+                            </Button>
+                          ) : null}
+                          {toggleAction ? (
+                            <Button
+                              variant="quiet"
+                              className={`channel-row-action-toggle ${ch.status === "enabled" ? "is-disable" : "is-enable"}`}
+                              icon={toggleAction.icon}
+                              disabled={rowBusy || toggleAction.disabled}
+                              title={toggleAction.label}
+                              aria-label={`${toggleAction.label}: ${ch.name}`}
+                              onClick={toggleAction.onSelect}
+                            >
+                              {toggleAction.label}
+                            </Button>
+                          ) : null}
+                        </div>
+                        <ActionMenu
+                          compact
+                          label={t("common.moreActions")}
+                          title={ch.name}
+                          disabled={rowBusy}
+                          onOpenChange={(open) => {
+                            // Ensure credentials for this row's site are loaded so the
+                            // check-in toggle label matches the overview badge.
+                            if (open) selectRow(ch.id);
                           }}
-                        >
-                          {t("channels.quickDetails")}
-                        </Button>
-                        {editAction ? (
-                          <Button
-                            variant="quiet"
-                            className="channel-row-action-edit"
-                            icon={editAction.icon}
-                            disabled={rowBusy || editAction.disabled}
-                            title={editAction.label}
-                            aria-label={`${t("common.edit")}: ${ch.name}`}
-                            onClick={editAction.onSelect}
-                          >
-                            {t("common.edit")}
-                          </Button>
-                        ) : null}
-                        {toggleAction ? (
-                          <Button
-                            variant="quiet"
-                            className={`channel-row-action-toggle ${ch.status === "enabled" ? "is-disable" : "is-enable"}`}
-                            icon={toggleAction.icon}
-                            disabled={rowBusy || toggleAction.disabled}
-                            title={toggleAction.label}
-                            aria-label={`${toggleAction.label}: ${ch.name}`}
-                            onClick={toggleAction.onSelect}
-                          >
-                            {toggleAction.label}
-                          </Button>
-                        ) : null}
+                          items={orderChannelMenuItems(moreActions)}
+                        />
                       </div>
-                      <ActionMenu
-                        compact
-                        label={t("common.moreActions")}
-                        title={ch.name}
-                        disabled={rowBusy}
-                        onOpenChange={(open) => {
-                          // Ensure credentials for this row's site are loaded so the
-                          // check-in toggle label matches the overview badge.
-                          if (open) selectRow(ch.id);
-                        }}
-                        items={moreActions}
-                      />
                     </td>
                   </tr>
                 );
@@ -626,7 +708,33 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                     if (!open) setContextMenu(null);
                   }}
                   position={{ top: contextMenu.top, left: contextMenu.left }}
-                  items={connectionActions(overview, { closeContext: true })}
+                  items={orderChannelMenuItems([
+                    ...connectionActions(overview, { closeContext: true }),
+                    {
+                      key: "account-credential",
+                      label: t("channels.userCredentialSettings"),
+                      icon: <KeyRound size={14} />,
+                      group: t("actions.manage"),
+                      onSelect: () =>
+                        setCheckinSettings({ overview, enabled: false, manageCheckin: false }),
+                    },
+                    ...(overview.checkin_supported
+                      ? [
+                          {
+                            key: "checkin-settings",
+                            label: t("channels.checkinSettings"),
+                            icon: <SlidersHorizontal size={14} />,
+                            group: t("actions.manage"),
+                            onSelect: () =>
+                              setCheckinSettings({
+                                overview,
+                                enabled: overview.checkin_enabled,
+                                manageCheckin: true,
+                              }),
+                          },
+                        ]
+                      : []),
+                  ])}
                 />
               );
             })()
@@ -636,15 +744,47 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
         <CheckinSettingsDialog
           overview={checkinSettings.overview}
           enabled={checkinSettings.enabled}
+          manageCheckin={checkinSettings.manageCheckin}
           t={t}
           setCheckin={setCheckin}
           onClose={() => setCheckinSettings(null)}
-          onEditCredential={() => {
-            const actions = connectionActions(checkinSettings.overview);
-            actions.find((item) => item.key === "edit")?.onSelect();
-          }}
         />
       ) : null}
     </Panel>
   );
+
+  async function toggleCheckinFromRow(overview: ChannelOverview) {
+    const enabled = !overview.checkin_enabled;
+    const openSettings = () => setCheckinSettings({ overview, enabled, manageCheckin: true });
+    if (!capabilityFlags(overview).checkinReady) {
+      openSettings();
+      return;
+    }
+
+    const siteId = overview.channel.site_id;
+    if (!siteId) {
+      openSettings();
+      return;
+    }
+
+    setCheckingCheckinFor(overview.channel.id);
+    try {
+      const credentials = await queryClient.fetchQuery({
+        queryKey: ["credentials", siteId],
+        queryFn: ({ signal }) => service.credentials(siteId, signal),
+        staleTime: 30_000,
+      });
+      const credential = userCredentialFor(overview, credentials);
+      const platformUserID = parseCredentialMeta(credential?.meta_json).platform_user_id;
+      if (!credential || !platformUserID) {
+        openSettings();
+        return;
+      }
+      toggleCheckin({ credentialId: credential.id, enabled });
+    } catch (error) {
+      toast.pushError(error);
+    } finally {
+      setCheckingCheckinFor(null);
+    }
+  }
 }

@@ -44,6 +44,7 @@ POLL_SECONDS="${POLL_SECONDS:-2}"
 HEARTBEAT_SECONDS="${HEARTBEAT_SECONDS:-30}"
 LOG_LINES="${LOG_LINES:-60}"
 LINE_LIMIT="${LINE_LIMIT:-400}"
+EXPECTED_IMAGE_REPOSITORY="${EXPECTED_IMAGE_REPOSITORY:-sise13/meta-gateway}"
 
 LOG="$STATE_DIR/updater.log"
 
@@ -125,17 +126,21 @@ run_update() {
   log "update requested (target=${_target:-follow-channel})"
 
   _pull="failed"
-  if (cd "$PROJECT_DIR" && compose pull "$SERVICE" >>"$LOG" 2>&1); then
-    _pull="ok"
-  else
-    log "docker compose pull failed"
-  fi
-
   _up="failed"
-  if (cd "$PROJECT_DIR" && compose up -d --no-build --no-deps "$SERVICE" >>"$LOG" 2>&1); then
-    _up="ok"
+  if validate_image_source; then
+    if (cd "$PROJECT_DIR" && compose pull "$SERVICE" >>"$LOG" 2>&1); then
+      _pull="ok"
+    else
+      log "docker compose pull failed"
+    fi
+
+    if [ "$_pull" = "ok" ] && (cd "$PROJECT_DIR" && compose up -d --no-build --no-deps "$SERVICE" >>"$LOG" 2>&1); then
+      _up="ok"
+    else
+      log "docker compose up skipped or failed"
+    fi
   else
-    log "docker compose up failed"
+    log "update refused: deployment image is not from $EXPECTED_IMAGE_REPOSITORY"
   fi
 
   _exit=1
@@ -147,6 +152,20 @@ run_update() {
   _tail=$(tail -n "$LOG_LINES" "$LOG" 2>/dev/null | cut -c1-"$LINE_LIMIT" | json_string)
   atomic_write "$STATE_DIR/result.json" \
     "{\"target\":$(printf '%s' "$_target" | json_string),\"exit_code\":$_exit,\"started_at\":$_started,\"finished_at\":$(date +%s),\"pull\":\"$_pull\",\"up\":\"$_up\",\"log\":$_tail}"
+}
+
+# 更新前核对运行容器和部署配置中的镜像来源，避免 fork 被替换成上游镜像。
+validate_image_source() {
+  _container=$(cd "$PROJECT_DIR" && compose ps -q "$SERVICE" 2>>"$LOG") || return 1
+  [ -n "$_container" ] || return 1
+  _running_image=$(docker inspect --format '{{.Config.Image}}' "$_container" 2>>"$LOG") || return 1
+  case "$_running_image" in
+    "$EXPECTED_IMAGE_REPOSITORY":*|"$EXPECTED_IMAGE_REPOSITORY"@*) ;;
+    *) return 1 ;;
+  esac
+
+  _images=$(cd "$PROJECT_DIR" && compose config --images 2>>"$LOG") || return 1
+  printf '%s\n' "$_images" | grep -Fqx "$_running_image"
 }
 
 mkdir -p "$STATE_DIR" 2>/dev/null || true

@@ -60,19 +60,19 @@ func newFakeDocker(t *testing.T) *fakeDocker {
 		case r.URL.Path == "/containers/self-id/json" || r.URL.Path == "/containers/gw/json":
 			w.Write([]byte(`{
 				"Id": "self-id", "Name": "/gw",
-				"Config": {"Image": "zichuanlan/meta-gateway:latest", "Env": ["ADMIN_TOKEN=x"], "Labels": {"app": "meta-gateway"}},
+				"Config": {"Image": "sise13/meta-gateway:latest", "Env": ["ADMIN_TOKEN=x"], "Labels": {"app": "meta-gateway"}},
 				"HostConfig": {"Binds": ["meta-gateway-data:/data"], "PortBindings": {"4100/tcp": [{"HostPort": "4100"}]}, "RestartPolicy": {"Name": "unless-stopped"}, "NetworkMode": "default", "GroupAdd": ["988"]},
 				"NetworkSettings": {"Networks": {"meta-gateway_default": {"Aliases": []}}},
 				"State": {"Running": true}
 			}`))
 		case r.URL.Path == "/containers/next-id/json":
 			if f.successorDead {
-				w.Write([]byte(`{"Id": "next-id", "Name": "/gw-next", "Config": {"Image": "zichuanlan/meta-gateway:latest"}, "HostConfig": {"GroupAdd": ["988"]}, "NetworkSettings": {}, "State": {"Running": false, "ExitCode": 1, "Error": ""}}`))
+				w.Write([]byte(`{"Id": "next-id", "Name": "/gw-next", "Config": {"Image": "sise13/meta-gateway:latest"}, "HostConfig": {"GroupAdd": ["988"]}, "NetworkSettings": {}, "State": {"Running": false, "ExitCode": 1, "Error": ""}}`))
 				return
 			}
 			// Running: the watchdog must not declare a live successor dead. It also
 			// carries the supplementary groups the swap needs.
-			w.Write([]byte(`{"Id": "next-id", "Name": "/gw-next", "Config": {"Image": "zichuanlan/meta-gateway:latest"}, "HostConfig": {"GroupAdd": ["988"]}, "NetworkSettings": {}, "State": {"Running": true}}`))
+			w.Write([]byte(`{"Id": "next-id", "Name": "/gw-next", "Config": {"Image": "sise13/meta-gateway:latest"}, "HostConfig": {"GroupAdd": ["988"]}, "NetworkSettings": {}, "State": {"Running": true}}`))
 		case r.URL.Path == "/images/create":
 			w.Write([]byte("{\"status\":\"Pulling from zichuanlan/meta-gateway\"}\n{\"status\":\"Download complete\"}\n"))
 		case r.URL.Path == "/containers/final-id/json":
@@ -134,7 +134,7 @@ func TestHandoffCreatesSuccessorWithoutPorts(t *testing.T) {
 		t.Fatalf("successor GroupAdd: %v, want [988]", hostConfig["GroupAdd"])
 	}
 	env := decodeStrings(createBody["Env"])
-	if !contains(env, swapEnv+"=gw") || !contains(env, imageEnv+"=zichuanlan/meta-gateway:latest") {
+	if !contains(env, swapEnv+"=gw") || !contains(env, imageEnv+"=sise13/meta-gateway:latest") {
 		t.Fatalf("swap env missing: %v", env)
 	}
 	if !containsPrefix(env, portsEnv+"=") {

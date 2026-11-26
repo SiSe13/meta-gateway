@@ -185,8 +185,8 @@ func genEnvVars(root string) (string, error) {
 			"运行设置会覆盖环境变量而不需要重启。",
 		"默认值列来自 `internal/config/config.go` 里的字面量。显示为空表示该变量没有字面量默认值"+
 			"（例如 `MASTER_KEY` 必须显式提供）；显示为包限定名（如 `time.Minute`）表示默认值在代码里是计算得出的。",
-		"必填项（`ADMIN_TOKEN`、`MASTER_KEY`）由启动校验强制，缺失会让进程直接退出——"+
-			"compose 文件刻意没有兜底凭据。",
+		"`MASTER_KEY` 必须显式配置。新部署不需要 `ADMIN_TOKEN`，首次访问控制台时创建管理员账号；"+
+			"旧部署仍可保留该配置以完成登录迁移。",
 	))
 	b.WriteString(countNote(len(names), "环境变量"))
 	b.WriteString(table([]string{"变量", "类型", "默认值", "说明"}, body))

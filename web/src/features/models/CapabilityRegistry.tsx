@@ -1,9 +1,19 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
+import { Input as HeroInput } from "@heroui/react";
 import { api } from "../../api/client";
 import type { CatalogFieldChange, CatalogPreviewItem, ModelCapability } from "../../api/types";
-import { Button, Dialog, Empty, ErrorState, Field, formatDate } from "../../components/ui";
+import {
+  Button,
+  CheckboxControl,
+  Dialog,
+  Empty,
+  ErrorState,
+  Field,
+  formatDate,
+  SelectControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
 
@@ -130,14 +140,14 @@ export function CapabilityRegistryDialog({ onClose }: { onClose: () => void }) {
       <div className="cap-registry-bar">
         <label className="directory-search cap-registry-filter">
           <Search size={14} aria-hidden="true" />
-          <input
+          <HeroInput
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
             placeholder={t("workbench.cap.filter")}
             aria-label={t("workbench.cap.filter")}
           />
         </label>
-        <input
+        <HeroInput
           value={newModel}
           placeholder={t("workbench.cap.addPlaceholder")}
           aria-label={t("workbench.cap.addPlaceholder")}
@@ -335,24 +345,21 @@ function CatalogDialog({
         <>
           <div className="catalog-toggles">
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={writeCapabilities}
                 onChange={(event) => setWriteCapabilities(event.target.checked)}
               />
               <span>{t("workbench.cap.catalog.writeCapabilities")}</span>
             </label>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={writeMetadata}
                 onChange={(event) => setWriteMetadata(event.target.checked)}
               />
               <span>{t("workbench.cap.catalog.writeMetadata")}</span>
             </label>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={writePrices}
                 disabled={!writeMetadata}
                 onChange={(event) => setWritePrices(event.target.checked)}
@@ -360,8 +367,7 @@ function CatalogDialog({
               <span>{t("workbench.cap.catalog.writePrices")}</span>
             </label>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={onlyChanges}
                 onChange={(event) => setOnlyChanges(event.target.checked)}
               />
@@ -530,37 +536,37 @@ function CapabilityDialog({
       <p className="panel-hint">{t("workbench.cap.editHint")}</p>
       <div className="meta-form">
         <Field label={t("workbench.cap.kind")}>
-          <select value={form.kind} onChange={(e) => patch({ kind: e.target.value })}>
+          <SelectControl value={form.kind} onChange={(e) => patch({ kind: e.target.value })}>
             {Object.keys(KIND_KEYS).map((kind) => (
               <option key={kind} value={kind}>
                 {kindLabel(t, kind)}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </Field>
         <Field label={t("workbench.cap.provider")}>
-          <input
+          <HeroInput
             value={form.provider}
             placeholder="openai, google, xai…"
             onChange={(e) => patch({ provider: e.target.value })}
           />
         </Field>
         <Field label={t("workbench.cap.endpoints")} hint={t("workbench.cap.endpointsHint")}>
-          <input
+          <HeroInput
             className="mono"
             value={form.endpoints.join(",")}
             onChange={(e) => patch({ endpoints: listField(e.target.value) })}
           />
         </Field>
         <Field label={t("workbench.cap.formats")} hint={t("workbench.cap.formatsHint")}>
-          <input
+          <HeroInput
             className="mono"
             value={form.input_formats.join(",")}
             onChange={(e) => patch({ input_formats: listField(e.target.value) })}
           />
         </Field>
         <Field label={t("workbench.cap.maxImages")}>
-          <input
+          <HeroInput
             type="number"
             min={0}
             value={form.max_input_images}
@@ -572,28 +578,28 @@ function CapabilityDialog({
           />
         </Field>
         <Field label={t("workbench.cap.inputs")}>
-          <input
+          <HeroInput
             value={form.input_modalities.join(",")}
             placeholder="text,image"
             onChange={(event) => patch({ input_modalities: listField(event.target.value) })}
           />
         </Field>
         <Field label={t("workbench.cap.outputs")}>
-          <input
+          <HeroInput
             value={form.output_modalities.join(",")}
             placeholder="image"
             onChange={(event) => patch({ output_modalities: listField(event.target.value) })}
           />
         </Field>
         <Field label={t("workbench.cap.sizes")}>
-          <input
+          <HeroInput
             value={form.size_options}
             placeholder="1024x1024,1024x1536"
             onChange={(event) => patch({ size_options: event.target.value })}
           />
         </Field>
         <Field label={t("workbench.cap.notes")}>
-          <input value={form.notes} onChange={(e) => patch({ notes: e.target.value })} />
+          <HeroInput value={form.notes} onChange={(e) => patch({ notes: e.target.value })} />
         </Field>
       </div>
       {error ? <ErrorState error={error} /> : null}

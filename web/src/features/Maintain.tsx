@@ -48,6 +48,7 @@ export function Maintain() {
     <Page
       title={showOperatorAccount ? t("operator.title") : t("maintain.title")}
       description={t("maintain.description")}
+      hideHeading={!showOperatorAccount}
     >
       <div className="ops-canvas">
         {/* Keep the runtime draft mounted while an avatar menu opens the hidden

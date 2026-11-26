@@ -54,6 +54,43 @@ it("closes mobile navigation after choosing a destination", () => {
   expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "page");
 });
 
+it("hides the icon on nested sidebar entries when requested", () => {
+  const { container } = render(
+    <I18nProvider>
+      <MemoryRouter initialEntries={["/settings?section=relay"]}>
+        <ConsoleShell
+          appearance="metapi"
+          sections={[
+            {
+              label: "Runtime",
+              items: [
+                {
+                  to: "/settings?section=relay",
+                  label: "Relay",
+                  icon: Cable,
+                  hideIcon: true,
+                  active: true,
+                },
+              ],
+            },
+          ]}
+          version="dev"
+          theme="light"
+          onThemeChange={vi.fn()}
+          onDisconnect={vi.fn()}
+          health={{ total: 0, healthy: 0, loading: false }}
+        >
+          <div />
+        </ConsoleShell>
+      </MemoryRouter>
+    </I18nProvider>,
+  );
+  const link = screen.getByRole("link", { name: "Relay" });
+  expect(link).toBeInTheDocument();
+  expect(link.querySelector("svg")).toBeNull();
+  expect(container.querySelector(".runtime-nav-dot")).toBeNull();
+});
+
 it("shows only the selected top workspace and omits the sidebar section caption", () => {
   const { container } = render(
     <I18nProvider>

@@ -1,4 +1,5 @@
 import { TimeField as HeroTimeField } from "@heroui/react";
+import { Input as HeroInput } from "@heroui/react";
 import { Time } from "@internationalized/date";
 import { useI18n } from "../../i18n";
 
@@ -33,7 +34,7 @@ function CheckinTimePicker({
   if (!time) {
     // Custom expression (e.g. weekday-based): fall back to the raw input.
     return (
-      <input
+      <HeroInput
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}

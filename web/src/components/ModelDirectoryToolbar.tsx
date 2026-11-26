@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Search } from "lucide-react";
+import { Input as HeroInput } from "@heroui/react";
 
 /** Shared directory search layout. Filters remain scoped to each account. */
 export function ModelDirectoryToolbar({
@@ -17,7 +18,9 @@ export function ModelDirectoryToolbar({
     <div className="models-simple-toolbar">
       <label className="directory-search models-search">
         <Search size={14} aria-hidden="true" />
-        <input
+        <HeroInput
+          className="models-search-input"
+          type="search"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={label}

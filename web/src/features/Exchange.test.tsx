@@ -64,17 +64,23 @@ const json = (body: unknown, status = 200) =>
 let settingsReply: () => WebDAVSettings = () => settings();
 let putReply: () => Response | Promise<Response> = () => json(settings());
 let putBodies: unknown[] = [];
+let exportBodies: unknown[] = [];
 
 function installFetch() {
   settingsReply = () => settings();
   putReply = () => json(settings());
   putBodies = [];
+  exportBodies = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = new URL(String(input), "http://localhost").pathname;
       const method = (init?.method ?? "GET").toUpperCase();
       if (path === "/admin/channels") return json(CHANNELS);
+      if (path === "/admin/exchange/export" && method === "POST") {
+        exportBodies.push(JSON.parse(String(init?.body ?? "{}")));
+        return json({ format: "meta-gateway-exchange", version: 1, items: [], skipped: [] });
+      }
       if (path === "/admin/webdav/status") return json(webdavStatus());
       if (path === "/admin/webdav/settings" && method === "GET") return json(settingsReply());
       if (path === "/admin/webdav/settings" && method === "PUT") {
@@ -161,7 +167,10 @@ describe("exchange task workspace", () => {
     expect(screen.getByRole("heading", { name: "Export channels" })).toBeVisible();
     expect(screen.getByText("Cloud backup sync")).toBeVisible();
     // The format legend is reference material: mounted, folded and closed.
-    expect(screen.getByText("What can I import?").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "What can I import?" })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
   it("keeps the WebDAV draft without persisting on the way", async () => {
@@ -184,6 +193,19 @@ describe("exchange task workspace", () => {
     // Touching another panel does not remount the export selection.
     fireEvent.change(downloadUrlField(), { target: { value: "https://typed.example/dav/" } });
     expect(screen.getByRole("checkbox", { name: /Alpha site/ })).toBeChecked();
+  });
+
+  it("marks every channel selected in all mode and sends explicit ids for secret export", async () => {
+    mount();
+    expect(await screen.findByRole("checkbox", { name: "Alpha site #1" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Beta site #2" })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("button", { name: "Export with secrets" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Download sensitive export" }));
+
+    await waitFor(() => expect(exportBodies).toHaveLength(1));
+    expect(exportBodies[0]).toEqual({ include_secrets: true, channel_ids: [1, 2] });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("does not let a background settings refresh overwrite a dirty draft", async () => {

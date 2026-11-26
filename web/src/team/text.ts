@@ -115,8 +115,8 @@ const zh = {
   restore: "恢复",
   bootstrap: "创建站长账户",
   bootstrapAuto:
-    "切换到团队模式时会自动用部署管理员创建站长（用户名与口令沿用当前管理员），无需另外填写。",
-  bootstrapHint: "仅当部署没有可用的管理员口令时，才需要在这里手动创建站长。",
+    "新部署首次访问时已通过初始化码创建站长账号。旧部署切换到团队模式时，如尚无站长账号，会沿用原管理凭据完成迁移。",
+  bootstrapHint: "仅当旧部署没有可用的管理凭据时，才需要在这里手动创建站长。",
   totp: "原控制台两步验证码（如已开启）",
   ownerReady: "站长账户已创建",
   invite: "邀请用户",
@@ -543,8 +543,8 @@ const en: Record<keyof typeof zh, string> = {
   restore: "Restore",
   bootstrap: "Create owner account",
   bootstrapAuto:
-    "Switching to team mode creates the owner from the deployment administrator automatically, reusing the admin username and secret — nothing to fill in.",
-  bootstrapHint: "Only needed when the deployment has no admin secret to derive a password from.",
+    "New deployments create the owner account with the first-run setup code. On older deployments, switching to team mode migrates the existing admin credentials if no owner exists.",
+  bootstrapHint: "Only needed on an older deployment with no usable admin credentials.",
   totp: "Console two-factor code (if enabled)",
   ownerReady: "Owner account created",
   invite: "Invite member",

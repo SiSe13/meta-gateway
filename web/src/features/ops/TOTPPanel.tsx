@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { api } from "../../api/client";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -89,7 +89,7 @@ function TOTPPanel() {
           >
             {t("ops.runtime.totpOpenApp")}
           </a>
-          <input
+          <HeroInput
             type="text"
             inputMode="numeric"
             pattern="[0-9]{6}"
@@ -111,7 +111,7 @@ function TOTPPanel() {
       {enabled ? (
         <div className="totp-setup">
           <p className="muted panel-note">{t("ops.runtime.totpDisableHint")}</p>
-          <input
+          <HeroInput
             type="text"
             inputMode="numeric"
             pattern="[0-9]{6}"

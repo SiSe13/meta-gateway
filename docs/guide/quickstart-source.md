@@ -19,7 +19,6 @@ cd web && npm ci && npm run build && cd ..
 go build -o bin/meta-gateway ./cmd/server
 
 # 3. 启动
-ADMIN_TOKEN=my-admin-token \
 MASTER_KEY=0123456789abcdef0123456789abcdef \
 ./bin/meta-gateway
 ```
@@ -55,7 +54,6 @@ npm run dev      # 127.0.0.1:4173，base 为 /console/
 ## 运行时的最小环境变量
 
 ```bash
-ADMIN_TOKEN=test \
 MASTER_KEY=test-key-32-chars-long!!!!!!! \
 METRICS_TOKEN=test \
 ./bin/meta-gateway

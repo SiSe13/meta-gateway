@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -27,17 +28,14 @@ type CheckinInput struct {
 	Cookie         string
 	AuthMode       AuthMode
 	PlatformUserID int64
-	// CheckinPath/Method override the endpoint for generic external sites
-	// (e.g. 薄荷公益站 POST /api/checkin/spin). Empty = default New-API path.
+	// CheckinPath/Method override the site-relative endpoint. Empty uses the
+	// platform default; common New-API forks default to POST /api/user/checkin.
 	CheckinPath   string
 	CheckinMethod string
-	// Headers are extra request headers for external sites that need more
-	// than a cookie (e.g. New-API forks require new-api-user). Host / Cookie /
-	// hop-by-hop headers are ignored; Origin/Referer stay derived from the URL.
+	// Headers are extra request headers for site-specific check-in endpoints.
+	// Host / Cookie / hop-by-hop headers are ignored.
 	Headers map[string]string
-	// Body is the request body for external sites whose check-in is an action
-	// rather than a bare POST (e.g. relayfor.xyz wants {"date":"…"}). Empty
-	// means an empty body, which is what most sites expect.
+	// Body supports site-specific POST APIs that require a JSON payload.
 	Body string
 }
 
@@ -97,24 +95,188 @@ func (a *JSONCheckinAdapter) Name() string { return a.name }
 func (a *JSONCheckinAdapter) RequiresPlatformUserID() bool { return a.userHeader }
 
 func (a *JSONCheckinAdapter) Checkin(ctx context.Context, input CheckinInput) (CheckinResult, error) {
-	endpoint, err := checkinEndpoint(input.BaseURL)
+	path := strings.TrimSpace(input.CheckinPath)
+	if path == "" {
+		path = "/api/user/checkin"
+	}
+	endpoint, err := checkinEndpoint(input.BaseURL, path)
 	if err != nil {
 		return CheckinResult{}, &CheckinError{Kind: ErrorInvalidURL}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
-	if err != nil {
-		return CheckinResult{}, &CheckinError{Kind: ErrorInvalidURL}
+	method := strings.ToUpper(strings.TrimSpace(input.CheckinMethod))
+	if method == "" {
+		method = http.MethodPost
 	}
-	if normalizeAuthMode(input.AuthMode) == AuthCookie {
-		if strings.TrimSpace(input.Cookie) != "" {
-			req.Header.Set("Cookie", input.Cookie)
+	if method != http.MethodPost && method != http.MethodGet {
+		return CheckinResult{}, &CheckinError{Kind: ErrorPayload, Message: "unsupported check-in method"}
+	}
+	body := ""
+	if method == http.MethodPost {
+		body = input.Body
+	}
+
+	mode := normalizeAuthMode(input.AuthMode)
+	var bearer *checkinAuth
+	if mode != AuthCookie && strings.TrimSpace(input.Secret) != "" {
+		bearer = &checkinAuth{bearer: strings.TrimSpace(input.Secret)}
+	}
+	cookies := cookieAuthCandidates(input)
+	if bearer == nil && len(cookies) == 0 {
+		return CheckinResult{}, &CheckinError{Kind: ErrorPayload, Message: "check-in requires an access token or cookie"}
+	}
+
+	var firstResult CheckinResult
+	var firstErr error
+	fallbackAllowed := bearer == nil
+	if bearer != nil {
+		result, requestErr := a.checkinRequest(ctx, endpoint, method, body, input, *bearer, false)
+		if requestErr == nil && result.Outcome == CheckinSuccess {
+			return result, nil
 		}
-	} else {
-		req.Header.Set("Authorization", "Bearer "+input.Secret)
+		firstResult, firstErr = result, requestErr
+		if requestErr != nil && (errors.Is(requestErr, context.Canceled) || errors.Is(requestErr, context.DeadlineExceeded)) {
+			return CheckinResult{}, requestErr
+		}
+		fallbackAllowed = shouldFallbackCheckin(result, requestErr)
 	}
-	req.Header.Set("Accept", "application/json")
+
+	// New-API forks may expose the browser's sign_in action. Try it before the
+	// cookie-form checkin endpoint, matching the site's own account workflow.
+	if fallbackAllowed && strings.TrimSpace(input.CheckinPath) == "" && method == http.MethodPost && len(cookies) > 0 {
+		legacyEndpoint, endpointErr := checkinEndpoint(input.BaseURL, "/api/user/sign_in")
+		if endpointErr == nil {
+			for _, auth := range cookies {
+				result, requestErr := a.checkinRequest(ctx, legacyEndpoint, http.MethodPost, "{}", input, auth, true)
+				if requestErr == nil && result.Outcome == CheckinSuccess {
+					return result, nil
+				}
+				if requestErr != nil && (errors.Is(requestErr, context.Canceled) || errors.Is(requestErr, context.DeadlineExceeded)) {
+					return CheckinResult{}, requestErr
+				}
+				if firstErr == nil && (firstResult.Outcome == "" || (firstResult.Outcome == CheckinSkipped && requestErr != nil)) {
+					firstResult, firstErr = result, requestErr
+				}
+			}
+		}
+	}
+	if fallbackAllowed {
+		for _, auth := range cookies {
+			result, requestErr := a.checkinRequest(ctx, endpoint, method, body, input, auth, false)
+			if requestErr == nil && result.Outcome == CheckinSuccess {
+				return result, nil
+			}
+			if requestErr != nil && (errors.Is(requestErr, context.Canceled) || errors.Is(requestErr, context.DeadlineExceeded)) {
+				return CheckinResult{}, requestErr
+			}
+			if firstErr == nil && (firstResult.Outcome == "" || (firstResult.Outcome == CheckinSkipped && requestErr != nil)) {
+				firstResult, firstErr = result, requestErr
+			}
+			if !shouldFallbackCheckin(result, requestErr) {
+				break
+			}
+		}
+	}
+	if firstErr != nil {
+		return CheckinResult{}, firstErr
+	}
+	return firstResult, nil
+}
+
+type checkinAuth struct {
+	bearer string
+	cookie string
+}
+
+// cookieAuthCandidates mirrors the common New-API session-cookie formats used by site forks.
+func cookieAuthCandidates(input CheckinInput) []checkinAuth {
+	if cookie := strings.TrimSpace(input.Cookie); cookie != "" {
+		return []checkinAuth{{cookie: cookie}}
+	}
+	secret := strings.TrimSpace(input.Secret)
+	if secret == "" {
+		return nil
+	}
+	if hasKnownSessionCookie(secret) {
+		return []checkinAuth{{cookie: secret}}
+	}
+	return []checkinAuth{{cookie: "session=" + secret}, {cookie: "token=" + secret}}
+}
+
+func hasKnownSessionCookie(value string) bool {
+	for _, part := range strings.Split(value, ";") {
+		name, _, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(name)) {
+		case "session", "token", "auth_token", "access_token", "jwt", "jwt_token":
+			return true
+		}
+	}
+	return false
+}
+
+// shouldFallbackCheckin retries alternate cookie auth only for endpoint/auth-shaped failures.
+func shouldFallbackCheckin(result CheckinResult, err error) bool {
+	if err == nil {
+		return result.Category == "unsupported"
+	}
+	var checkinErr *CheckinError
+	if !errors.As(err, &checkinErr) {
+		return false
+	}
+	switch checkinErr.Kind {
+	case ErrorTransport:
+		return true
+	case ErrorStatus:
+		return checkinErr.Status == http.StatusUnauthorized || checkinErr.Status == http.StatusForbidden ||
+			checkinErr.Status == http.StatusNotFound || checkinErr.Status == http.StatusMethodNotAllowed
+	case ErrorPayload:
+		message := strings.ToLower(checkinErr.Message)
+		for _, marker := range []string{"unauthorized", "forbidden", "access token", "new-api-user", "invalid token", "not login", "not logged", "未登录", "未提供", "未授权"} {
+			if strings.Contains(message, marker) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// checkinRequest sends one auth variant and normalizes its response.
+func (a *JSONCheckinAdapter) checkinRequest(ctx context.Context, endpoint, method, body string, input CheckinInput, auth checkinAuth, browserAction bool) (CheckinResult, error) {
+	var reader io.Reader
+	if method == http.MethodPost && body != "" {
+		reader = strings.NewReader(body)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, reader)
+	if err != nil {
+		return CheckinResult{}, &CheckinError{Kind: ErrorInvalidURL}
+	}
+	if auth.cookie != "" {
+		req.Header.Set("Cookie", auth.cookie)
+	} else if auth.bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+auth.bearer)
+	}
+	req.Header.Set("Accept", "application/json, text/plain, */*")
+	if method == http.MethodPost {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if browserAction {
+		req.Header.Set("X-Requested-With", "XMLHttpRequest")
+		req.Header.Set("User-Agent", defaultCheckinUserAgent)
+		if parsed, parseErr := url.Parse(endpoint); parseErr == nil {
+			origin := parsed.Scheme + "://" + parsed.Host
+			req.Header.Set("Origin", origin)
+			req.Header.Set("Referer", origin+"/")
+		}
+	}
 	if a.userHeader {
 		ApplyCompatUserIDHeaders(req.Header, input.PlatformUserID)
+	}
+	for key, value := range input.Headers {
+		if key != "" && checksumHeaderAllowed(key) {
+			req.Header.Set(key, value)
+		}
 	}
 
 	resp, err := a.client.Do(req)
@@ -130,39 +292,41 @@ func (a *JSONCheckinAdapter) Checkin(ctx context.Context, input CheckinInput) (C
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return CheckinResult{}, &CheckinError{
-			Kind:    ErrorStatus,
-			Status:  resp.StatusCode,
-			Message: explainCheckinHTTPStatus(resp.StatusCode),
+			Kind: ErrorStatus, Status: resp.StatusCode, Message: explainCheckinHTTPStatus(resp.StatusCode),
 		}
 	}
-
 	limited := io.LimitReader(resp.Body, maxCheckinResponseBytes+1)
-	body, err := io.ReadAll(limited)
+	responseBody, err := io.ReadAll(limited)
 	if err != nil {
 		return CheckinResult{}, &CheckinError{Kind: ErrorTransport}
 	}
-	if len(body) > maxCheckinResponseBytes {
+	if len(responseBody) > maxCheckinResponseBytes {
 		return CheckinResult{}, &CheckinError{Kind: ErrorTooLarge}
 	}
 	var payload struct {
 		Success *bool  `json:"success"`
 		Message string `json:"message"`
 		Data    struct {
-			Reward any `json:"reward"`
+			Reward       any `json:"reward"`
+			QuotaAwarded any `json:"quota_awarded"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(body, &payload); err != nil || payload.Success == nil {
+	if err := json.Unmarshal(responseBody, &payload); err != nil || payload.Success == nil {
 		return CheckinResult{}, &CheckinError{
 			Kind:    ErrorPayload,
 			Message: "upstream body was not valid check-in JSON (missing success field)",
 		}
 	}
 	if *payload.Success {
+		reward := payload.Data.Reward
+		if reward == nil {
+			reward = payload.Data.QuotaAwarded
+		}
 		return CheckinResult{
 			Outcome:  CheckinSuccess,
 			Category: "checked_in",
 			Message:  "check-in succeeded",
-			Reward:   rewardString(payload.Data.Reward),
+			Reward:   rewardString(reward),
 		}, nil
 	}
 	if alreadyCheckedIn(payload.Message) {
@@ -182,10 +346,16 @@ func (a *JSONCheckinAdapter) Checkin(ctx context.Context, input CheckinInput) (C
 	}
 }
 
-func checkinEndpoint(baseURL string) (string, error) {
+const defaultCheckinUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+func checkinEndpoint(baseURL, checkinPath string) (string, error) {
 	// Same base normalization as account self/token probes: strip trailing /v1 so
-	// OpenAI-style site URLs still hit /api/user/checkin on the site root.
-	return accountEndpoint(baseURL, "/api/user/checkin")
+	// OpenAI-style site URLs still hit check-in APIs on the site root.
+	path := strings.TrimSpace(checkinPath)
+	if path == "" || !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "\\?#%") || strings.Contains(path, "..") {
+		return "", errors.New("invalid check-in path")
+	}
+	return accountEndpoint(baseURL, path)
 }
 
 func rewardString(value any) string {

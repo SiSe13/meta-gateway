@@ -1,7 +1,16 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import type { RouteMember } from "../../api/types";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import { Button, Dialog, ErrorState, Field, InfoTip } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  ErrorState,
+  Field,
+  InfoTip,
+  SelectControl,
+  CheckboxControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { memberRealName, serializeMemberMapping } from "../../lib/alias";
 
@@ -87,7 +96,7 @@ export function MemberDialog({
     >
       {!value.id ? (
         <Field label={t("common.channel")}>
-          <select
+          <SelectControl
             value={form.channel_id ?? ""}
             onChange={(event) => {
               // The previous channel's alias target says nothing about this
@@ -107,15 +116,15 @@ export function MemberDialog({
                 {channel.name}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </Field>
       ) : null}
       <div className="ops-panel-context">
         <span>{t("routing.memberDialogIntro")}</span>
       </div>
       <div className="form-grid">
-        <Field label={t("routing.priorityLabel")}>
-          <input
+        <Field label={t("routing.priorityLabel")} hint={t("routing.priorityHint")}>
+          <HeroInput
             type="number"
             value={form.priority ?? 0}
             onChange={(event) => {
@@ -123,10 +132,9 @@ export function MemberDialog({
               setForm({ ...form, priority: Number(event.target.value) });
             }}
           />
-          <InfoTip label={t("routing.priorityHint")} />
         </Field>
-        <Field label={t("routing.weightLabel")}>
-          <input
+        <Field label={t("routing.weightLabel")} hint={t("routing.weightHint")}>
+          <HeroInput
             type="number"
             min={0}
             value={form.weight ?? 100}
@@ -135,12 +143,11 @@ export function MemberDialog({
               setForm({ ...form, weight: Number(event.target.value) });
             }}
           />
-          <InfoTip label={t("routing.weightHint")} />
         </Field>
         <p className="field-hint">{t("billing.priceLocation")}</p>
       </div>
-      <Field label={t("routing.memberGroupLabel")}>
-        <select
+      <Field label={t("routing.memberGroupLabel")} hint={t("routing.memberGroupHint")}>
+        <SelectControl
           value={form.group_name || "default"}
           onChange={(event) => setForm({ ...form, group_name: event.target.value || "default" })}
         >
@@ -149,10 +156,9 @@ export function MemberDialog({
               {group === "default" ? t("routing.groupDefault") : group}
             </option>
           ))}
-        </select>
-        <InfoTip label={t("routing.memberGroupHint")} />
+        </SelectControl>
       </Field>
-      <Field label={t("routing.memberRealName")}>
+      <Field label={t("routing.memberRealName")} hint={t("routing.memberRealNameHint")}>
         <SearchableSelect
           // Remount on channel change: the picker keeps its own "custom entry"
           // state, and a stale one would outlive the options it belonged to.
@@ -180,11 +186,9 @@ export function MemberDialog({
             setForm({ ...form, mapping_json: serializeMemberMapping(next) });
           }}
         />
-        <InfoTip label={t("routing.memberRealNameHint")} />
       </Field>
       <label className="check">
-        <input
-          type="checkbox"
+        <CheckboxControl
           checked={form.enabled ?? true}
           onChange={(event) => setForm({ ...form, enabled: event.target.checked })}
         />

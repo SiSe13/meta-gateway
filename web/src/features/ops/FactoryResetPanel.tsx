@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { api } from "../../api/client";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
@@ -29,7 +30,7 @@ function FactoryResetPanel() {
       id="runtime-factory-reset"
     >
       <div className="panel-header">
-        <strong>{t("ops.factoryReset.title")}</strong>
+        <h2>{t("ops.factoryReset.title")}</h2>
       </div>
       <p className="muted panel-lede">{t("ops.factoryReset.hint")}</p>
       {!arm ? (
@@ -38,7 +39,7 @@ function FactoryResetPanel() {
         </Button>
       ) : (
         <div className="factory-reset-arm">
-          <input
+          <HeroInput
             type="text"
             placeholder={t("ops.factoryReset.typeConfirm")}
             value={confirm}

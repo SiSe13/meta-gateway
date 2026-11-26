@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { translate } from "../../i18n";
-import { auditActionLabel } from "./AuditPanel";
+import { auditActionLabel, auditOutcomeStatus } from "./AuditPanel";
+
+describe("system log outcome status", () => {
+  it("maps audit failures to the localized failed status", () => {
+    expect(auditOutcomeStatus("failure")).toBe("failed");
+    expect(auditOutcomeStatus("success")).toBe("success");
+  });
+});
 
 describe("system log action labels", () => {
   it("explains common model discovery and admin actions", () => {

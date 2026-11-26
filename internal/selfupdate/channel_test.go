@@ -29,7 +29,23 @@ func TestHandoffUsesConfirmedBetaTag(t *testing.T) {
 	s.target = "v9.1.0-beta.2"
 	s.handoff()
 	body := f.bodies["/containers/create"]
-	if body["Image"] != "zichuanlan/meta-gateway:9.1.0-beta.2" {
+	if body["Image"] != "sise13/meta-gateway:9.1.0-beta.2" {
 		t.Fatalf("image=%v", body["Image"])
+	}
+}
+
+func TestProjectImageOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		repository string
+		want       bool
+	}{
+		{"sise13/meta-gateway", true},
+		{"docker.io/sise13/meta-gateway", true},
+		{"zichuanlan/meta-gateway", false},
+		{"docker.io/zichuanlan/meta-gateway", false},
+	} {
+		if got := isProjectImage(tc.repository); got != tc.want {
+			t.Errorf("isProjectImage(%q) = %v, want %v", tc.repository, got, tc.want)
+		}
 	}
 }

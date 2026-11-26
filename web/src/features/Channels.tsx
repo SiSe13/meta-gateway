@@ -63,6 +63,7 @@ const INVALIDATE = [
   ["routes"],
   ["route-overviews"],
   ["discovered-models"],
+  ["finance"],
 ] as const;
 export function Channels() {
   const { client } = useSession();
@@ -436,7 +437,7 @@ export function Channels() {
       // have changed it since this dialog opened, and only an explicit
       // picker change (below) may touch it.
       const { model_sync_mode: _snapshotSyncMode, ...channelFields } = input.channel;
-      return service.updateChannel(input.channel.id, {
+      const updated = await service.updateChannel(input.channel.id, {
         ...channelFields,
         name,
         base_url: channelBase,
@@ -467,6 +468,16 @@ export function Channels() {
         site_id: siteId,
         credential_id: relayCredentialId,
       });
+      // 用户 Access Token/Cookie 变更后立即触发余额刷新，不必等缓存过期。
+      if (clearCredential || secretChanged || cookieChanged) {
+        try {
+          await service.refreshFinance();
+        } catch {
+          // 凭证已保存成功；余额接口暂时不可用时提示用户，定时检查仍会重试。
+          toast.push({ tone: "info", message: t("channels.balanceRefreshDelayed") });
+        }
+      }
+      return updated;
     },
     invalidateKeys: [...INVALIDATE, ["credentials"]],
     toastOnError: false,
@@ -530,6 +541,11 @@ export function Channels() {
       });
     },
     invalidateKeys: [...INVALIDATE, ["credentials"]],
+    onSuccess: (result) => {
+      if (result.duplicate) {
+        toast.push({ tone: "info", message: t("channels.apiKeyDuplicateSkipped") });
+      }
+    },
   });
 
   const deleteApiKeyCredential = useAdminMutation({
@@ -571,12 +587,6 @@ export function Channels() {
     invalidateKeys: [["credentials"], ["channel-overviews"], ["runtime-settings"]],
     pendingIdOf: (input) => input.credentialId,
   });
-  const runCheckin = useAdminMutation({
-    mutationFn: (credentialId: number) => service.runCredential(credentialId),
-    invalidateKeys: [["checkin-logs"], ["credentials"], ["channel-overviews"]],
-    pendingIdOf: (credentialId) => credentialId,
-  });
-
   const siteById = useMemo(() => {
     const map = new Map<number, Site>();
     for (const site of sites.data ?? []) map.set(site.id, site);
@@ -729,7 +739,6 @@ export function Channels() {
     t,
     navigate,
     pushError: (error) => toast.pushError(error),
-    userCredentialFor,
     selectRow,
     setContextMenu,
     setBulkMode,
@@ -747,8 +756,6 @@ export function Channels() {
       del,
       duplicate,
       createUpstreamKey,
-      setCheckin,
-      runCheckin,
       saveEdit,
     },
   };
@@ -1029,13 +1036,14 @@ export function Channels() {
                 </>
               }
               setCheckin={(input) => setCheckin.mutateAsync(input)}
+              toggleCheckin={(input) => setCheckin.mutate(input)}
               openAdd={openAdd}
               selectRow={selectRow}
               setInspectorOpen={setInspectorOpen}
               setContextMenu={setContextMenu}
               contextMenu={contextMenu}
               connectionActions={connectionActions}
-              pending={{ refresh, probe, accountProbe, syncKeys, toggle, del }}
+              pending={{ refresh, probe, accountProbe, syncKeys, checkin: setCheckin, toggle, del }}
             />
 
             <ThemeDetails

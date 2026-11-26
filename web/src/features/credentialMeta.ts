@@ -4,6 +4,8 @@ export function parseCredentialMeta(metaJSON?: string): {
   group?: string;
   upstream_token_id?: number;
   platform_user_id?: number;
+  checkin_path?: string;
+  checkin_method?: string;
   /** Raw parsed object, for callers that must round-trip unknown keys. */
   raw?: Record<string, unknown>;
 } {
@@ -19,11 +21,16 @@ export function parseCredentialMeta(metaJSON?: string): {
           : undefined;
     const upstream =
       typeof parsed.upstream_token_id === "number" ? parsed.upstream_token_id : undefined;
+    const checkinPath = typeof parsed.checkin_path === "string" ? parsed.checkin_path : undefined;
+    const checkinMethod =
+      typeof parsed.checkin_method === "string" ? parsed.checkin_method : undefined;
     return {
       name,
       group,
       upstream_token_id: upstream,
       platform_user_id: positiveInt(parsed.platform_user_id),
+      checkin_path: checkinPath,
+      checkin_method: checkinMethod,
       raw: parsed,
     };
   } catch {

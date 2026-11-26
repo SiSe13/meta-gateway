@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { Field } from "../../components/ui";
 import { useI18n } from "../../i18n";
 
@@ -37,7 +38,7 @@ export function PriceFields({
     <>
       {fields.map(([key, label]) => (
         <Field key={key} label={t(label)}>
-          <input
+          <HeroInput
             type="number"
             step="any"
             min={0}

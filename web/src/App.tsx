@@ -65,6 +65,12 @@ import { useOperatingMode } from "./hooks/useOperatingMode";
 import { setCurrency, useCurrency } from "./lib/format";
 import { useToast } from "./toast";
 import { PRELOAD_EXHAUSTED_EVENT } from "./lib/preloadRecovery";
+import {
+  RUNTIME_GROUPS,
+  runtimeMenuEntries,
+  runtimeSectionChanged,
+  runtimeSectionMenuKey,
+} from "./features/ops/runtimeNavigation";
 
 const Channels = lazy(() =>
   import("./features/Channels").then((module) => ({ default: module.Channels })),
@@ -220,7 +226,10 @@ function Connect({
   const [manualCode, setManualCode] = useState(false);
   const accepting = Boolean(inviteToken || recoveryToken || manualCode);
   const team = teamText(locale);
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState("admin");
+  const [setupRequired, setSetupRequired] = useState(false);
+  const [setupCode, setSetupCode] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [upgradeHelp, setUpgradeHelp] = useState(false);
   // The second layer of the sign-in card: registration, third-party sign-in and
   // the upgrade guide. Collapsed by default so the form stays the only thing
@@ -282,6 +291,14 @@ function Connect({
   // providers, and the sign-in form carries on unchanged.
   useEffect(() => {
     const controller = new AbortController();
+    void fetch("/admin/setup/status", { credentials: "same-origin", signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body: { required?: boolean } | null) => {
+        if (body) setSetupRequired(Boolean(body.required));
+      })
+      .catch(() => {
+        /* 旧版本升级或离线时仍可显示普通登录表单。 */
+      });
     void fetch("/auth/options", { credentials: "same-origin", signal: controller.signal })
       .then((response) => (response.ok ? response.json() : null))
       .then(
@@ -377,6 +394,33 @@ function Connect({
       } else {
         setError(t("app.connect.failed"));
       }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function submitSetup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!username.trim() || !password || password !== confirmPassword || !setupCode.trim()) return;
+    setPending(true);
+    setError("");
+    try {
+      const response = await fetch("/admin/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: setupCode.trim(), username: username.trim(), password }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || typeof body.session_token !== "string") {
+        setError(typeof body.error === "string" ? body.error : t("app.connect.failed"));
+        return;
+      }
+      const sessionToken = body.session_token as string;
+      const sites = await api(new ApiClient(sessionToken)).sites();
+      setSetupRequired(false);
+      onAuthorized(sessionToken, remember, sites);
+    } catch {
+      setError(t("app.connect.failed"));
     } finally {
       setPending(false);
     }
@@ -505,76 +549,146 @@ function Connect({
                 <h2 id="login-card-title">{t("login.welcome")}</h2>
                 <p>{t("login.hint")}</p>
               </div>
-              <form onSubmit={submit} aria-busy={pending}>
-                <Field label={t("app.connect.username")}>
-                  <input
-                    autoFocus
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    autoComplete="username"
-                    disabled={pending}
-                    required
-                  />
-                </Field>
-                <Field label={t("app.connect.password")}>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    autoComplete="current-password"
-                    disabled={pending}
-                    required
-                  />
-                </Field>
-                {needTOTP ? (
-                  <Field label={t("app.connect.totp")}>
+              {setupRequired ? (
+                <form onSubmit={submitSetup} aria-busy={pending}>
+                  <p className="field-hint">{t("setup.firstRunHint")}</p>
+                  <Field label={t("setup.code")}>
                     <input
+                      value={setupCode}
+                      onChange={(event) => setSetupCode(event.target.value)}
+                      autoComplete="one-time-code"
+                      required
+                      disabled={pending}
+                    />
+                  </Field>
+                  <Field label={t("app.connect.username")}>
+                    <input
+                      value={username}
+                      onChange={(event) => setUsername(event.target.value)}
+                      autoComplete="username"
+                      minLength={3}
+                      maxLength={64}
+                      pattern="[A-Za-z0-9_.-]+"
+                      required
+                      disabled={pending}
+                    />
+                  </Field>
+                  <Field label={t("operator.newPassword")}>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      autoComplete="new-password"
+                      required
+                      disabled={pending}
+                    />
+                  </Field>
+                  <Field label={t("operator.confirmNewPassword")}>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      autoComplete="new-password"
+                      required
+                      disabled={pending}
+                    />
+                  </Field>
+                  {password && confirmPassword && password !== confirmPassword ? (
+                    <div className="inline-error" role="alert">
+                      {t("operator.passwordMismatch")}
+                    </div>
+                  ) : null}
+                  {error ? (
+                    <div className="inline-error" role="alert">
+                      {error}
+                    </div>
+                  ) : null}
+                  <Button
+                    type="submit"
+                    disabled={
+                      pending ||
+                      !setupCode.trim() ||
+                      !username.trim() ||
+                      !password ||
+                      password !== confirmPassword
+                    }
+                    className="login-submit"
+                  >
+                    {pending ? t("app.connect.connecting") : t("setup.createOwner")}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={submit} aria-busy={pending}>
+                  <Field label={t("app.connect.username")}>
+                    <input
+                      autoFocus
                       type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
-                      value={totpCode}
-                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       onFocus={() => setIsFocused(true)}
                       onBlur={() => setIsFocused(false)}
-                      autoComplete="one-time-code"
-                      placeholder="123456"
+                      autoComplete="username"
                       disabled={pending}
                       required
                     />
                   </Field>
-                ) : null}
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    disabled={pending}
-                  />
-                  <span>{t("app.connect.remember")}</span>
-                </label>
-                {error && (
-                  <div className="inline-error" role="alert">
-                    {error}
-                  </div>
-                )}
-                <Button
-                  type="submit"
-                  disabled={pending || !username.trim() || !password}
-                  className="login-submit"
-                  ref={loginButtonRef}
-                >
-                  <span className="btn-content">
-                    <ArrowRight size={16} />
-                    {pending ? t("app.connect.connecting") : t("app.connect.submit")}
-                  </span>
-                </Button>
-              </form>
+                  <Field label={t("app.connect.password")}>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                      autoComplete="current-password"
+                      disabled={pending}
+                      required
+                    />
+                  </Field>
+                  {needTOTP ? (
+                    <Field label={t("app.connect.totp")}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        value={totpCode}
+                        onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        autoComplete="one-time-code"
+                        placeholder="123456"
+                        disabled={pending}
+                        required
+                      />
+                    </Field>
+                  ) : null}
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                      disabled={pending}
+                    />
+                    <span>{t("app.connect.remember")}</span>
+                  </label>
+                  {error && (
+                    <div className="inline-error" role="alert">
+                      {error}
+                    </div>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={pending || !username.trim() || !password}
+                    className="login-submit"
+                    ref={loginButtonRef}
+                  >
+                    <span className="btn-content">
+                      <ArrowRight size={16} />
+                      {pending ? t("app.connect.connecting") : t("app.connect.submit")}
+                    </span>
+                  </Button>
+                </form>
+              )}
               <HeroButton
                 type="button"
                 variant="ghost"
@@ -729,6 +843,12 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
   // staff get the gateway's pages, a member gets the pages that are theirs.
   const effectiveRole = role ?? "owner";
   const allowedFor = (item: ChromeNavItem) => canAccessNav(item, role);
+  const location = useLocation();
+  const runtimeSettingsQuery = useQuery({
+    queryKey: ["runtime-settings"],
+    queryFn: ({ signal }) => api(client!).runtimeSettings(signal),
+    enabled: isStaff(role) && location.pathname === "/settings",
+  });
   const usersRequest = useCallback(
     <T,>(path: string, init?: RequestInit) => client!.request<T>(path, init),
     [client],
@@ -781,7 +901,6 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
 
   const { scheme: theme, toggleScheme: changeTheme, appearance } = useAppearance();
 
-  const location = useLocation();
   const navigate = useNavigate();
   const [setupWizardOpen, setSetupWizardOpen] = useState(() => location.pathname === "/setup");
 
@@ -828,7 +947,13 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
         // still run); only the sidebar row goes away.
         !hiddenPlugins.has(m.id),
     )
-    .map((m) => ({ to: m.open_path!, label: m.name, icon: Puzzle, group: "backup" as const }));
+    .map((m) => ({
+      to: m.open_path!,
+      label: m.name,
+      icon: Puzzle,
+      group: "backup" as const,
+      active: undefined,
+    }));
 
   // The multi-user area is gated by the operating mode (see lib/topBar.ts):
   // absence is the default on a personal gateway, and pinning the entry in the
@@ -841,17 +966,50 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
     label: t(item.labelKey),
     icon: item.icon,
     group: item.group,
+    active: undefined,
+    changed: false,
   }));
-  const paletteNav = [...registeredNav.filter((item) => !modeHidesNav(item.to)), ...enabledPlugins];
+  const runtimeSettingsNav = isStaff(role)
+    ? RUNTIME_GROUPS.flatMap((group) =>
+        runtimeMenuEntries(group).map((entry) => ({
+          to: `/settings?tab=runtime&section=${encodeURIComponent(entry.key)}`,
+          label: t(entry.label),
+          icon: ChevronRight,
+          hideIcon: true,
+          group: "settings" as const,
+          active: false,
+          changed: runtimeSettingsQuery.data
+            ? entry.sections.some((section) =>
+                runtimeSectionChanged(
+                  section,
+                  runtimeSettingsQuery.data!.editable,
+                  runtimeSettingsQuery.data!.env_bootstrap,
+                ),
+              )
+            : false,
+        })),
+      )
+    : [];
+  const requestedRuntimeSection = new URLSearchParams(location.search).get("section");
+  const selectedRuntimeSection = RUNTIME_GROUPS.some((group) =>
+    group.sections.some((section) => section.key === requestedRuntimeSection),
+  )
+    ? requestedRuntimeSection!
+    : "relay";
+  const selectedRuntimeMenuKey = RUNTIME_GROUPS.flatMap((group) => group.sections)
+    .filter((section) => section.key === selectedRuntimeSection)
+    .map(runtimeSectionMenuKey)[0];
+  for (const item of runtimeSettingsNav)
+    item.active =
+      location.pathname === "/settings" &&
+      new URLSearchParams(item.to.split("?")[1] ?? "").get("section") === selectedRuntimeMenuKey;
+  const sidebarNav = [...registeredNav, ...runtimeSettingsNav, ...enabledPlugins];
+  const paletteNav = [...sidebarNav.filter((item) => !modeHidesNav(item.to))];
 
   // 顶栏工作区和侧栏入口共用导航注册表，并按角色、运行模式和外观偏好过滤。
   const hidden = new Set(chrome.hiddenNav);
-  const availableNav = [...registeredNav, ...enabledPlugins].filter(
-    (item) => !modeHidesNav(item.to) && !hidden.has(item.to),
-  );
-  const modeAvailableNav = [...registeredNav, ...enabledPlugins].filter(
-    (item) => !modeHidesNav(item.to),
-  );
+  const availableNav = sidebarNav.filter((item) => !modeHidesNav(item.to) && !hidden.has(item.to));
+  const modeAvailableNav = sidebarNav.filter((item) => !modeHidesNav(item.to));
   const activeTopNavigation = chromeNavGroupForLocation(location.pathname, location.search);
   const activeGroup = CHROME_NAV_GROUPS.find((item) => item.id === activeTopNavigation)!;
   const topNavigation = CHROME_NAV_GROUPS.flatMap((group) => {
@@ -866,14 +1024,35 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
       },
     ];
   });
-  const navSections = [
-    {
-      label: t(activeGroup.labelKey),
-      items: availableNav
-        .filter((item) => item.group === activeTopNavigation)
-        .map(({ to, label, icon }) => ({ to, label, icon })),
-    },
-  ];
+  const navSections =
+    activeTopNavigation === "settings"
+      ? RUNTIME_GROUPS.map((group) => ({
+          label: t(group.label),
+          items: runtimeMenuEntries(group)
+            .map((entry) =>
+              availableNav.find(
+                (item) =>
+                  item.group === "settings" &&
+                  item.to.endsWith(`section=${encodeURIComponent(entry.key)}`),
+              ),
+            )
+            .filter((item): item is (typeof availableNav)[number] => Boolean(item))
+            .map((item) => ({
+              to: item.to,
+              label: item.label,
+              icon: item.icon,
+              active: item.active,
+              changed: "changed" in item ? item.changed : false,
+            })),
+        }))
+      : [
+          {
+            label: t(activeGroup.labelKey),
+            items: availableNav
+              .filter((item) => item.group === activeTopNavigation)
+              .map(({ to, label, icon }) => ({ to, label, icon })),
+          },
+        ];
 
   return (
     <>

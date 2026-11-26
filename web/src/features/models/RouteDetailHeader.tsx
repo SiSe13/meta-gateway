@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Route, RoutingCandidate } from "../../api/types";
 import { ActionMenu, type ActionMenuItem } from "../../components/ActionMenu";
 import { Button, InfoTip, StatusBadge } from "../../components/ui";
+import { SearchableSelect } from "../../components/SearchableSelect";
 
 /**
  * The selected route's header: which model this is, who serves it, whether it is
@@ -97,13 +98,18 @@ export function RouteDetailHeader({
         <div className="routing-mode-control" title={t("modelsPage.scopeHint")}>
           <span>{t("routing.mode.label")}</span>
           <InfoTip label={t("routing.modeHint")} />
-          <select
-            className="routing-mode-select"
-            aria-label={t("routing.mode.label")}
+          <SearchableSelect
+            ariaLabel={t("routing.mode.label")}
             value={route.routing_mode || "auto"}
             disabled={saveRoutingMode.pendingId === route.id}
-            onChange={(event) => {
-              const next = event.target.value;
+            options={[
+              { value: "auto", label: t("routing.mode.auto") },
+              { value: "adaptive", label: t("routing.mode.adaptive") },
+              { value: "latency", label: t("routing.mode.latency") },
+              { value: "weighted", label: t("routing.mode.weighted") },
+              { value: "single", label: t("routing.mode.single") },
+            ]}
+            onChange={(next) => {
               if (next === "single") {
                 // Manual single selection pins the top member; the per-member menu
                 // pins a specific channel.
@@ -117,13 +123,7 @@ export function RouteDetailHeader({
               }
               saveRoutingMode.mutate({ route, mode: next });
             }}
-          >
-            <option value="auto">{t("routing.mode.auto")}</option>
-            <option value="adaptive">{t("routing.mode.adaptive")}</option>
-            <option value="latency">{t("routing.mode.latency")}</option>
-            <option value="weighted">{t("routing.mode.weighted")}</option>
-            <option value="single">{t("routing.mode.single")}</option>
-          </select>
+          />
         </div>
         <ActionMenu
           compact

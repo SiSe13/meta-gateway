@@ -14,8 +14,10 @@ import (
 type Config struct {
 	HTTPAddr      string   `env:"HTTP_ADDR"`
 	DataDir       string   `env:"DATA_DIR"`
+	// AdminToken仅保留给旧部署登录迁移兼容使用。
 	AdminToken    string   `env:"ADMIN_TOKEN" secret:"true"`
 	AdminUsername string   `env:"ADMIN_USERNAME"`
+	// AdminTokens是旧部署的额外口令轮换列表。
 	AdminTokens   []string `env:"ADMIN_TOKENS" secret:"true"`
 	// AdminTokenLogin re-opens the ADMIN_TOKEN-as-password login after the
 	// deployment has claimed an owner account. Empty (the default) means the

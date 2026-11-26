@@ -25,6 +25,7 @@ services:
       dockerfile: Dockerfile.e2e
     environment:
       GATEWAY_URL: http://meta-gateway:4100
+      # E2E deliberately exercises the legacy ADMIN_TOKEN login path.
       ADMIN_TOKEN: "${ADMIN_TOKEN:?ADMIN_TOKEN is required}"
       METRICS_TOKEN: "${METRICS_TOKEN:?METRICS_TOKEN is required}"
       UPSTREAM_URL: http://mock-upstream:8080

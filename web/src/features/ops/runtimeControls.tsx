@@ -1,6 +1,6 @@
 import { useId, type InputHTMLAttributes, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { useI18n } from "../../i18n";
 import { InfoTip } from "../../components/ui";
 
@@ -179,7 +179,7 @@ export function ValidatedNumberInput({
 
   return (
     <span className={`setting-input-wrap${error ? " is-invalid" : ""}`}>
-      <input
+      <HeroInput
         {...props}
         type="number"
         min={min}

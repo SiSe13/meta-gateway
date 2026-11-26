@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHROME_NAV_GROUPS, CHROME_NAV_ITEMS } from "./chromeNav";
 import { MODE_GATED_NAV, modeHiddenNav } from "./topBar";
+import { RUNTIME_GROUPS, runtimeMenuEntries } from "../features/ops/runtimeNavigation";
 
 describe("console navigation registry", () => {
   it("orders the top-level workspaces as requested", () => {
@@ -27,9 +28,23 @@ describe("console navigation registry", () => {
       "admin",
     ]);
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/workbench")).toBeUndefined();
-    expect(CHROME_NAV_ITEMS.filter((item) => item.group === "settings")).toEqual([
-      expect.objectContaining({ path: "/settings?tab=runtime" }),
-    ]);
+    expect(CHROME_NAV_ITEMS.filter((item) => item.group === "settings")).toEqual([]);
+    expect(CHROME_NAV_GROUPS.find((group) => group.id === "settings")?.defaultPath).toContain(
+      "section=relay",
+    );
+    expect(RUNTIME_GROUPS.map((group) => group.sections.length)).toEqual([7, 7, 9]);
+    expect(RUNTIME_GROUPS[2]!.sections.map((section) => section.key)).toContain("recovery");
+    expect(RUNTIME_GROUPS[2]!.sections.map((section) => section.key)).not.toContain("danger");
+    expect(RUNTIME_GROUPS[2]!.sections.map((section) => section.key)).not.toContain("restoreEnv");
+    expect(RUNTIME_GROUPS.map((group) => runtimeMenuEntries(group).length)).toEqual([5, 4, 5]);
+    expect(
+      RUNTIME_GROUPS.flatMap((group) => group.sections.map((section) => section.key)),
+    ).not.toContain("checkin");
+    expect(
+      runtimeMenuEntries(RUNTIME_GROUPS[0]!)
+        .find((entry) => entry.key === "routing")
+        ?.sections.map((section) => section.key),
+    ).toEqual(["routing", "stableFirst", "sticky"]);
   });
 
   // The multi-user area is the one entry hidden by state instead of by a
@@ -54,7 +69,7 @@ it("reserves personal settings for a team account while retaining deployment set
   expect(canAccessNav(users, "member")).toBe(false);
   expect(
     canAccessNav(
-      CHROME_NAV_ITEMS.find((item) => item.path === "/settings?tab=runtime")!,
+      CHROME_NAV_ITEMS.find((item) => item.path === "/system-logs")!,
       null,
     ),
   ).toBe(true);

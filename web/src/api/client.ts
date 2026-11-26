@@ -181,6 +181,38 @@ export class ApiClient {
     return this.request<T>(path, { signal });
   }
 
+  async getBlob(path: string): Promise<Blob> {
+    const generation = teamSessionGeneration();
+    const headers = new Headers({ Accept: "application/octet-stream" });
+    if (this.authMode === "bearer") headers.set("Authorization", `Bearer ${this.token}`);
+    let response: Response;
+    try {
+      response = await fetch(path, { headers, credentials: "same-origin" });
+    } catch (error) {
+      throw new ApiError(
+        0,
+        error instanceof Error ? error.message : "Unable to reach Meta Gateway",
+        undefined,
+        localGatewayOrigin(path),
+      );
+    }
+    this.checkSession(generation);
+    if (!response.ok) {
+      if (response.status === 401) this.onUnauthorized?.();
+      let message = `Request failed (${response.status})`;
+      try {
+        const body: unknown = await response.json();
+        if (isErrorBody(body)) message = body.error;
+      } catch {
+        /* 下载错误通常返回 JSON，无法解析时保留状态码。 */
+      }
+      throw new ApiError(response.status, message, undefined, localGatewayOrigin(path));
+    }
+    const blob = await response.blob();
+    this.checkSession(generation);
+    return blob;
+  }
+
   /**
    * Opens an SSE endpoint. SSE needs a long-lived response body the caller
    * reads itself, so this bypasses request()'s JSON decode and returns the raw
@@ -366,7 +398,8 @@ export const api = (client: ApiClient) => ({
       /** Pool tier: -10 backup, 0 balanced (default), 10 preferred. */
       priority?: number;
     },
-  ) => client.post<Credential>(`/admin/sites/${siteId}/credentials`, body),
+  ) =>
+    client.post<Credential & { duplicate?: boolean }>(`/admin/sites/${siteId}/credentials`, body),
   updateCredential: (
     id: number,
     body: {
@@ -989,6 +1022,8 @@ export const api = (client: ApiClient) => ({
       "/admin/channels/account/finance",
       signal,
     ),
+  refreshFinance: () =>
+    client.post<{ items: FinanceItem[]; refreshing?: boolean }>("/admin/channels/account/finance"),
   modelBlocks: (signal?: AbortSignal) =>
     client.get<{
       items: Array<{
@@ -1162,6 +1197,8 @@ export const api = (client: ApiClient) => ({
   cleanupAudit: () => client.post<{ removed: number }>("/admin/audit-events/cleanup"),
   backups: (signal?: AbortSignal) => client.getList<BackupRecord>("/admin/backups", signal),
   createBackup: () => client.post<BackupRecord>("/admin/backups"),
+  downloadBackup: (name: string) =>
+    client.getBlob(`/admin/backups/${encodeURIComponent(name)}/download`),
   runtimeSettings: (signal?: AbortSignal) =>
     client.get<RuntimeSettings>("/admin/runtime-settings", signal),
   /** The site's money presentation: symbol + rate applied to every amount. */

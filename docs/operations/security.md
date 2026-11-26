@@ -4,14 +4,13 @@
 
 | 变量 | 作用 |
 | :--- | :--- |
-| `ADMIN_TOKEN` | 部署管理员口令 |
-| `ADMIN_TOKENS` | 额外接受的轮换口令（逗号分隔） |
-| `ADMIN_USERNAME` | 管理员用户名（默认 `admin`）；可在控制台验证口令 + TOTP 后改，**改后优先于环境变量** |
+| `ADMIN_TOKEN` / `ADMIN_TOKENS` | 旧版部署兼容口令；新部署不需要设置 |
+| `ADMIN_USERNAME` | 旧版部署的初始用户名；新部署在首次初始化时设置 |
 
 ### 会话令牌怎么存放
 
 ```
-POST /admin/session   →  { "token": "<管理口令>" }  →  返回 session_token
+POST /admin/session   →  { "username": "<管理员>", "password": "<密码>" }  →  返回 session_token
 ```
 
 之后所有管理接口用 `Authorization: Bearer <session_token>`。
@@ -87,7 +86,7 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" http://127.0.0.1:4100/metrics
 
 只有显式配置的 `TRUSTED_SCRAPER_CIDRS` 可以免 token 抓取。
 
-> **不要把 `ADMIN_TOKEN` 复用成 `METRICS_TOKEN`。** 指标端点的暴露面与后果和管理面完全不同。
+> 旧部署若仍配置 `ADMIN_TOKEN`，不要把它复用成 `METRICS_TOKEN`。指标端点的暴露面与后果和管理面完全不同。
 
 ## 六、插件边界
 
@@ -112,7 +111,7 @@ OAuth 的 state + PKCE 存在**签名 cookie** 里（HMAC 用 `MASTER_KEY` 派�
 
 ## 八、安全检查清单
 
-- [ ] `ADMIN_TOKEN`、`MASTER_KEY`、`METRICS_TOKEN` 三者互不相同且都是随机值
+- [ ] `MASTER_KEY`、`METRICS_TOKEN` 使用不同的随机值；旧部署的 `ADMIN_TOKEN` 也与二者区分
 - [ ] 部署在 CDN / 反代之后时设了 `TRUSTED_PROXY_CIDRS`
 - [ ] 开启了 TOTP
 - [ ] `MASTER_KEY` 已随备份单独保存

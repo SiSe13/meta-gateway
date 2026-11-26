@@ -264,6 +264,7 @@ func NewWithDependencies(cfg *config.Config, db *store.DB, enc *crypto.Encrypter
 		db:            db,
 		adminTokens:   cfg.AdminTokenList(),
 		adminUsername: cfg.AdminUsername,
+		setupCode:     auth.AdminSetupCode(enc.KeyMaterial(), cfg.DataDir),
 		team:          teamHandler,
 		sessionKey:    sessionKey,
 		enc:           enc,

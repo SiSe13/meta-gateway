@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +20,15 @@ import (
 // "admin").
 func TestSwitchingToTeamSeedsTheOwnerFromTheDeploymentAdmin(t *testing.T) {
 	e := newTeamTestEnv(t)
+	var mode struct {
+		OwnerBootstrapAvailable bool `json:"owner_bootstrap_available"`
+	}
+	if err := json.Unmarshal(e.admin("GET", "/admin/mode", nil, 200), &mode); err != nil {
+		t.Fatal(err)
+	}
+	if !mode.OwnerBootstrapAvailable {
+		t.Fatal("mode response did not report the usable deployment admin credentials")
+	}
 
 	// No owner exists yet. The switch itself is what creates one.
 	e.setMode("team")

@@ -1,6 +1,7 @@
-import { DatabaseBackup } from "lucide-react";
+import { DatabaseBackup, Download } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../api/client";
+import type { BackupRecord } from "../../api/types";
 import { useClientPagination } from "../../hooks/useClientPagination";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -30,6 +31,17 @@ export function BackupsPanel() {
     mutationFn: s.createBackup,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["backups"] }),
   });
+  const download = useMutation({
+    mutationFn: async (backup: BackupRecord) => {
+      const blob = await s.downloadBackup(backup.name);
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = backup.name;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+  });
   const backupRows = q.data ?? [];
   const backupPagination = useClientPagination(backupRows, 12);
   return (
@@ -47,6 +59,7 @@ export function BackupsPanel() {
       }
     >
       {create.error && <ErrorState error={create.error} />}
+      {download.error && <ErrorState error={download.error} />}
       {create.data && (
         <div className="result-strip">
           <StatusBadge value={create.data.status} />
@@ -75,6 +88,7 @@ export function BackupsPanel() {
               t("common.duration"),
               t("common.checksum"),
               t("common.created"),
+              t("ops.downloadBackup"),
             ]}
           >
             {backupPagination.pageItems.map((b) => (
@@ -89,6 +103,17 @@ export function BackupsPanel() {
                 <td>{t("common.ms", { n: b.duration_ms })}</td>
                 <td className="mono truncate">{b.checksum}</td>
                 <td>{formatDate(b.created_at)}</td>
+                <td>
+                  <Button
+                    variant="quiet"
+                    icon={<Download size={14} />}
+                    disabled={download.isPending}
+                    loading={download.isPending && download.variables?.id === b.id}
+                    onClick={() => download.mutate(b)}
+                  >
+                    {t("ops.downloadBackup")}
+                  </Button>
+                </td>
               </tr>
             ))}
           </DataTable>

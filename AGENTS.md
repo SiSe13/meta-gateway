@@ -22,9 +22,11 @@ go build -o bin/meta-gateway ./cmd/server   # 构建二进制
 本地开发启动（最小必需环境变量）：
 
 ```bash
-ADMIN_TOKEN=test MASTER_KEY=test-key-32-chars-long!!!!!!! METRICS_TOKEN=test \
+MASTER_KEY=test-key-32-chars-long!!!!!!! METRICS_TOKEN=test \
   ./bin/meta-gateway
 ```
+
+首次启动后从服务端日志读取一次性初始化码，在控制台创建站长账号和密码。`ADMIN_TOKEN` 仅用于兼容旧部署登录。
 
 ### 前端（Node 24+，位于 `web/`）
 
@@ -41,8 +43,7 @@ npm run build          # tsc -b && vite build
 
 **当前为统一控制台产物**：成员与管理员均从 `/console` 登录，`/app` 为兼容跳转，
 `npm run build` 只构建 `internal/webui/dist`。成员复用共享页面与主题，由服务端账号角色隔离权限，
-成员数据源只调用 `/me/*`，不得将管理接口权限下放给成员。`ADMIN_USERNAME` 默认 `admin`，
-部署管理员密码沿用 `ADMIN_TOKEN`；网页保存的管理员用户名优先于 `ADMIN_USERNAME`，保存在 `operator_preferences`。未配置时环境变量仍为初始默认值；现有团队账号重名时优先，失败不得回退到部署管理员。网页改名需原管理口令/TOTP，禁止与团队账号冲突。
+成员数据源只调用 `/me/*`，不得将管理接口权限下放给成员。首次启动通过日志中的一次性初始化码创建站长账号和密码；旧部署可继续使用 `ADMIN_TOKEN` 完成登录迁移。`ADMIN_USERNAME` 默认 `admin`，网页保存的管理员用户名优先于该环境变量，保存在 `operator_preferences`。未配置时环境变量仍为初始默认值；现有团队账号重名时优先，失败不得回退到站长账号。网页改名需当前站长密码/TOTP，禁止与团队账号冲突。
 
 ### 完整交付前的质量门（全绿才算完成，少跑一项就可能被 CI 挡下）
 

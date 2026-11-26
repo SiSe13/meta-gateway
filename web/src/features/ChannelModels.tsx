@@ -1,7 +1,7 @@
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, Checkbox as HeroCheckbox, Input as HeroInput } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { Fragment, useMemo, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAvailability } from "../hooks/useAvailability";
 import { AvailabilityIndicator } from "../components/AvailabilityIndicator";
@@ -75,7 +75,6 @@ export function ChannelModelsPanel({
   const [statusFilter, setStatusFilter] = useState<"all" | "enabled" | "disabled">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkMode, setBulkMode] = useState(false);
-  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Vendor groups start collapsed so a long candidate list stays scannable.
   // Search or bulk mode forces them open, otherwise hidden rows would read
@@ -400,12 +399,6 @@ export function ChannelModelsPanel({
 
   const selectable = filtered;
   const allSelected = selectable.length > 0 && selectable.every((m) => selectedIds.has(m.key));
-  const someSelected = selectable.length > 0 && selectable.some((m) => selectedIds.has(m.key));
-  useEffect(() => {
-    if (selectAllRef.current) {
-      selectAllRef.current.indeterminate = someSelected && !allSelected;
-    }
-  }, [someSelected, allSelected]);
 
   const toggleSelect = (key: string) => {
     setSelectedIds((prev) => {
@@ -499,7 +492,9 @@ export function ChannelModelsPanel({
 
   return (
     <>
-      {header ?? (
+      {header !== undefined ? (
+        header
+      ) : (
         <div className="channel-models-panel-head">
           <div>
             <p className="page-kicker">{channel?.name ?? `#${channelId}`}</p>
@@ -579,8 +574,9 @@ export function ChannelModelsPanel({
 
       <Panel className="ops-list-panel">
         <div className="models-simple-toolbar">
-          <input
+          <HeroInput
             className="models-search"
+            type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t("routing.searchPlaceholder")}
@@ -616,7 +612,8 @@ export function ChannelModelsPanel({
             ))}
           </div>
           <div className="channel-model-add">
-            <input
+            <HeroInput
+              className="channel-model-add-input"
               value={customName}
               placeholder={t("channels.customModelPlaceholder")}
               onChange={(event) => setCustomName(event.target.value)}
@@ -627,40 +624,55 @@ export function ChannelModelsPanel({
                 }
               }}
             />
+            {customName.trim() ? (
+              <Button
+                variant="primary"
+                className="channel-model-action channel-model-action-add"
+                icon={<Plus size={14} />}
+                disabled={addCustom.isPending}
+                onClick={() => {
+                  addCustom.mutate(customName);
+                  setCustomName("");
+                }}
+              >
+                {t("channels.customModelAdd")}
+              </Button>
+            ) : null}
+          </div>
+          {parkedMembers.length > 0 ? (
+            <Button
+              variant="danger"
+              className="channel-model-action channel-model-action-cleanup"
+              icon={<Trash2 size={14} />}
+              disabled={cleanupParked.isPending}
+              title={t("channels.modelsCleanupHint")}
+              onClick={() => setCleanupOpen(true)}
+            >
+              {t("channels.modelsCleanup", { n: parkedMembers.length })}
+            </Button>
+          ) : null}
+          {bulkMode ? (
+            <HeroCheckbox
+              className="channel-model-select-all"
+              aria-label={t("channels.modelsSelectAll")}
+              isSelected={allSelected}
+              isIndeterminate={!allSelected && selectedCount > 0}
+              onChange={toggleSelectAll}
+              isDisabled={bulkToggle.isPending}
+            >
+              <HeroCheckbox.Content>
+                <HeroCheckbox.Control>
+                  <HeroCheckbox.Indicator />
+                </HeroCheckbox.Control>
+                {t("channels.modelsSelectAll")}
+              </HeroCheckbox.Content>
+            </HeroCheckbox>
+          ) : (
             <Button
               variant="secondary"
-              icon={<Plus size={14} />}
-              disabled={addCustom.isPending || !customName.trim()}
-              onClick={() => {
-                addCustom.mutate(customName);
-                setCustomName("");
-              }}
+              className="channel-alias-save channel-model-action"
+              onClick={enterBulkMode}
             >
-              {t("channels.customModelAdd")}
-            </Button>
-          </div>
-          <Button
-            variant="secondary"
-            icon={<Trash2 size={14} />}
-            disabled={cleanupParked.isPending || parkedMembers.length === 0}
-            title={t("channels.modelsCleanupHint")}
-            onClick={() => setCleanupOpen(true)}
-          >
-            {t("channels.modelsCleanup", { n: parkedMembers.length })}
-          </Button>
-          {bulkMode ? (
-            <label className="channel-model-select-all" title={t("channels.modelsBulkHint")}>
-              <input
-                ref={selectAllRef}
-                type="checkbox"
-                checked={allSelected}
-                onChange={toggleSelectAll}
-                disabled={bulkToggle.isPending}
-              />
-              <span>{t("channels.modelsSelectAll")}</span>
-            </label>
-          ) : (
-            <Button variant="secondary" className="channel-alias-save" onClick={enterBulkMode}>
               {t("channels.modelsBulkSelect")}
             </Button>
           )}
@@ -748,38 +760,42 @@ export function ChannelModelsPanel({
                             className="channel-model-row is-alias has-availability"
                           >
                             {bulkMode ? (
-                              <label
+                              <HeroCheckbox
                                 className="channel-model-select"
-                                title={t("channels.modelsSelectAll")}
+                                aria-label={t("channels.modelsSelectAll")}
+                                isSelected={selectedIds.has(item.key)}
+                                isDisabled={bulkToggle.isPending}
+                                onChange={() => toggleSelect(item.key)}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedIds.has(item.key)}
-                                  disabled={bulkToggle.isPending}
-                                  onChange={() => toggleSelect(item.key)}
-                                />
-                              </label>
+                                <HeroCheckbox.Content>
+                                  <HeroCheckbox.Control>
+                                    <HeroCheckbox.Indicator />
+                                  </HeroCheckbox.Control>
+                                </HeroCheckbox.Content>
+                              </HeroCheckbox>
                             ) : (
-                              <label
+                              <HeroCheckbox
                                 className="channel-model-toggle"
-                                title={
+                                aria-label={
                                   member
                                     ? t("channels.modelEnabledHint")
                                     : t("channels.modelAdoptHint")
                                 }
+                                isSelected={enabled}
+                                isDisabled={
+                                  member ? toggleMember.pendingId === member.id : adopt.isPending
+                                }
+                                onChange={() => {
+                                  if (member) toggleMember.mutate(member);
+                                  else adopt.mutate(item.name);
+                                }}
                               >
-                                <input
-                                  type="checkbox"
-                                  checked={enabled}
-                                  disabled={
-                                    member ? toggleMember.pendingId === member.id : adopt.isPending
-                                  }
-                                  onChange={() => {
-                                    if (member) toggleMember.mutate(member);
-                                    else adopt.mutate(item.name);
-                                  }}
-                                />
-                              </label>
+                                <HeroCheckbox.Content>
+                                  <HeroCheckbox.Control>
+                                    <HeroCheckbox.Indicator />
+                                  </HeroCheckbox.Control>
+                                </HeroCheckbox.Content>
+                              </HeroCheckbox>
                             )}
                             <span className="mono truncate" title={item.name}>
                               {item.name}
@@ -794,7 +810,8 @@ export function ChannelModelsPanel({
                             <span className="channel-model-alias">
                               {discoveredModel ? (
                                 <>
-                                  <input
+                                  <HeroInput
+                                    className="channel-model-alias-input"
                                     value={inputValue}
                                     placeholder={t("channels.aliasPlaceholder")}
                                     onChange={(event) =>

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCheck, ListChecks, Plus } from "lucide-react";
 import type { ModelMatchMode, Route } from "../../api/types";
 import { api } from "../../api/client";
-import { Button, Dialog, Empty, ErrorState } from "../../components/ui";
+import { Button, CheckboxControl, Dialog, Empty, ErrorState } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -170,8 +170,7 @@ export function AutoMatchMembersDialog({
           <div className="selection-list scroll-list">
             {candidates.map((item) => (
               <label className="check" key={item.channel_id}>
-                <input
-                  type="checkbox"
+                <CheckboxControl
                   // The row also carries a source chip; naming the control by
                   // the channel alone keeps the checkbox's label unambiguous.
                   aria-label={item.channel_name}

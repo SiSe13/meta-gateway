@@ -11,6 +11,12 @@ import (
 	"github.com/lan/meta-gateway/internal/buildinfo"
 )
 
+func TestRepoTracksCurrentFork(t *testing.T) {
+	if Repo != "SiSe13/meta-gateway" {
+		t.Fatalf("Repo = %q, want current fork SiSe13/meta-gateway", Repo)
+	}
+}
+
 func TestIsNewer(t *testing.T) {
 	cases := []struct {
 		tag     string

@@ -104,6 +104,16 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Resolve Docker Hub image
+        id: image
+        env:
+          CONFIGURED_IMAGE: ${{ vars.DOCKERHUB_IMAGE }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          image="${CONFIGURED_IMAGE:-${REPOSITORY_OWNER,,}/meta-gateway}"
+          echo "name=$image" >> "$GITHUB_OUTPUT"
+
       - name: Classify release channel
         id: channel
         env:
@@ -123,7 +133,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: zichuanlan/meta-gateway
+          images: ${{ steps.image.outputs.name }}
           flavor: latest=false
           # `latest` only moves for stable releases. `beta` moves for every
           # release on purpose: the beta channel is documented as receiving

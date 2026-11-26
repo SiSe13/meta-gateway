@@ -23,8 +23,8 @@ services:
       BACKUP_DIR: /data/backups
       NO_PROXY: "127.0.0.1,localhost,host.docker.internal"
       ADMIN_USERNAME: admin
-      # The team-mode owner is auto-created from these two, so the walkthrough
-      # login (admin / 123456) works straight after a fresh volume.
+      # This isolated walkthrough intentionally covers the legacy ADMIN_TOKEN
+      # login and team-owner migration path (admin / 123456).
       ADMIN_TOKEN: "123456"
       MASTER_KEY: local-ui-audit-isolated-master-key
       METRICS_TOKEN: local-metrics-audit-only

@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"net/http"
@@ -269,6 +270,93 @@ func TestProbeAndSyncKeys(t *testing.T) {
 	bound, err := db.Credential.GetByID(*channel.CredentialID)
 	if err != nil || bound == nil || bound.Kind != "api_key" {
 		t.Fatalf("bound=%+v err=%v", bound, err)
+	}
+}
+
+func TestSyncKeysReusesSameSecretAndKeepsLocalName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/user/self":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"id":9,"username":"bob"}}`))
+		case "/api/token/":
+			_, _ = w.Write([]byte(`{"success":true,"data":[{"id":17,"name":"upstream-name","key":"same-key","status":1}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	db, err := store.OpenTest(filepath.Join(t.TempDir()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	enc, err := crypto.New("account-test-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := New(db, enc, adapters.NewRegistry(server.Client()))
+	siteID, err := db.Site.Create(&domain.Site{
+		Name: "demo", BaseURL: server.URL, Platform: "new-api", Status: domain.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	userSecret, err := enc.Encrypt([]byte("user-access-token"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	userCredentialID, err := db.Credential.Create(&domain.Credential{
+		SiteID: siteID, Kind: "access_token", SecretEnc: []byte(userSecret), Status: domain.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keySecret, err := enc.Encrypt([]byte("same-key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyCredentialID, err := db.Credential.Create(&domain.Credential{
+		SiteID: siteID, Kind: "api_key", SecretEnc: []byte(keySecret),
+		MetaJSON: `{"name":"manual-name"}`, Status: domain.StatusDisabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	channelID, err := db.Channel.Create(&domain.Channel{
+		SiteID: &siteID, CredentialID: &userCredentialID, Name: "demo", TypeHint: "new-api",
+		Status: domain.StatusEnabled,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := svc.SyncKeys(context.Background(), channelID, SyncKeysRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CreatedCredentials != 0 || result.ReusedCredentials != 1 {
+		t.Fatalf("sync result=%+v, want one reused key and no duplicate", result)
+	}
+	credentials, err := db.Credential.ListBySite(siteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(credentials) != 2 {
+		t.Fatalf("credential count=%d, want original account and API key only", len(credentials))
+	}
+	var metadata map[string]any
+	if err := json.Unmarshal([]byte(credentials[1].MetaJSON), &metadata); err != nil {
+		t.Fatalf("decode reused key metadata %q: %v", credentials[1].MetaJSON, err)
+	}
+	if metadata["name"] != "manual-name" {
+		t.Fatalf("reused key name=%v, want local name to remain unchanged", metadata["name"])
+	}
+	if _, imported := metadata["upstream_token_id"]; imported {
+		t.Fatalf("manually created key was incorrectly marked as upstream-managed: %s", credentials[1].MetaJSON)
+	}
+	if credentials[1].ID != keyCredentialID || credentials[1].Status != domain.StatusDisabled {
+		t.Fatalf("reused key changed existing identity or status: %+v", credentials[1])
 	}
 }
 

@@ -1,12 +1,11 @@
 import type { ComponentProps } from "react";
 import type { Channel, ChannelOverview, Credential, Site } from "../../api/types";
-import { Button, ConfirmDialog } from "../../components/ui";
-import { Drawer } from "../../components/Drawer";
+import { ConfirmDialog, Dialog } from "../../components/ui";
 import { AddChannelDialog } from "./AddChannelDialog";
 import { CreateKeyDialog } from "./CreateKeyDialog";
 import { EditChannelDialog } from "./EditChannelDialog";
 import { ChannelModelsPanel } from "../ChannelModels";
-import { ChannelKeysDrawer } from "../ChannelKeys";
+import { ChannelKeysDialog } from "../ChannelKeys";
 import type { CreateConnectionInput } from "./helpers";
 import type { PickableCredential } from "./channelCredentials";
 import { useToast } from "../../toast";
@@ -149,6 +148,13 @@ export function ChannelDialogs(props: ChannelDialogsProps) {
           // (notably the sync mode radio) in the form.
           key={edit.id}
           value={edit}
+          existingGroups={Array.from(
+            new Set(
+              overviews
+                .map((row) => row.channel.group_name?.trim())
+                .filter((group): group is string => Boolean(group)),
+            ),
+          ).sort((left, right) => left.localeCompare(right))}
           routeOverviews={routeOverviews}
           site={edit.site_id != null ? siteById.get(edit.site_id) : undefined}
           credentials={credentials}
@@ -208,7 +214,7 @@ export function ChannelDialogs(props: ChannelDialogsProps) {
   );
 }
 
-/** The rest of the overlays: key creation, the two channel drawers, and delete. */
+/** The rest of the overlays: key creation, channel management, and delete. */
 function ChannelAuxDialogs({
   t,
   toast,
@@ -294,31 +300,16 @@ function ChannelAuxDialogs({
         />
       ) : null}
       {modelsChannel ? (
-        <Drawer
+        <Dialog
+          className="channel-models-dialog"
           title={t("channels.modelsSection")}
-          width={780}
           onClose={closeModelsDrawer}
-          footer={
-            <Button variant="secondary" onClick={closeModelsDrawer}>
-              {t("common.close")}
-            </Button>
-          }
         >
-          <ChannelModelsPanel
-            channelId={modelsChannel.id}
-            header={
-              <div className="channel-models-panel-head">
-                <div>
-                  <p className="page-kicker">{modelsChannel.name}</p>
-                  <p className="detail-section-empty is-quiet">{t("channels.modelsManageHint")}</p>
-                </div>
-              </div>
-            }
-          />
-        </Drawer>
+          <ChannelModelsPanel channelId={modelsChannel.id} header={null} />
+        </Dialog>
       ) : null}
       {keysChannel ? (
-        <ChannelKeysDrawer
+        <ChannelKeysDialog
           channel={keysChannel}
           apiKeys={credentials.filter((item) => item.kind === "api_key")}
           pending={

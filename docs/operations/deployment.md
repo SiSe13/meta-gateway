@@ -2,7 +2,7 @@
 
 ## 部署
 
-一个进程、一个 SQLite 数据库。复制 `.env.example` 到私有环境文件，把 `ADMIN_TOKEN`、`MASTER_KEY`、`METRICS_TOKEN` 换成各自独立的随机值，然后：
+一个进程、一个 SQLite 数据库。复制 `.env.example` 到私有环境文件，为 `MASTER_KEY`、`METRICS_TOKEN` 配置各自独立的随机值，然后：
 
 ```bash
 docker compose up -d --build
@@ -10,7 +10,7 @@ docker compose ps
 curl --fail http://127.0.0.1:4100/readyz
 ```
 
-Compose **没有兜底凭据**——缺变量会直接启动失败，这是刻意的。
+首次启动后从控制台创建管理员账号；服务端启动日志会输出一次性初始化码。Compose 不再要求设置 `ADMIN_TOKEN`。
 
 镜像以 UID/GID `10001` 运行，数据库与备份存在 `/data`。新建的**命名卷**会继承正确属主；升级已有的 **bind mount 或旧卷**之前，先停服务并把数据目录改成 `10001` 可写。
 
@@ -18,7 +18,7 @@ Compose **没有兜底凭据**——缺变量会直接启动失败，这是刻�
 
 控制台嵌在 Go 二进制里，由网关在 `/console/` 提供。无扩展名的嵌套路径（如 `/console/routing`）返回 SPA 外壳；**缺失的资源路径返回 `404`，绝不回退成 HTML**。HTML 用 `Cache-Control: no-cache`，带内容哈希的资源用一年期不可变缓存。
 
-连接用 `ADMIN_TOKEN`，**不是** `METRICS_TOKEN`。令牌只放在 `Authorization: Bearer` 头里，默认只驻留内存（操作员可以主动选择标签页级 `sessionStorage`），不进 Cookie、`localStorage`、URL、配置或日志。收到 `401` 即失效当前 UI 会话。
+控制台使用管理员账号密码登录，登录后管理会话只放在 `Authorization: Bearer` 头里，默认只驻留内存（操作员可以主动选择标签页级 `sessionStorage`），不进 Cookie、`localStorage`、URL、配置或日志。收到 `401` 即失效当前 UI 会话。
 
 凭据密文用密码输入框；下游令牌明文以 `MASTER_KEY` 加密存储，只能通过显式 reveal 调用重新查看（每次 reveal / 轮换都进审计）；带密文的导出不提供浏览器预览。
 

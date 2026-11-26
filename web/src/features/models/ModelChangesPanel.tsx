@@ -1,6 +1,7 @@
 import { ArrowRight, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { Input as HeroInput } from "@heroui/react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../../api/client";
 import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
@@ -11,7 +12,14 @@ import type {
   ModelReplacementPreview,
   ModelReplacementRequest,
 } from "../../api/types";
-import { Button, ConfirmDialog, Dialog, Empty } from "../../components/ui";
+import {
+  Button,
+  CheckboxControl,
+  ConfirmDialog,
+  Dialog,
+  Empty,
+  SelectControl,
+} from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -232,7 +240,7 @@ export function ModelChangesPanel({
         <div id="model-change-history" className="model-change-history">
           <p className="muted">{t("modelChanges.hint")}</p>
           <div className="model-change-filters">
-            <input
+            <HeroInput
               className="model-change-filter-search"
               aria-label={t("modelChanges.search")}
               placeholder={t("modelChanges.search")}
@@ -317,8 +325,7 @@ export function ModelChangesPanel({
                 <article key={item.id} className="model-change-row">
                   <div className="model-change-heading">
                     {item.status === "pending" ? (
-                      <input
-                        type="checkbox"
+                      <CheckboxControl
                         aria-label={t("modelChanges.select", {
                           model: item.model_name,
                           channel: item.channel_name,
@@ -554,11 +561,9 @@ function ReplacementDialog({
     request: ModelReplacementRequest;
   } | null>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
-  const targetSelect = useRef<HTMLSelectElement>(null);
   const previousStep = useRef(false);
   useEffect(() => {
     if (preview) previewHeading.current?.focus();
-    else if (previousStep.current) targetSelect.current?.focus();
     previousStep.current = preview !== null;
   }, [preview]);
   const channels = useQuery({
@@ -669,8 +674,7 @@ function ReplacementDialog({
         <>
           <fieldset disabled={busy} className="model-replacement-fields">
             <label className="check">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={crossChannel}
                 onChange={(e) => {
                   setCrossChannel(e.target.checked);
@@ -684,7 +688,7 @@ function ReplacementDialog({
             ) : null}
             <label>
               {t("modelChanges.targetChannel")}
-              <select
+              <SelectControl
                 value={targetChannel}
                 disabled={!crossChannel}
                 onChange={(e) => changeTarget(Number(e.target.value))}
@@ -701,7 +705,7 @@ function ReplacementDialog({
                         </option>
                       ))
                   : null}
-              </select>
+              </SelectControl>
             </label>
             {channels.isError || inventory.isError ? (
               <div className="inline-error" role="alert">
@@ -719,12 +723,11 @@ function ReplacementDialog({
             ) : null}
             <label>
               {t("modelChanges.search")}
-              <input value={modelQuery} onChange={(e) => setModelQuery(e.target.value)} />
+              <HeroInput value={modelQuery} onChange={(e) => setModelQuery(e.target.value)} />
             </label>
             <label>
               {t("modelChanges.targetModel")}
-              <select
-                ref={targetSelect}
+              <SelectControl
                 value={targetModel}
                 disabled={inventory.isPending || inventory.isError}
                 onChange={(e) => {
@@ -741,7 +744,7 @@ function ReplacementDialog({
                     {candidates.has(model) ? ` — ${t("modelChanges.added")}` : ""}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </label>
             {!inventory.isPending && !inventory.isError && !models.length ? (
               <p className="muted">{t("modelChanges.noTargets")}</p>
@@ -750,8 +753,7 @@ function ReplacementDialog({
             <div className="model-replacement-members">
               {members.map((member) => (
                 <label className="check" key={member.member_id}>
-                  <input
-                    type="checkbox"
+                  <CheckboxControl
                     checked={memberIds.includes(member.member_id)}
                     onChange={(e) => {
                       setMemberIds((ids) =>
@@ -940,8 +942,7 @@ function DiscardDialog({
                   className={`check${member.deletable ? "" : " is-disabled"}`}
                   key={member.member_id}
                 >
-                  <input
-                    type="checkbox"
+                  <CheckboxControl
                     disabled={!member.deletable}
                     checked={memberIds.includes(member.member_id)}
                     onChange={(e) => {

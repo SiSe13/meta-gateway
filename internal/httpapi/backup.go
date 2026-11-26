@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +18,7 @@ func NewBackupHandler(service *backup.Service) *BackupHandler {
 func (h *BackupHandler) Register(r chi.Router) {
 	r.Get("/backups", h.list)
 	r.Post("/backups", h.create)
+	r.Get("/backups/{name}/download", h.download)
 }
 
 func (h *BackupHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -43,4 +46,26 @@ func (h *BackupHandler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, records)
+}
+
+func (h *BackupHandler) download(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	file, err := h.service.Open(name)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.NotFound(w, r)
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "failed to open backup")
+		return
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read backup")
+		return
+	}
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	http.ServeContent(w, r, name, info.ModTime(), file)
 }

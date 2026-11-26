@@ -178,10 +178,8 @@ func TestComposeUpdaterLastResult(t *testing.T) {
 	}
 }
 
-// The compose updater follows the deployment's tag exactly like watchtower does,
-// so the same guard applies: an unset tag is not a refusal (the executor installs
-// the container's own tag either way), a pinned tag is.
-func TestComposeModeUsesTheTrackedTargetGuard(t *testing.T) {
+// Compose updater 可用时，控制台写入请求，由侧车校验镜像来源后执行更新。
+func TestComposeModeSupportsOneClickUpdate(t *testing.T) {
 	dir := withUpdaterDir(t)
 	writeHeartbeat(t, dir, 0)
 	t.Setenv("SELFUPDATE_TRACK_TAG", "latest")
@@ -190,14 +188,12 @@ func TestComposeModeUsesTheTrackedTargetGuard(t *testing.T) {
 	if mode := service.Mode(); mode != ModeCompose {
 		t.Fatalf("mode=%s", mode)
 	}
-	if err := service.StartTarget("v4.0.0-beta.7"); !errors.Is(err, ErrTrackMismatch) {
-		t.Fatalf("a prerelease on a latest deployment returned %v, want ErrTrackMismatch", err)
+	if status := service.Status(); !status.Available {
+		t.Fatal("compose mode should advertise one-click updates")
 	}
 	if err := service.StartTarget("v4.0.0"); err != nil {
-		t.Fatalf("a stable target was refused: %v", err)
+		t.Fatalf("StartTarget returned %v", err)
 	}
-	// The handoff is asynchronous by design — this process may be replaced at
-	// any moment — so wait for the request rather than reading it immediately.
 	request := filepath.Join(dir, "request.json")
 	deadline := time.Now().Add(3 * time.Second)
 	for {
@@ -205,7 +201,7 @@ func TestComposeModeUsesTheTrackedTargetGuard(t *testing.T) {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatal("no request was written to the shared volume")
+			t.Fatal("compose updater request was not written")
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

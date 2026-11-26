@@ -9,7 +9,7 @@
 <p>
   <a href="https://github.com/ZiChuanLan/meta-gateway/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/ZiChuanLan/meta-gateway/ci.yml?branch=master&style=flat-square&labelColor=2F3646"></a>
   <a href="https://zichuanlan.github.io/meta-gateway/"><img alt="Docs" src="https://img.shields.io/github/deployments/ZiChuanLan/meta-gateway/github-pages?style=flat-square&label=docs&labelColor=2F3646"></a>
-  <a href="https://hub.docker.com/r/zichuanlan/meta-gateway"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/zichuanlan/meta-gateway?style=flat-square&labelColor=2F3646&color=2496ED"></a>
+  <a href="https://hub.docker.com/r/sise13/meta-gateway"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/sise13/meta-gateway?style=flat-square&labelColor=2F3646&color=2496ED"></a>
   <a href="https://github.com/ZiChuanLan/meta-gateway/releases"><img alt="Stable release" src="https://img.shields.io/github/v/release/ZiChuanLan/meta-gateway?style=flat-square&label=stable&labelColor=2F3646&color=4F6BF0"></a>
   <a href="https://github.com/ZiChuanLan/meta-gateway/releases"><img alt="Beta release" src="https://img.shields.io/github/v/release/ZiChuanLan/meta-gateway?style=flat-square&label=beta&include_prereleases&labelColor=2F3646&color=E8B93E"></a>
   <a href="https://github.com/ZiChuanLan/meta-gateway/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/ZiChuanLan/meta-gateway?style=flat-square&labelColor=2F3646&color=E8B93E"></a>
@@ -94,7 +94,7 @@
 # docker-compose.yml
 services:
   meta-gateway:
-    image: zichuanlan/meta-gateway:${IMAGE_TAG:-latest}   # latest = 正式版；beta = 预发布
+    image: ${IMAGE_REPOSITORY:-sise13/meta-gateway}:${IMAGE_TAG:-latest}   # latest = 正式版；beta = 预发布
     container_name: meta-gateway
     restart: unless-stopped
     ports:
@@ -102,19 +102,17 @@ services:
     volumes:
       - ./data:/data
     environment:
-      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN required}
       MASTER_KEY: ${MASTER_KEY:?MASTER_KEY 32-char required}
       METRICS_TOKEN: ${METRICS_TOKEN:-mg-metrics-secret}
 ```
 
 ```bash
-export ADMIN_TOKEN=$(openssl rand -hex 16)
 export MASTER_KEY=$(openssl rand -hex 16)   # 32 字符加密主密钥
 docker compose up -d
 curl --fail http://127.0.0.1:4100/readyz
 ```
 
-访问 `http://localhost:4100/console/`，输入 `ADMIN_TOKEN` 进入控制台。
+访问 `http://localhost:4100/console/`，根据服务端启动日志中的一次性初始化码设置站长账号和密码。
 
 <img src="docs/screenshots/login.png" alt="控制台登录页" width="100%">
 
@@ -122,6 +120,17 @@ curl --fail http://127.0.0.1:4100/readyz
 
 > [!IMPORTANT]
 > **`MASTER_KEY` 必须随数据库一起备份、一起迁移。** 换一个 `MASTER_KEY` 打开同一个库，所有已存凭据都解不开。
+
+### Fork 发布自己的 Docker 镜像并启用一键更新
+
+仓库自带的 Release 工作流会在推送版本 tag 且 CI 通过后，构建 `linux/amd64` 与 `linux/arm64` 镜像、推送 Docker Hub，并创建 GitHub Release。默认镜像名为 `<GitHub 仓库所有者小写>/meta-gateway`；本 fork 对应 `sise13/meta-gateway`。
+
+1. 在 Docker Hub 创建公开仓库 `sise13/meta-gateway`。
+2. 在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 添加 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。如果镜像仓库名和 GitHub 所有者不同，再添加仓库变量 `DOCKERHUB_IMAGE`，值填完整的 `用户名/仓库名`。
+3. 部署自己的 fork 镜像：在 `.env` 中设置 `IMAGE_REPOSITORY=sise13/meta-gateway`，然后用仓库的 `docker-compose.yml` 启动。标准 Compose 部署带有一键更新侧车；已有部署需先拉取包含侧车和镜像配置的新版 Compose 文件并重新创建容器。
+4. 发布新版本时，在通过 CI 的提交上打 tag 并推送，例如 `git tag vX.Y.Z`、`git push origin vX.Y.Z`。工作流会构建并推送版本镜像和 `latest` 标签，同时创建 GitHub Release；控制台检查到 Release 后即可一键更新。
+
+本地只构建、不发布可运行 `docker compose build`；只有推送到你自己的 Docker Hub 仓库，并在 fork 的 GitHub 仓库创建对应 Release，已部署实例才有可检查和拉取的新版本。
 
 ### AI 一键部署
 
@@ -132,21 +141,21 @@ curl --fail http://127.0.0.1:4100/readyz
 
 ```markdown
 请帮我在当前服务器/本机部署 Meta Gateway（高性能 AI 统一中继网关）。
-项目仓库：https://github.com/ZiChuanLan/meta-gateway
+项目仓库：https://github.com/SiSe13/meta-gateway
 
 部署要求：
-1. 采用 Docker Compose 方式部署，使用官方镜像 `zichuanlan/meta-gateway:latest`；
+1. 采用 Docker Compose 方式部署，使用镜像 `sise13/meta-gateway:latest`；
 2. 宿主机服务端口映射为 4100（即 `4100:4100`）；
 3. 数据持久化挂载至当前目录下的 `./data` 目录（映射容器内 `/data`）；
 4. 环境变量要求：
-   - 自动生成一个高强度的 `ADMIN_TOKEN` 作为后台控制台登录密码；
+   - 首次启动后使用启动日志中的一次性初始化码创建管理员账号和密码；
    - 自动生成一个 32 位的强随机字符串作为 AES 密钥 `MASTER_KEY`（必须 ≥ 32 字符）；
    - 开启自动重启策略 `restart: unless-stopped`；
 5. 生成完整的 `docker-compose.yml` 文件后，自动执行 `docker compose up -d` 命令拉起容器；
 6. 检查容器运行状态，并在控制台清晰输出：
    - 控制台 WebUI 访问地址（`http://<IP或localhost>:4100/console`）；
    - API 中继调用地址（`http://<IP或localhost>:4100/v1`）；
-   - 随机生成的 ADMIN_TOKEN 密码与 MASTER_KEY 明文记录。
+   - MASTER_KEY 明文记录，并妥善保存管理员密码。
 ```
 
 </details>
@@ -213,7 +222,7 @@ Nginx 是纯传输层转发，无法理解 AI 模型的语义。Meta Gateway 运
 <summary><strong>Q: 数据与凭证安全如何保证？</strong></summary>
 
 1. 所有上游 API Key 在入库前均由 `MASTER_KEY` 执行 AES-GCM 高强度加密，仅在出站转发前在内存中瞬时解密；
-2. 控制台 `ADMIN_TOKEN` 仅保留在浏览器当前会话内存中，不存 Cookie、不入 URL；
+2. 控制台会话仅保留在浏览器当前会话内存中，不存 Cookie、不入 URL；
 3. 出站流量全局搭载 SSRF 防护墙，严格拦截环回私网与非法重定向。
 </details>
 

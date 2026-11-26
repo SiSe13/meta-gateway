@@ -35,23 +35,24 @@ export function CreateKeyDialog({
   });
   const [group, setGroup] = useState("");
   useEffect(() => {
-    if (group) return;
     const groups = groupsQuery.data?.groups ?? [];
-    if (groups.length > 0) setGroup(groups[0] ?? "");
-  }, [groupsQuery.data, group]);
+    setGroup((current) => (groups.includes(current) ? current : (groups[0] ?? "")));
+  }, [channelId, groupsQuery.data]);
   const groupOptions: SelectOption[] = (groupsQuery.data?.groups ?? []).map((value) => ({
     value,
     label: value,
     group: "token-groups",
   }));
   const groupsLoadFailed = Boolean(groupsQuery.isError);
-  const canSubmit = !groupsLoadFailed && Boolean(group.trim());
+  const groupsEmpty = groupsQuery.isSuccess && groupOptions.length === 0;
+  const canSubmit = !groupsLoadFailed && groupOptions.some((option) => option.value === group);
 
   return (
     <Dialog
       title={t("channels.createKeyTitle")}
       onClose={onClose}
       busy={pending}
+      className="create-upstream-key-dialog"
       actions={
         <>
           <Button variant="secondary" onClick={onClose} disabled={pending}>
@@ -72,17 +73,27 @@ export function CreateKeyDialog({
       <p className="dialog-hint">
         {t("channels.createKeyHint")} <strong>{channelName}</strong>
       </p>
+      <p className="create-key-purpose">{t("channels.createKeyPurpose")}</p>
       <Field label={t("channels.createKeyGroup")} hint={t("channels.createKeyGroupHint")}>
         <SearchableSelect
           options={groupOptions}
           groups={["token-groups"]}
           value={group}
           onChange={(value) => setGroup(value ?? "")}
-          disabled={pending}
-          allowCustom
+          disabled={pending || groupsQuery.isPending || groupOptions.length === 0}
           placeholder={t("channels.createKeyGroupPlaceholder")}
         />
       </Field>
+      {groupsQuery.isPending ? (
+        <p className="create-key-group-state" role="status">
+          {t("channels.createKeyGroupsLoading")}
+        </p>
+      ) : null}
+      {groupsEmpty ? (
+        <p className="create-key-group-state" role="status">
+          {t("channels.createKeyGroupsEmpty")}
+        </p>
+      ) : null}
       {groupsLoadFailed ? (
         <div className="dialog-form-error">{t("channels.createKeyGroupsUnavailable")}</div>
       ) : null}

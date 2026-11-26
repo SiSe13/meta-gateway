@@ -34,6 +34,7 @@ var (
 	ErrNoContainer   = errors.New("self-update requires a Docker deployment (HOSTNAME unset)")
 	ErrBadTarget     = errors.New("self-update target must be a newer release tag")
 	ErrTrackMismatch = errors.New("watchtower_channel_mismatch: set IMAGE_TAG to beta or latest and recreate the container before switching tracks")
+	ErrForeignImage  = errors.New("self-update refused: the deployment image cannot be verified as published by this project fork")
 )
 
 // Update mode: compose-updater sidecar (preferred — it re-reads the deployment
@@ -150,7 +151,8 @@ func (s *Service) Status() Status {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.expireLocked()
-	available := mode != ModeNone
+	// Compose 更新器会在拉取前校验部署文件中的镜像归属。
+	available := mode == ModeCompose || mode == ModeSocket
 	if s.phase == PhaseHandoff {
 		available = true
 	}
@@ -308,8 +310,8 @@ func (s *Service) start(target string) error {
 	if mode == ModeNone {
 		return ErrUnavailable
 	}
-	if target != "" && mode != ModeSocket && !TrackedTargetAllowed(target) {
-		return trackMismatch(target)
+	if mode != ModeCompose && mode != ModeSocket {
+		return ErrForeignImage
 	}
 	s.mu.Lock()
 	s.expireLocked()
@@ -333,25 +335,9 @@ func (s *Service) start(target string) error {
 	if mode == ModeCompose {
 		go func() {
 			s.setPhase(PhasePulling, "")
-			// The sidecar does the pulling and the recreate; this process only
-			// hands over the request. Its own container is what gets replaced, so
-			// nothing here can report the outcome — the successor reads the
-			// updater's result file instead (Status.LastResult).
+			// 更新侧车会验证 Compose 中的镜像仓库，再拉取并重建网关容器。
 			if err := TriggerComposeUpdater(target, s.from); err != nil {
 				s.fail(fmt.Errorf("compose updater: %w", err))
-				return
-			}
-			s.setPhase(PhaseHandoff, "")
-		}()
-		return nil
-	}
-	if mode == ModeWatchtower {
-		go func() {
-			s.setPhase(PhasePulling, "")
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			defer cancel()
-			if err := TriggerWatchtower(ctx); err != nil {
-				s.fail(fmt.Errorf("watchtower trigger: %w", err))
 				return
 			}
 			s.setPhase(PhaseHandoff, "")
@@ -381,8 +367,8 @@ func (s *Service) handoff() {
 		return
 	}
 	repository, _ := splitImageRef(self.Config.Image)
-	if repository != "zichuanlan/meta-gateway" && repository != "docker.io/zichuanlan/meta-gateway" {
-		s.fail(fmt.Errorf("refusing to update foreign image %q", self.Config.Image))
+	if !isProjectImage(repository) {
+		s.fail(fmt.Errorf("%w: %q", ErrForeignImage, self.Config.Image))
 		return
 	}
 
@@ -499,6 +485,17 @@ func (s *Service) handoff() {
 	// successor tears the old container down.
 	s.setPhase(PhaseHandoff, "")
 	go s.watchSuccessor(nextID)
+}
+
+// isProjectImage 只允许使用当前 fork 命名空间发布的镜像。
+func isProjectImage(repository string) bool {
+	repository = strings.TrimPrefix(strings.ToLower(repository), "docker.io/")
+	switch repository {
+	case strings.ToLower(updatecheck.Repo):
+		return true
+	default:
+		return false
+	}
 }
 
 // watchSuccessor reports a successor that dies without taking over.

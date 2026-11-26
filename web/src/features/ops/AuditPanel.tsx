@@ -34,6 +34,11 @@ export function auditActionLabel(action: string, t: (key: string) => string) {
   return action;
 }
 
+/** 将审计接口的失败状态映射到界面统一使用的失败徽标。 */
+export function auditOutcomeStatus(outcome: string) {
+  return outcome === "failure" ? "failed" : outcome;
+}
+
 function auditResourceLabel(event: AuditEvent, t: (key: string) => string) {
   if (!event.resource_kind) return t("systemLogs.noResource");
   const key = `systemLogs.resource.${event.resource_kind}`;
@@ -115,7 +120,6 @@ export function AuditPanel() {
         <ErrorState error={q.error} />
       ) : (
         <>
-          <p className="system-logs-guide">{t("systemLogs.guide")}</p>
           <DataTable
             headers={[
               t("systemLogs.column.action"),
@@ -132,12 +136,11 @@ export function AuditPanel() {
               <tr key={e.id}>
                 <td>
                   <strong title={e.action}>{auditActionLabel(e.action, t)}</strong>
-                  <small>{t("systemLogs.eventId", { id: e.id })}</small>
                 </td>
                 <td>{auditActorLabel(e, t)}</td>
                 <td>{auditResourceLabel(e, t)}</td>
                 <td>
-                  <StatusBadge value={e.outcome} />
+                  <StatusBadge value={auditOutcomeStatus(e.outcome)} />
                 </td>
                 <td title={statusExplanation(e.status_code, t)}>
                   <span className="system-logs-http-status">HTTP {e.status_code}</span>
@@ -175,6 +178,7 @@ export function AuditPanel() {
       {confirm && (
         <ConfirmDialog
           title={t("systemLogs.cleanupTitle")}
+          className="system-logs-cleanup-dialog"
           message={t("systemLogs.cleanupMessage")}
           confirmLabel={t("systemLogs.cleanupConfirm")}
           pending={cleanup.isPending}

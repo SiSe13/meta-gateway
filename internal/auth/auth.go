@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -268,27 +267,20 @@ func ValidateAdminToken(token string, candidates []string, verifySession func(st
 // SessionPrefix marks signed admin session tokens (login after TOTP).
 const SessionPrefix = "mg-sess."
 
-// SessionSigningKey derives the session signing key from the master key and
-// the current admin-token set. Rotating ADMIN_TOKEN therefore invalidates
-// sessions issued under the previous token set.
+// SessionSigningKey基于主密钥派生稳定签名密钥，账号凭据单独保存在数据库中。
 func SessionSigningKey(masterKey []byte, adminTokens []string) []byte {
-	tokens := make([]string, 0, len(adminTokens))
-	for _, token := range adminTokens {
-		if token = strings.TrimSpace(token); token != "" {
-			tokens = append(tokens, token)
-		}
-	}
-	sort.Strings(tokens)
+	_ = adminTokens // 保留参数，兼容现有嵌入调用方。
 	mac := hmac.New(sha256.New, masterKey)
-	mac.Write([]byte("admin-session-key:"))
-	for _, token := range tokens {
-		if token == "" {
-			continue
-		}
-		mac.Write([]byte(strconv.Itoa(len(token))))
-		mac.Write([]byte(":" + token))
-	}
+	mac.Write([]byte("admin-session-key:v2"))
 	return mac.Sum(nil)
+}
+
+// AdminSetupCode从加密主密钥和数据目录派生首次初始化码。
+func AdminSetupCode(masterKey []byte, dataDir string) string {
+	mac := hmac.New(sha256.New, masterKey)
+	mac.Write([]byte("admin-setup-code:"))
+	mac.Write([]byte(dataDir))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 // SignSessionToken issues a short-lived signed admin session token for a raw

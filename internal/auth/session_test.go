@@ -25,6 +25,18 @@ func TestAdminSessionEnvelopeIsUnchanged(t *testing.T) {
 	}
 }
 
+func TestAdminSessionSigningKeyDoesNotDependOnLegacyTokens(t *testing.T) {
+	master := []byte("stable-session-master-key")
+	first := SessionSigningKey(master, []string{"old-deployment-token"})
+	second := SessionSigningKey(master, nil)
+	if !hmac.Equal(first, second) {
+		t.Fatal("removing the legacy deployment token changed the session signing key")
+	}
+	if hmac.Equal(first, SessionSigningKey([]byte("different-master-key"), nil)) {
+		t.Fatal("session signing key did not change with MASTER_KEY")
+	}
+}
+
 func TestAdminSessionAcceptsExistingEnvelopes(t *testing.T) {
 	// Construct the historical wire format independently of the signer.
 	// Both the original expiry-only and newer nonce-bearing forms remain valid.

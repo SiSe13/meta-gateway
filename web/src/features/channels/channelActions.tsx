@@ -1,5 +1,4 @@
 import {
-  CalendarCheck,
   Copy,
   ExternalLink,
   KeyRound,
@@ -61,8 +60,6 @@ export type ChannelActionDeps = {
   t: Text;
   navigate: (to: string) => void;
   pushError: (error: unknown) => void;
-  /** The channel's user credential, used to label the check-in actions. */
-  userCredentialFor: (overview: ChannelOverview) => { id: number } | undefined;
   selectRow: (id: number) => void;
   setContextMenu: (value: null) => void;
   setBulkMode: (value: boolean) => void;
@@ -87,8 +84,6 @@ export type ChannelActionDeps = {
     duplicate: PendingMutation;
     /** Only reset here: the dialog that opens does the creating. */
     createUpstreamKey: Pick<PendingMutation, "pendingId" | "reset">;
-    setCheckin: PendingMutation;
-    runCheckin: PendingMutation;
     saveEdit: PendingMutation;
   };
 };
@@ -99,11 +94,31 @@ const RANKS: Record<string, number> = {
   details: 0,
   models: 0,
   logs: 0,
+  test: 0,
   edit: 1,
   duplicate: 1,
   toggle: 1,
+  "check-account": 1,
+  "sync-keys": 1,
+  "create-key": 1,
   bulk: 3,
   delete: 4,
+};
+
+/** 同一分组内按常用流程排列，查看与验证优先于维护操作。 */
+const ACTION_ORDER: Record<string, number> = {
+  models: 0,
+  logs: 1,
+  test: 2,
+  details: 3,
+  pin: 4,
+  edit: 0,
+  toggle: 1,
+  duplicate: 2,
+  "check-account": 3,
+  "sync-keys": 4,
+  "create-key": 5,
+  sync: 0,
 };
 
 const SECTIONS = [
@@ -281,49 +296,6 @@ export function channelActions(
         deps.navigate(`/logs?channel_id=${ch.id}`);
       },
     },
-    ...(() => {
-      // Label must follow overview badge (site-level schedule), not an arbitrary
-      // first token.
-      const scheduleOn = Boolean(overview.checkin_enabled);
-      const checkinCred = deps.userCredentialFor(overview);
-      if (!checkinCred && !caps.hasUser) return [];
-      // Has user token on overview but credentials list not loaded yet: still show
-      // the correct label.
-      const canToggle = Boolean(checkinCred);
-      return [
-        {
-          key: "checkin-toggle",
-          label: scheduleOn ? t("channels.checkinDisable") : t("channels.checkinEnable"),
-          icon: <CalendarCheck size={14} />,
-          disabled:
-            busy ||
-            !canToggle ||
-            (checkinCred != null && mutations.setCheckin.pendingId === checkinCred.id),
-          onSelect: () => {
-            close();
-            if (!checkinCred) return;
-            mutations.setCheckin.mutate({
-              credentialId: checkinCred.id,
-              enabled: !scheduleOn,
-            });
-          },
-        },
-        {
-          key: "checkin-run",
-          label: t("channels.checkinRun"),
-          icon: <CalendarCheck size={14} />,
-          disabled:
-            busy ||
-            !canToggle ||
-            (checkinCred != null && mutations.runCheckin.pendingId === checkinCred.id),
-          onSelect: () => {
-            close();
-            if (!checkinCred) return;
-            mutations.runCheckin.mutate(checkinCred.id);
-          },
-        },
-      ];
-    })(),
     {
       key: "delete",
       label: t("common.delete"),
@@ -359,7 +331,11 @@ export function channelActions(
     },
   });
   return items
-    .sort((a, b) => (RANKS[a.key] ?? 2) - (RANKS[b.key] ?? 2))
+    .sort(
+      (a, b) =>
+        (RANKS[a.key] ?? 2) - (RANKS[b.key] ?? 2) ||
+        (ACTION_ORDER[a.key] ?? 99) - (ACTION_ORDER[b.key] ?? 99),
+    )
     .map((item) => ({
       ...item,
       group: t(SECTIONS[RANKS[item.key] ?? 2]!),

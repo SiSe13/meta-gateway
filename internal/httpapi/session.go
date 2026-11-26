@@ -25,6 +25,7 @@ type sessionHandler struct {
 	db            *store.DB
 	adminTokens   []string
 	adminUsername string
+	setupCode     string
 	team          *TeamHandler
 	sessionKey    []byte // HMAC key for session tokens (master-key derived)
 	enc           encryptor
@@ -47,8 +48,11 @@ type encryptor interface {
 // (the chi router mounted at /admin handles the rest; this path is added
 // directly to the root router before the /admin mount).
 func (h *sessionHandler) RegisterPublic(r interface {
+	Get(string, http.HandlerFunc)
 	Post(string, http.HandlerFunc)
 }) {
+	r.Get("/admin/setup/status", h.setupStatus)
+	r.Post("/admin/setup", h.setupAdmin)
 	r.Post("/admin/session", h.login)
 }
 

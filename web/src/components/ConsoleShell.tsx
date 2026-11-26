@@ -8,7 +8,14 @@ import { Drawer } from "./Drawer";
 import { UI_THEMES } from "../themes/registry";
 import type { UIThemeId } from "../themes/types";
 
-export type ConsoleNavItem = { to: string; label: string; icon: LucideIcon };
+export type ConsoleNavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  hideIcon?: boolean;
+  active?: boolean;
+  changed?: boolean;
+};
 export type ConsoleTopNavItem = { id: string; label: string; to: string };
 type NavSection = { label: string; items: ConsoleNavItem[] };
 
@@ -95,20 +102,30 @@ export function ConsoleShell({
         {sections
           .filter((section) => section.items.length)
           .map((section) => (
-            <div className="console-nav-group" key={section.label}>
-              {section.items.map(({ to, label, icon: Icon }) => (
+            <div
+              className={`console-nav-group${sections.length > 1 ? " console-nav-group--nested" : ""}`}
+              key={section.label}
+            >
+              {sections.length > 1 ? (
+                <span className="console-nav-caption">{section.label}</span>
+              ) : null}
+              {section.items.map(({ to, label, icon: Icon, hideIcon, active, changed }) => (
                 <NavLink
                   key={to}
                   to={to}
                   end={(to.split("?", 1)[0] ?? "/") === "/"}
                   title={label}
-                  className={({ isActive }) => `console-nav-link${isActive ? " active" : ""}`}
+                  className={({ isActive }) =>
+                    `console-nav-link${(active ?? isActive) ? " active" : ""}`
+                  }
+                  aria-current={active === undefined ? undefined : active ? "page" : "false"}
                   onClick={() => {
                     if (mobile) setMobileOpen(false);
                   }}
                 >
-                  <Icon size={18} strokeWidth={1.7} aria-hidden="true" />
+                  {!hideIcon ? <Icon size={18} strokeWidth={1.7} aria-hidden="true" /> : null}
                   <span>{label}</span>
+                  {changed ? <i className="runtime-nav-dot" aria-hidden="true" /> : null}
                   <i className="console-nav-indicator" aria-hidden="true" />
                 </NavLink>
               ))}

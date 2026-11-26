@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "../i18n";
 import { SessionProvider } from "../session";
 import { ToastProvider } from "../toast";
-import { ChannelKeysDrawer } from "./ChannelKeys";
+import { ChannelKeysDialog } from "./ChannelKeys";
 
 const CHANNEL = {
   id: 5,
@@ -93,7 +93,7 @@ function renderDrawer(
       <I18nProvider>
         <ToastProvider>
           <SessionProvider>
-            <ChannelKeysDrawer
+            <ChannelKeysDialog
               channel={CHANNEL as never}
               apiKeys={keys as never}
               pending={false}
@@ -130,7 +130,7 @@ async function expandAllowlist() {
   await waitFor(() => expect(candidateModels().length).toBeGreaterThan(0));
 }
 
-describe("ChannelKeysDrawer model allowlist", () => {
+describe("ChannelKeysDialog model allowlist", () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -249,7 +249,7 @@ const TEST_REPORT = {
   ],
 };
 
-describe("ChannelKeysDrawer batch keys", () => {
+describe("ChannelKeysDialog batch keys", () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
@@ -291,7 +291,7 @@ describe("ChannelKeysDrawer batch keys", () => {
         <I18nProvider>
           <ToastProvider>
             <SessionProvider>
-              <ChannelKeysDrawer
+              <ChannelKeysDialog
                 channel={CHANNEL as never}
                 apiKeys={[GEMINI_KEY, DEAD_KEY] as never}
                 pending={false}

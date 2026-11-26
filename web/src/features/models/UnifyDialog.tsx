@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { UnifyApplyResult, UnifyGroup, UnifyRule, UnifyVariant } from "../../api/types";
-import { Button, Dialog, Empty } from "../../components/ui";
+import { Button, CheckboxControl, Dialog, Empty } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
 import { useSession } from "../../session";
@@ -111,8 +111,7 @@ export function UnifyDialog({ onClose }: { onClose: () => void }) {
         <p className="unify-section-hint">{t("modelsPage.unify.rulesHint")}</p>
         {ALL_RULES.map((rule) => (
           <label className="check" key={rule}>
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={rules.includes(rule)}
               disabled={preview.isPending}
               onChange={(event) => {
@@ -267,11 +266,7 @@ function GroupCard({
   return (
     <div className={`unify-group${group.risky ? " is-loose" : ""}${checked ? "" : " is-off"}`}>
       <label className="unify-group-head">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={(event) => onToggle(event.target.checked)}
-        />
+        <CheckboxControl checked={checked} onChange={(event) => onToggle(event.target.checked)} />
         <span className="unify-count">{t("modelsPage.unify.canonicalPrefix")}</span>
         <strong className="mono">{group.canonical}</strong>
         {group.route_id ? (

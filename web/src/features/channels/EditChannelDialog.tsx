@@ -1,7 +1,7 @@
 import { ChevronDown, ExternalLink, FlaskConical, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import { Button as HeroButton } from "@heroui/react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type { Channel, RouteOverview, Site } from "../../api/types";
@@ -24,7 +24,6 @@ import {
   TYPE_OPTIONS,
   isCustomChannelType,
   normalizeTypeChoice,
-  userAuthFieldsFor,
 } from "./helpers";
 import { SyncModePicker, type ModelSyncMode } from "./SyncModePicker";
 import { ChannelModelTestDialog } from "./ChannelModelTestDialog";
@@ -34,6 +33,7 @@ import { mappingRealName as mappingReal } from "../../lib/alias";
 
 export function EditChannelDialog({
   value,
+  existingGroups = [],
   routeOverviews,
   site,
   credentials,
@@ -49,6 +49,7 @@ export function EditChannelDialog({
   refreshingModels,
 }: {
   value: Channel;
+  existingGroups?: string[];
   routeOverviews?: RouteOverview[];
   site?: Site;
   credentials: Array<{
@@ -143,14 +144,6 @@ export function EditChannelDialog({
   const [typeHint, setTypeHint] = useState(
     value.type_hint || site?.platform || "openai-compatible",
   );
-  // 用户 Access Token / 用户 Cookie only make sense for site families with
-  // account surfaces (check-in, balance, key creation). They live in the
-  // advanced section and disappear entirely for types that cannot use them.
-  const authFields = userAuthFieldsFor(typeHint);
-  const showUserTokenField =
-    authFields === "both" || (authFields === "none" && Boolean(userCredential?.has_secret));
-  const showUserCookieField =
-    authFields === "both" || authFields === "cookie" || Boolean(userCredential?.has_cookie);
   const [groupName, setGroupName] = useState(value.group_name || "default");
   const [maxReasoningEffort, setMaxReasoningEffort] = useState(value.max_reasoning_effort ?? "");
   const [payloadRules, setPayloadRules] = useState(value.payload_rules ?? "");
@@ -220,23 +213,8 @@ export function EditChannelDialog({
   // actually moved it here, so a stale snapshot can never stomp that choice.
   const [syncModeDirty, setSyncModeDirty] = useState(false);
   const [stableFirst, setStableFirst] = useState(value.stable_first ?? false);
-  const [userToken, setUserToken] = useState(userCredential?.has_secret ? SECRET_MASK : "");
-  const [userCookie, setUserCookie] = useState(userCredential?.has_cookie ? SECRET_MASK : "");
-  // The credential overview arrives asynchronously (the channel overview and
-  // the site's credential list are separate queries). Until it does, the token
-  // fields are empty — which the save path reads as "clear the credential".
-  // Track the arrival so the masks are seeded exactly once and an untouched
-  // dialog can never delete a stored credential.
-  const seededCredentialId = useRef<number | null>(null);
-  useEffect(() => {
-    if (userCredential == null) return;
-    if (seededCredentialId.current === userCredential.id) return;
-    seededCredentialId.current = userCredential.id;
-    setUserToken(userCredential.has_secret ? SECRET_MASK : "");
-    setUserCookie(userCredential.has_cookie ? SECRET_MASK : "");
-  }, [userCredential]);
-  // The section holds the settings that change forwarding. Check-in credentials
-  // and scheduling are configured in their own focused dialog.
+  // Account credentials and scheduling are managed from the dedicated check-in
+  // settings; this editor keeps only channel forwarding configuration.
   const advancedConfigured = [
     priority !== 0 || weight !== 100 ? t("channels.advRouting") : "",
     maxReasoningEffort ? t("channels.maxReasoningEffort") : "",
@@ -253,9 +231,6 @@ export function EditChannelDialog({
     stableFirst ? t("channels.stableFirst") : "",
     payloadRules.trim() && payloadRules.trim() !== "[]" ? t("channels.payloadRules") : "",
     endpointMapParts.length > 0 ? t("channels.endpointMap") : "",
-    userCredential?.has_secret || userCredential?.has_cookie || userCredential?.id
-      ? t("channels.advUserCredential")
-      : "",
   ].filter(Boolean);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(
     () => readAdvancedOpen() ?? advancedConfigured.length > 0,
@@ -326,6 +301,7 @@ export function EditChannelDialog({
         title={t("channels.edit")}
         onClose={onClose}
         busy={pending}
+        width={760}
         footer={
           <>
             <Button variant="secondary" onClick={onClose} disabled={pending}>
@@ -363,8 +339,9 @@ export function EditChannelDialog({
                   call_policy: callPolicy,
                   usage_limit_cost: usageLimitCost,
                   usage_limit_tokens: usageLimitTokens,
-                  userToken,
-                  userCookie,
+                  // Account credentials are edited in the check-in settings.
+                  userToken: SECRET_MASK,
+                  userCookie: SECRET_MASK,
                   apiKey: "",
                 })
               }
@@ -382,6 +359,19 @@ export function EditChannelDialog({
             <Field label={t("common.name")}>
               <input value={name} onChange={(e) => setName(e.target.value)} disabled={pending} />
             </Field>
+            <Field
+              label={t("common.baseUrl")}
+              hint={inheritedBase ? t("channels.editBaseUrlInherited") : t("channels.baseUrlHint")}
+            >
+              <input
+                type="url"
+                required
+                value={baseUrl}
+                onChange={(e) => setBaseUrl(e.target.value)}
+                placeholder="https://api.example.com"
+                disabled={pending}
+              />
+            </Field>
             <Field label={t("common.type")}>
               <SearchableSelect
                 options={TYPE_OPTIONS}
@@ -394,23 +384,19 @@ export function EditChannelDialog({
               />
             </Field>
             <Field label={t("channels.group")} hint={t("channels.groupHint")}>
-              <input
+              <SearchableSelect
+                options={Array.from(new Set(["default", ...existingGroups]))
+                  .sort((a, b) => a.localeCompare(b))
+                  .map((group) => ({ value: group, label: group, group: "existing" }))}
+                groups={["existing"]}
                 value={groupName}
-                onChange={(event) => setGroupName(event.target.value)}
+                onChange={(next) => setGroupName(next ?? "default")}
                 disabled={pending}
-              />
-            </Field>
-            <Field
-              label={t("common.baseUrl")}
-              hint={inheritedBase ? t("channels.editBaseUrlInherited") : t("channels.baseUrlHint")}
-            >
-              <input
-                type="url"
-                required
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.example.com"
-                disabled={pending}
+                allowCustom
+                placeholder={t("channels.group")}
+                customLabel={t("channels.groupCustom")}
+                customPlaceholder={t("channels.groupCustomPlaceholder")}
+                ariaLabel={t("channels.group")}
               />
             </Field>
           </div>
@@ -572,56 +558,6 @@ export function EditChannelDialog({
           </div>
           {showAdvanced ? (
             <div className="advanced-fields">
-              {showUserTokenField || showUserCookieField ? (
-                <div className="form-grid">
-                  {showUserTokenField ? (
-                    <Field
-                      label={t("channels.userToken")}
-                      hint={
-                        userCredential?.has_secret
-                          ? t("channels.userTokenPresentHint")
-                          : t("channels.userTokenHint")
-                      }
-                    >
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        value={userToken}
-                        onChange={(e) => setUserToken(e.target.value)}
-                        placeholder={
-                          userCredential?.has_secret
-                            ? t("channels.editSecretPlaceholder")
-                            : t("channels.userTokenEmptyPlaceholder")
-                        }
-                        disabled={pending}
-                      />
-                    </Field>
-                  ) : null}
-                  {showUserCookieField ? (
-                    <Field
-                      label={t("channels.userCookie")}
-                      hint={
-                        userCredential?.has_cookie
-                          ? t("channels.userCookiePresentHint")
-                          : t("channels.userCookieHint")
-                      }
-                    >
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        value={userCookie}
-                        onChange={(e) => setUserCookie(e.target.value)}
-                        placeholder={
-                          userCredential?.has_cookie
-                            ? t("channels.editSecretPlaceholder")
-                            : t("channels.userCookiePlaceholder")
-                        }
-                        disabled={pending}
-                      />
-                    </Field>
-                  ) : null}
-                </div>
-              ) : null}
               <div className="form-grid">
                 <Field label={t("common.priority")} hint={t("channels.priorityHint")}>
                   <input
@@ -737,20 +673,7 @@ export function EditChannelDialog({
                     </option>
                   </select>
                 </Field>
-                <Field label={t("channels.proxyUrl")} hint={t("channels.proxyUrlHint")}>
-                  <input
-                    type="url"
-                    value={proxyUrl}
-                    placeholder="http://127.0.0.1:7897"
-                    onChange={(e) => setProxyUrl(e.target.value)}
-                    disabled={pending}
-                  />
-                </Field>
-                {/* The call policy belongs here rather than in the main body: it
-                    is not what the channel *is* (name, URL, models), it is how it
-                    behaves when the gateway itself knocks. Empty is the normal
-                    state — the site owns this decision — and the option spells
-                    out which way it currently inherits. */}
+                {/* 此策略控制保活等自动请求的表现，与签到账号凭据分开配置。 */}
                 <Field label={t("channels.callPolicy")} hint={t("channels.callPolicyHint")}>
                   <select
                     value={callPolicy}
@@ -771,6 +694,15 @@ export function EditChannelDialog({
                       {t("channels.keepalive.policyRealCallsOnly")}
                     </option>
                   </select>
+                </Field>
+                <Field label={t("channels.proxyUrl")} hint={t("channels.proxyUrlHint")}>
+                  <input
+                    type="url"
+                    value={proxyUrl}
+                    placeholder="http://127.0.0.1:7897"
+                    onChange={(e) => setProxyUrl(e.target.value)}
+                    disabled={pending}
+                  />
                 </Field>
               </div>
 

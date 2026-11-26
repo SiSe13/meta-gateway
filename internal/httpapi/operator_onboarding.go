@@ -1,7 +1,9 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,6 +15,101 @@ import (
 	"github.com/lan/meta-gateway/internal/store"
 	"github.com/lan/meta-gateway/internal/totp"
 )
+
+// setupStatus只公开是否需要初始化，不泄露初始化码或账号信息。
+func (h *sessionHandler) setupStatus(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	var count int
+	if err := h.db.QueryRow(`SELECT count(*) FROM team_users WHERE role='owner'`).Scan(&count); err != nil {
+		writeError(w, 500, "auth_unavailable")
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"required": count == 0 && len(h.adminTokens) == 0})
+}
+
+// setupAdmin使用启动日志中的一次性初始化码创建首个站长账号。
+func (h *sessionHandler) setupAdmin(w http.ResponseWriter, r *http.Request) {
+	if len(h.adminTokens) != 0 {
+		writeError(w, 403, "legacy_setup_disabled")
+		return
+	}
+	if !teamOriginOK(r) {
+		writeError(w, 403, "csrf_failed")
+		return
+	}
+	if h.loginLimiter != nil {
+		if allowed, wait := h.loginLimiter.Allow(hashLoginKey("ip:" + ClientIP(r).String())); !allowed {
+			loginRateLimited(w, wait)
+			return
+		}
+	}
+	if h.globalLoginLimiter != nil {
+		if allowed, wait := h.globalLoginLimiter.Allow(0); !allowed {
+			loginRateLimited(w, wait)
+			return
+		}
+	}
+	var req struct {
+		Code     string `json:"code"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10)).Decode(&req); err != nil {
+		writeError(w, 400, "invalid body")
+		return
+	}
+	if h.setupCode == "" || subtle.ConstantTimeCompare([]byte(req.Code), []byte(h.setupCode)) != 1 {
+		writeError(w, 403, "invalid_setup_code")
+		return
+	}
+	name := strings.ToLower(strings.TrimSpace(req.Username))
+	if !teamUsername.MatchString(name) {
+		writeError(w, 400, "invalid_username")
+		return
+	}
+	hash, err := hashTeamPassword(req.Password)
+	if err != nil {
+		writeError(w, 400, "password_length")
+		return
+	}
+	tx, err := h.db.Begin()
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`UPDATE operator_preferences SET id=id WHERE id=1`); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	var count int
+	if err = tx.QueryRow(`SELECT count(*) FROM team_users WHERE role='owner'`).Scan(&count); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if count != 0 {
+		writeError(w, 409, "owner_exists")
+		return
+	}
+	if _, err = tx.Exec(`UPDATE operator_preferences SET admin_username='' WHERE id=1`); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if _, err = tx.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id) VALUES(?,?,?,'owner',1)`, name, name, hash); err != nil {
+		writeError(w, 409, "username_taken")
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	token, err := auth.SignSessionToken(h.sessionKey, sessionTTL)
+	if err != nil {
+		writeError(w, 500, "session token")
+		return
+	}
+	writeJSON(w, 201, map[string]string{"session_token": token})
+}
 
 // operator_onboarding.go owns the first-run claim of the deployment administrator.
 //
@@ -107,10 +204,8 @@ func (h *sessionHandler) onboarding(w http.ResponseWriter, r *http.Request) {
 // claimOwner sets the deployment's owner credential: one username plus a stored
 // password, replacing "the admin token, typed as a password".
 //
-// It stays behind the same confirmation the rename used (the current token, plus
-// the second factor when enabled) because it is a credential change on an
-// already-authenticated session. Re-running it updates the existing owner row, so
-// the same call is also how the operator changes their own username or password.
+// It stays behind the current password (or the legacy deployment token during
+// upgrade), plus the second factor when enabled, because this changes credentials.
 func (h *sessionHandler) claimOwner(w http.ResponseWriter, r *http.Request) {
 	if !teamOwner(w, r) {
 		return
@@ -120,10 +215,11 @@ func (h *sessionHandler) claimOwner(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Token    string `json:"token"`
-		TOTP     string `json:"totp_code"`
+		Username        string `json:"username"`
+		Password        string `json:"password"`
+		Token           string `json:"token"`
+		CurrentPassword string `json:"current_password"`
+		TOTP            string `json:"totp_code"`
 	}
 	if err := decodeJSON(w, r, &req, 0, false); err != nil {
 		return
@@ -132,9 +228,13 @@ func (h *sessionHandler) claimOwner(w http.ResponseWriter, r *http.Request) {
 	// so the token is a confirmation rather than a guessable password — and
 	// spending the sign-in bucket on it locked the operator out of the sign-in
 	// form for a minute right after claiming their own account.
-	// The token is required even once an owner exists: without it, a hijacked
-	// session could swap the owner's credentials.
-	if !auth.ValidAdminToken(req.Token, h.adminTokens) {
+	// Reauthentication prevents a stolen browser session from replacing credentials.
+	authorized := auth.ValidAdminToken(req.Token, h.adminTokens)
+	if !authorized && req.CurrentPassword != "" {
+		account, accountErr := h.ownerAccount()
+		authorized = accountErr == nil && account != nil && checkTeamPassword(account.PasswordHash, req.CurrentPassword)
+	}
+	if !authorized {
 		writeError(w, 403, "invalid_credentials")
 		return
 	}

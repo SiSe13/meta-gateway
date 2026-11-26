@@ -16,6 +16,7 @@ import (
 	_ "time/tzdata" // embed IANA tz database so CHECKIN_TZ works in minimal containers
 
 	"github.com/lan/meta-gateway/internal/adapters"
+	"github.com/lan/meta-gateway/internal/auth"
 	"github.com/lan/meta-gateway/internal/backup"
 	"github.com/lan/meta-gateway/internal/checkin"
 	"github.com/lan/meta-gateway/internal/config"
@@ -63,11 +64,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Validate required config.
-	if len(cfg.AdminTokenList()) == 0 {
-		logger.Error("configuration invalid", "category", "admin_token_required")
-		os.Exit(1)
-	}
 	if cfg.MasterKey == "" {
 		logger.Error("configuration invalid", "category", "master_key_required")
 		os.Exit(1)
@@ -97,6 +93,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer db.Close()
+	var ownerCount int
+	if err := db.QueryRow(`SELECT count(*) FROM team_users WHERE role='owner'`).Scan(&ownerCount); err == nil && ownerCount == 0 && len(cfg.AdminTokenList()) == 0 {
+		logger.Warn("首次启动尚未设置站长账号；请使用启动日志中的初始化码", "setup_code", auth.AdminSetupCode(enc.KeyMaterial(), cfg.DataDir))
+	}
 
 	outboundPolicy, err := outbound.NewPolicy(outbound.Options{
 		AllowHosts:  cfg.OutboundAllowHosts,

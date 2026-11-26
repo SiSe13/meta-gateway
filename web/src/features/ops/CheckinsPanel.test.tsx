@@ -184,13 +184,13 @@ describe("scheduled check-in panel", () => {
         );
       }
     }
-    expect(screen.getByRole("option", { name: "成功" })).toBeInTheDocument();
+    fireEvent.click(statusFilter);
+    expect(await screen.findByRole("option", { name: "成功" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "失败" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "已跳过" })).toBeInTheDocument();
-    expect(await screen.findByRole("option", { name: "示例站点" })).toBeInTheDocument();
-
-    fireEvent.change(siteFilter, { target: { value: "7" } });
-    fireEvent.change(statusFilter, { target: { value: "failed" } });
+    fireEvent.click(screen.getByRole("option", { name: "失败" }));
+    fireEvent.click(siteFilter);
+    fireEvent.click(await screen.findByRole("option", { name: "示例站点" }));
 
     await waitFor(() => {
       const query = logQueries
@@ -206,7 +206,7 @@ describe("scheduled check-in panel", () => {
     });
   });
 
-  it("shows just the site name in the history list", async () => {
+  it("shows the site, localized source, and returned reward without credential id", async () => {
     setup(settings({}), [
       {
         id: 1,
@@ -222,6 +222,16 @@ describe("scheduled check-in panel", () => {
       },
     ]);
     expect(await screen.findByRole("cell", { name: "示例站点" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "手动" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "3.5" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "凭证 ID" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "9" })).not.toBeInTheDocument();
     expect(screen.queryByText(/#7|example\.com|凭证 #9/)).not.toBeInTheDocument();
+
+    const panel = document.querySelector(".checkin-history-panel");
+    const tableWrap = screen.getByRole("table").closest(".table-wrap");
+    expect(tableWrap?.parentElement).toBe(panel);
+    expect(tableWrap).toHaveClass("is-fill");
+    expect(panel?.querySelector(":scope > .pagination-bar")).not.toBeNull();
   });
 });

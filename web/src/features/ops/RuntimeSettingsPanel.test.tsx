@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { Link, MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 import { I18nProvider } from "../../i18n";
 import { SessionProvider } from "../../session";
@@ -17,6 +17,7 @@ afterEach(() => {
 function mount(
   children: ReactNode,
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+  initialEntries = ["/"],
 ) {
   localStorage.setItem("meta-gateway.locale", "en");
   localStorage.setItem("meta-gateway.admin-token", "test-token");
@@ -25,7 +26,7 @@ function mount(
       <I18nProvider>
         <ToastProvider>
           <SessionProvider>
-            <MemoryRouter>{children}</MemoryRouter>
+            <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
           </SessionProvider>
         </ToastProvider>
       </I18nProvider>
@@ -77,6 +78,16 @@ function runtimeServer(read: () => Record<string, unknown>) {
   let stored: Record<string, unknown> | null = null;
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input).split("?")[0];
+    if (path === "/admin/mode") {
+      return new Response(
+        JSON.stringify({
+          mode: "personal",
+          has_owner: true,
+          role: "owner",
+          owner_bootstrap_available: true,
+        }),
+      );
+    }
     if (path !== "/admin/runtime-settings") return new Response(JSON.stringify({}));
     const base = read();
     if (init?.method === "PUT") {
@@ -88,11 +99,6 @@ function runtimeServer(read: () => Record<string, unknown>) {
     return new Response(JSON.stringify({ ...base, editable: stored ?? base.editable }));
   });
   return { fetcher, puts };
-}
-
-/** The rail owns the page: any section is one click away, from any group. */
-async function openSection(name: string) {
-  fireEvent.click(await screen.findByRole("button", { name }));
 }
 
 it("shows an initial load failure with a working retry instead of endless loading", async () => {
@@ -111,72 +117,82 @@ it("shows an initial load failure with a working retry instead of endless loadin
   await waitFor(() => expect(reads()).toBeGreaterThan(before));
 });
 
-// The page used to be nineteen peer cards behind a chip index, then a tab bar
-// plus an anchor row. There is one navigation level now: the rail lists every
-// group and section, and the flow beside it shows the group you are in.
-it("navigates from one grouped rail, showing a group's sections continuously", async () => {
+// The shell sidebar owns settings navigation; a section query restores the
+// selected group without rendering a second menu inside the page.
+it("opens the requested settings group from its section URL", async () => {
   vi.stubGlobal("fetch", runtimeServer(() => payload()).fetcher);
-  mount(<RuntimeSettingsPanel />);
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=keepalive"]);
 
-  // Every group is named in the rail, and so is every section — including the
-  // ones whose group is not being rendered right now.
-  expect(await screen.findByText("Forwarding & routing")).toBeInTheDocument();
-  expect(screen.getByText("Health & automation")).toBeInTheDocument();
-  expect(screen.getByText("Data & operations")).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Keepalive" })).toBeInTheDocument();
-
-  // The active group renders its sections continuously — not one card at a time.
-  expect(screen.getByRole("heading", { name: "Relay failover" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Routing" })).toBeInTheDocument();
-  expect(screen.getByText("Per-channel concurrency ceiling")).toBeInTheDocument();
-
-  // A rail entry from another group moves the flow to that group.
-  fireEvent.click(screen.getByRole("button", { name: "Keepalive" }));
   expect(
-    await screen.findByRole("heading", { name: /Failure cooldown|Cooldown/ }),
+    await screen.findByRole("heading", { name: "Account keepalive settings" }),
   ).toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Relay failover" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Keepalive" })).toHaveAttribute("aria-current", "true");
+  expect(
+    screen.queryByRole("heading", { name: /Failure cooldown|Cooldown/ }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("navigation", { name: "Sections" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Settings section")).not.toBeInTheDocument();
 });
 
-// The rail is an index, and a phone needs that index as one control: a column of
-// three grouped label rows is a wall of small type. The select is a second
-// presentation of the same one selection, so moving between sections from it must
-// change the flow — and only the flow: no write, and no reset of a draft that is
-// still being typed.
-it("moves between sections from the phone index without writing or losing the draft", async () => {
+it("shows the related routing cards together under the consolidated menu entry", async () => {
+  vi.stubGlobal("fetch", runtimeServer(() => payload()).fetcher);
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=routing"]);
+
+  expect(await screen.findByRole("heading", { name: "Routing strategy" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "New-channel stability trial" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Session affinity" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Request failover" })).not.toBeInTheDocument();
+});
+
+it("shows both recovery forms directly in the merged runtime menu section", async () => {
+  vi.stubGlobal("fetch", runtimeServer(() => payload()).fetcher);
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=recovery"]);
+
+  expect(await screen.findByRole("heading", { name: "Reset to environment" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Reset to environment" })).toBeInTheDocument();
+  expect(screen.getByText("Factory reset")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Start factory reset…" })).toBeInTheDocument();
+  expect(screen.queryByText("Danger zone")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Runtime parameters" })).not.toBeInTheDocument();
+});
+
+it("shows the operating mode control directly in account security settings", async () => {
+  vi.stubGlobal("fetch", runtimeServer(() => payload()).fetcher);
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=users"]);
+
+  expect(await screen.findByRole("button", { name: "Operating mode" })).toHaveTextContent(
+    "Personal",
+  );
+  expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  expect(screen.queryByRole("link", { name: /Open user management/ })).not.toBeInTheDocument();
+});
+
+// Sidebar links change only the section query. Switching between groups must
+// preserve an in-progress draft and never trigger a settings write.
+it("follows sidebar section links without writing or losing the draft", async () => {
   const server = runtimeServer(() => payload());
   vi.stubGlobal("fetch", server.fetcher);
-  mount(<RuntimeSettingsPanel />);
+  mount(
+    <>
+      <Link to="/settings?tab=runtime&section=keepalive">Keepalive menu</Link>
+      <Link to="/settings?tab=runtime&section=relay">Relay menu</Link>
+      <RuntimeSettingsPanel />
+    </>,
+    undefined,
+    ["/settings?tab=runtime&section=relay"],
+  );
 
-  // Two distinct accessible names: the rail and the picker are two presentations
-  // of one index, not two landmarks answering to the same label.
-  expect(await screen.findByRole("navigation", { name: "Sections" })).toBeInTheDocument();
-  const picker = screen.getByLabelText("Settings section") as HTMLSelectElement;
-  // One selection: the select reports the section the rail already shows, and the
-  // groups travel with it as <optgroup>.
-  expect(picker).toHaveValue("relay");
-  expect(within(picker).getByRole("group", { name: "Forwarding & routing" })).toBeInTheDocument();
-
-  const rounds = screen.getByLabelText(/Retry rounds/) as HTMLInputElement;
+  const rounds = (await screen.findByLabelText(/Retry rounds/)) as HTMLInputElement;
   fireEvent.change(rounds, { target: { value: "40" } });
-  // The picker says which sections differ in words, not with a colour dot: a
-  // state the operator must be able to read, not only see.
-  expect(
-    within(picker).getByRole("option", { name: "Relay failover · Changed" }),
-  ).toBeInTheDocument();
-  expect(within(picker).getByRole("option", { name: "Routing" })).toBeInTheDocument();
 
-  fireEvent.change(picker, { target: { value: "keepalive" } });
-  expect(await screen.findByRole("heading", { name: "Keepalive" })).toBeInTheDocument();
-  expect(picker).toHaveValue("keepalive");
+  fireEvent.click(screen.getByRole("link", { name: "Keepalive menu" }));
+  expect(
+    await screen.findByRole("heading", { name: "Account keepalive settings" }),
+  ).toBeInTheDocument();
+  expect(screen.queryByLabelText(/Retry rounds/)).not.toBeInTheDocument();
   // Navigation is not a save.
   expect(server.puts).toHaveLength(0);
-  // ...and the rail follows the same selection, moved from the picker this time.
-  expect(screen.getByRole("button", { name: "Keepalive" })).toHaveAttribute("aria-current", "true");
 
-  // Coming back re-renders the flow, not the draft.
-  fireEvent.change(picker, { target: { value: "relay" } });
+  fireEvent.click(screen.getByRole("link", { name: "Relay menu" }));
   expect((screen.getByLabelText(/Retry rounds/) as HTMLInputElement).value).toBe("40");
   expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
 });
@@ -253,10 +269,9 @@ it("writes the draft when a field is left, and not while it is being typed", asy
 it("saves a checkbox on the change itself, with no blur to wait for", async () => {
   const server = runtimeServer(() => payload());
   vi.stubGlobal("fetch", server.fetcher);
-  mount(<RuntimeSettingsPanel />);
-  await openSection("Routing");
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=routing"]);
 
-  fireEvent.click(screen.getByRole("checkbox", { name: /Latency-aware routing/ }));
+  fireEvent.click(await screen.findByRole("switch", { name: /Latency-aware routing/ }));
   await waitFor(() => expect(server.puts).toHaveLength(1));
   expect(server.puts[0]!.routing_latency_aware).toBe(true);
 });
@@ -269,7 +284,7 @@ it("turns image-write failover on and marks it as an override", async () => {
   vi.stubGlobal("fetch", server.fetcher);
   mount(<RuntimeSettingsPanel />);
 
-  const toggle = (await screen.findByRole("checkbox", {
+  const toggle = (await screen.findByRole("switch", {
     name: /Fail over image requests/,
   })) as HTMLInputElement;
   expect(toggle.checked).toBe(false);
@@ -293,7 +308,7 @@ it("opens the scope dialog when the image switch is armed, and writes only after
   vi.stubGlobal("fetch", server.fetcher);
   mount(<RuntimeSettingsPanel />);
 
-  const main = (await screen.findByRole("checkbox", {
+  const main = (await screen.findByRole("switch", {
     name: /Fail over image requests/,
   })) as HTMLInputElement;
   fireEvent.click(main);
@@ -326,14 +341,14 @@ it("writes the selected scope, and the blunt option implies the 5xx one", async 
   vi.stubGlobal("fetch", server.fetcher);
   mount(<RuntimeSettingsPanel />);
 
-  const main = (await screen.findByRole("checkbox", {
+  const main = (await screen.findByRole("switch", {
     name: /Fail over image requests/,
   })) as HTMLInputElement;
   fireEvent.click(main);
   await screen.findByText(/Turn on “fail over image requests”\?/);
 
-  const five = screen.getByRole("checkbox", { name: /Also retry 5xx/ }) as HTMLInputElement;
-  const blunt = screen.getByRole("checkbox", {
+  const five = screen.getByRole("switch", { name: /Also retry 5xx/ }) as HTMLInputElement;
+  const blunt = screen.getByRole("switch", {
     name: /Retry 504, timeouts and broken streams too/,
   }) as HTMLInputElement;
   fireEvent.click(blunt);
@@ -361,7 +376,7 @@ it("clears the whole scope when the image switch goes off", async () => {
   vi.stubGlobal("fetch", server.fetcher);
   mount(<RuntimeSettingsPanel />);
 
-  const main = (await screen.findByRole("checkbox", {
+  const main = (await screen.findByRole("switch", {
     name: /Fail over image requests/,
   })) as HTMLInputElement;
   fireEvent.click(main);
@@ -380,13 +395,10 @@ it("marks the fields that override the deployment default, and their section", a
   );
   mount(<RuntimeSettingsPanel />);
 
-  // The section dot is what makes the sidebar useful: a change made three
-  // sections ago must still be visible from here.
-  const relay = await screen.findByRole("button", { name: "Relay failover" });
-  expect(relay.querySelector(".runtime-nav-dot")).not.toBeNull();
-  expect(
-    screen.getByRole("button", { name: "Routing" }).querySelector(".runtime-nav-dot"),
-  ).toBeNull();
+  const relay = await screen.findByRole("heading", { name: "Request failover" });
+  expect(relay.closest(".runtime-section")?.querySelector(".setting-state")).toHaveTextContent(
+    "Changed",
+  );
 
   // A row that differs from the deployment default says so; a row that does not
   // says nothing. A "Default" chip on every untouched row was noise — the answer
@@ -442,8 +454,7 @@ it("shows the environment layer read-only, folded into the service section", asy
       ],
     })).fetcher,
   );
-  mount(<RuntimeSettingsPanel />);
-  await openSection("Service & network");
+  mount(<RuntimeSettingsPanel />, undefined, ["/settings?tab=runtime&section=server"]);
 
   // Folded until asked for: the variable list is a fact about the deployment,
   // not a knob, and it should not out-shout the settings above it.

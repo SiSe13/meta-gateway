@@ -1,4 +1,5 @@
 import { useI18n } from "../../i18n";
+import { SelectControl } from "../../components/ui";
 import { SCHEDULE_PRESETS, presetOfCron, type SchedulePresetId } from "../../lib/schedulePresets";
 import { CheckinTimePicker } from "./CheckinTimePicker";
 
@@ -37,7 +38,7 @@ export function CronSchedulePicker({
   };
   return (
     <span className="cron-schedule-picker">
-      <select
+      <SelectControl
         aria-label={t("ops.schedule.presetLabel")}
         disabled={disabled}
         value={preset}
@@ -50,7 +51,7 @@ export function CronSchedulePicker({
               : t(`ops.schedule.preset.${item.id}`)}
           </option>
         ))}
-      </select>
+      </SelectControl>
       {preset === "off" ? (
         <span className="muted">{t("ops.schedule.offHint")}</span>
       ) : preset === "custom" || preset === "daily" ? (

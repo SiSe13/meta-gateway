@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Field, Panel } from "../components/ui";
+import { Button, Field, Panel, SelectControl } from "../components/ui";
 import { teamText, teamError } from "./text";
 import type { ModeInfo, TeamRequest } from "./types";
 import "./team.css";
@@ -87,23 +87,24 @@ export function ModePanel({
             }}
           >
             <fieldset className="team-modal-content" disabled={busy || !owner}>
-              <select
-                aria-label={t("mode")}
-                className="runtime-mode-select"
-                value={mode}
-                onChange={(e) => setChoice(e.target.value as "personal" | "team")}
-              >
-                <option value="personal">{t("personal")}</option>
-                <option value="team">{t("enabled")}</option>
-              </select>
+              <div className="runtime-mode-controls">
+                <SelectControl
+                  aria-label={t("mode")}
+                  value={mode}
+                  onChange={(e) => setChoice(e.target.value as "personal" | "team")}
+                >
+                  <option value="personal">{t("personal")}</option>
+                  <option value="team">{t("enabled")}</option>
+                </SelectControl>
+                <Button type="submit" disabled={mode === query.data.mode}>
+                  {busy ? t("saving") : t("save")}
+                </Button>
+              </div>
               {query.data.mode === "team" && mode === "personal" ? (
                 <p className="muted panel-lede" style={{ marginTop: 12 }}>
                   {t("disableHint")}
                 </p>
               ) : null}
-              <Button type="submit" style={{ marginTop: 6 }} disabled={mode === query.data.mode}>
-                {busy ? t("saving") : t("save")}
-              </Button>
             </fieldset>
           </form>
           {!query.data.has_owner && owner && (
@@ -114,47 +115,54 @@ export function ModePanel({
               <p className="muted panel-lede" style={{ marginTop: 22 }}>
                 {t("bootstrapAuto")}
               </p>
-              <form
-                style={{ marginTop: 12 }}
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const data = new FormData(event.currentTarget);
-                  void save("/admin/mode/owner", "POST", {
-                    username: data.get("username"),
-                    name: data.get("name"),
-                    password: data.get("password"),
-                    totp: data.get("totp"),
-                  });
-                }}
-              >
-                <h4 style={{ margin: "0 0 6px", fontSize: 13 }}>{t("bootstrap")}</h4>
-                <p className="muted panel-lede">{t("bootstrapHint")}</p>
-                <fieldset className="team-modal-content" disabled={busy}>
-                  <div className="form-grid">
-                    <Field label={t("username")}>
-                      <input
-                        name="username"
-                        minLength={3}
-                        maxLength={64}
-                        required
-                        autoComplete="username"
-                      />
-                    </Field>
-                    <Field label={t("name")}>
-                      <input name="name" maxLength={80} required />
-                    </Field>
-                    <Field label={`${t("password")} · ${t("passwordHint")}`}>
-                      <input name="password" type="password" required autoComplete="new-password" />
-                    </Field>
-                    <Field label={t("totp")}>
-                      <input name="totp" inputMode="numeric" autoComplete="one-time-code" />
-                    </Field>
-                  </div>
-                  <Button type="submit" variant="secondary">
-                    {busy ? t("saving") : t("bootstrap")}
-                  </Button>
-                </fieldset>
-              </form>
+              {!query.data.owner_bootstrap_available ? (
+                <form
+                  style={{ marginTop: 12 }}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const data = new FormData(event.currentTarget);
+                    void save("/admin/mode/owner", "POST", {
+                      username: data.get("username"),
+                      name: data.get("name"),
+                      password: data.get("password"),
+                      totp: data.get("totp"),
+                    });
+                  }}
+                >
+                  <h4 style={{ margin: "0 0 6px", fontSize: 13 }}>{t("bootstrap")}</h4>
+                  <p className="muted panel-lede">{t("bootstrapHint")}</p>
+                  <fieldset className="team-modal-content" disabled={busy}>
+                    <div className="form-grid">
+                      <Field label={t("username")}>
+                        <input
+                          name="username"
+                          minLength={3}
+                          maxLength={64}
+                          required
+                          autoComplete="username"
+                        />
+                      </Field>
+                      <Field label={t("name")}>
+                        <input name="name" maxLength={80} required />
+                      </Field>
+                      <Field label={`${t("password")} · ${t("passwordHint")}`}>
+                        <input
+                          name="password"
+                          type="password"
+                          required
+                          autoComplete="new-password"
+                        />
+                      </Field>
+                      <Field label={t("totp")}>
+                        <input name="totp" inputMode="numeric" autoComplete="one-time-code" />
+                      </Field>
+                    </div>
+                    <Button type="submit" variant="secondary">
+                      {busy ? t("saving") : t("bootstrap")}
+                    </Button>
+                  </fieldset>
+                </form>
+              ) : null}
             </>
           )}
         </>

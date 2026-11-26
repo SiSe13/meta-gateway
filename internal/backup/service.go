@@ -107,6 +107,42 @@ func (s *Service) Create(ctx context.Context) (*store.BackupRecord, error) {
 
 func (s *Service) List(limit int) ([]store.BackupRecord, error) { return s.db.BackupRecord.List(limit) }
 
+// Open opens a successful backup by its generated name, never by an arbitrary path.
+func (s *Service) Open(name string) (*os.File, error) {
+	if !safeName.MatchString(name) || filepath.Base(name) != name {
+		return nil, os.ErrNotExist
+	}
+	records, err := s.db.BackupRecord.ListSuccessful()
+	if err != nil {
+		return nil, fmt.Errorf("list backups: %w", err)
+	}
+	found := false
+	for _, record := range records {
+		if record.Name == name {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil, os.ErrNotExist
+	}
+
+	file, err := os.Open(filepath.Join(s.dir, name))
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, os.ErrNotExist
+	}
+	return file, nil
+}
+
 // Dir is where snapshots are written. The self-update path asks, because an
 // update that cannot be rolled back must not start, and an empty directory is
 // the misconfiguration that would otherwise only show up as a confusing

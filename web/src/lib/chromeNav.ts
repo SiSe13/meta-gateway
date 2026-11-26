@@ -1,7 +1,7 @@
 import type { ConsoleRole } from "../session";
 import {
   Activity,
-  ArrowLeftRight,
+  ArrowUpDown,
   Boxes,
   Cable,
   CalendarCheck,
@@ -36,7 +36,11 @@ export const CHROME_NAV_GROUPS: ChromeNavGroup[] = [
     labelKey: "app.topNav.observations",
     defaultPath: "/channels?view=observations",
   },
-  { id: "settings", labelKey: "app.topNav.settings", defaultPath: "/settings?tab=runtime" },
+  {
+    id: "settings",
+    labelKey: "app.topNav.settings",
+    defaultPath: "/settings?tab=runtime&section=relay",
+  },
   { id: "backup", labelKey: "app.topNav.backupExtensions", defaultPath: "/exchange" },
 ];
 
@@ -93,7 +97,7 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
   {
     path: "/exchange",
     labelKey: "app.nav.exchange",
-    icon: ArrowLeftRight,
+    icon: ArrowUpDown,
     group: "backup",
     roles: STAFF,
   },
@@ -152,13 +156,6 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
     icon: UserRound,
     group: "users",
     roles: OWNER,
-  },
-  {
-    path: "/settings?tab=runtime",
-    labelKey: "ops.tab.runtime",
-    icon: Settings,
-    group: "settings",
-    roles: STAFF,
   },
   {
     path: "/channels?view=observations",

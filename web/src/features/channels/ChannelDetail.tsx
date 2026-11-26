@@ -213,7 +213,10 @@ export function ChannelDetail({
       })()}
 
       {ch.site_id ? (
-        <Link className="button button-quiet" to={`/channels?view=observations&site=${ch.site_id}`}>
+        <Link
+          className="button button-quiet channel-detail-site-observation"
+          to={`/channels?view=observations&site=${ch.site_id}`}
+        >
           {t("availability.openSite")}
         </Link>
       ) : null}

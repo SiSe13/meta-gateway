@@ -17,7 +17,14 @@ it("offers personal/team setup and does not advance after saving sync defaults f
   const fetcher = vi.fn(async (input: RequestInfo | URL) => {
     const path = String(input);
     if (path === "/admin/mode")
-      return new Response(JSON.stringify({ mode: "personal", has_owner: false, role: "owner" }));
+      return new Response(
+        JSON.stringify({
+          mode: "personal",
+          has_owner: false,
+          role: "owner",
+          owner_bootstrap_available: true,
+        }),
+      );
     return new Response(JSON.stringify({ error: "save failed" }), { status: 500 });
   });
   vi.stubGlobal("fetch", fetcher);
@@ -39,7 +46,7 @@ it("offers personal/team setup and does not advance after saving sync defaults f
     </QueryClientProvider>,
   );
   expect(await screen.findByLabelText("Operating mode")).toHaveValue("personal");
-  expect(screen.getByRole("heading", { name: "Create owner account" })).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Create owner account" })).toBeNull();
   fireEvent.click(screen.getAllByRole("radio")[1]!);
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   await waitFor(() =>
@@ -54,7 +61,14 @@ it("adds the selected site type when creating the first upstream site", async ()
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
     if (path === "/admin/mode")
-      return new Response(JSON.stringify({ mode: "personal", has_owner: true, role: "owner" }));
+      return new Response(
+        JSON.stringify({
+          mode: "personal",
+          has_owner: true,
+          role: "owner",
+          owner_bootstrap_available: true,
+        }),
+      );
     if (path === "/admin/runtime-settings" && !init?.method)
       return new Response(JSON.stringify({ editable: { default_model_sync_mode: "manual" } }));
     if (path === "/admin/runtime-settings" && init?.method === "PUT")

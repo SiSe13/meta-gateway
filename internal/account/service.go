@@ -385,22 +385,33 @@ func (s *Service) SyncKeys(ctx context.Context, channelID int64, request SyncKey
 		}
 		if matchedID > 0 {
 			result.ReusedCredentials++
-			// Best-effort: refresh meta name/group on reuse when empty.
-			if matched, getErr := s.db.Credential.GetByID(matchedID); getErr == nil && matched != nil {
-				metaPayload := map[string]any{"name": name, "group": key.Group}
-				if key.ID > 0 {
-					metaPayload["upstream_token_id"] = key.ID
-				}
-				if metaBytes, metaErr := json.Marshal(metaPayload); metaErr == nil {
-					matched.MetaJSON = string(metaBytes)
-					_ = s.db.Credential.Update(matched)
-				}
+			// 合并到已有密钥时保留本地名称，只补齐缺失名称并刷新上游分组信息。
+			matched, getErr := s.db.Credential.GetByID(matchedID)
+			if getErr != nil || matched == nil {
+				zeroString(&secret)
+				zeroString(&resolved.input.Secret)
+				return nil, internalError("credential_lookup_failed")
+			}
+			metaPayload := map[string]any{}
+			if strings.TrimSpace(matched.MetaJSON) != "" {
+				_ = json.Unmarshal([]byte(matched.MetaJSON), &metaPayload)
+			}
+			if existingName, _ := metaPayload["name"].(string); strings.TrimSpace(existingName) == "" {
+				metaPayload["name"] = name
+			}
+			metaPayload["group"] = key.Group
+			if _, imported := metaPayload["upstream_token_id"]; imported && key.ID > 0 {
+				metaPayload["upstream_token_id"] = key.ID
+			}
+			if metaBytes, metaErr := json.Marshal(metaPayload); metaErr == nil {
+				matched.MetaJSON = string(metaBytes)
+				_ = s.db.Credential.Update(matched)
 			}
 			result.Items = append(result.Items, SyncKeyItem{
 				Name: name, Group: key.Group, CredentialID: matchedID,
-				UpstreamTokenID: key.ID, Enabled: true, Status: "reused", Category: "existing_api_key",
+				UpstreamTokenID: key.ID, Enabled: matched.Status == domain.StatusEnabled, Status: "reused", Category: "existing_api_key",
 			})
-			if attachID == 0 {
+			if attachID == 0 && matched.Status == domain.StatusEnabled {
 				attachID = matchedID
 			}
 			zeroString(&secret)
@@ -1723,7 +1734,7 @@ func (s *Service) findMatchingAPIKey(existing []domain.Credential, secret string
 	secretBytes := []byte(secret)
 	for index := range existing {
 		cred := existing[index]
-		if !strings.EqualFold(cred.Kind, "api_key") || cred.Status != domain.StatusEnabled || len(cred.SecretEnc) == 0 {
+		if !strings.EqualFold(cred.Kind, "api_key") || len(cred.SecretEnc) == 0 {
 			continue
 		}
 		plaintext, err := s.enc.Decrypt(string(cred.SecretEnc))
