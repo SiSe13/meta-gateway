@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Channel, RouteMember, RoutingCandidate } from "../../api/types";
+import { translate } from "../../i18n";
 import {
   candidateState,
   getEffectiveRoutingPolicy,
@@ -133,9 +134,8 @@ describe("getEffectiveRoutingPolicy", () => {
 });
 
 describe("upstreamChoices", () => {
-  // Stands in for useI18n's t: the only key this helper formats.
-  const t = (key: string, vars?: Record<string, string | number>) =>
-    key === "routing.memberOrigin" ? `原模型 ${vars?.model}` : key;
+  // 使用真实中文词典，覆盖原模型和默认分组的展示文案。
+  const t = (key: string, vars?: Record<string, string | number>) => translate("zh-CN", key, vars);
 
   // The bug this covers: one channel serving a shared alias under several
   // upstream names printed the SAME row N times ("商汤日日新 · p0/w100"), so the
@@ -193,8 +193,9 @@ describe("upstreamChoices", () => {
     );
     expect(choices.map((choice) => choice.label)).toEqual([
       "商汤日日新 · p10/w100 · #7 · vip",
-      "商汤日日新 · p10/w100 · #7 · default",
+      "商汤日日新 · p10/w100 · #7 · 默认",
     ]);
+    expect(choices.map((choice) => choice.group)).toEqual(["vip", "default"]);
   });
 
   it("leaves an unambiguous list alone", () => {

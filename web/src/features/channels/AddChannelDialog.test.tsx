@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { I18nProvider } from "../../i18n";
+import { I18nProvider, translate } from "../../i18n";
 import { SessionProvider } from "../../session";
 import { ToastProvider } from "../../toast";
 import { AddChannelDialog } from "./AddChannelDialog";
@@ -161,6 +161,29 @@ describe("AddChannelDialog endpoint preview", () => {
     fireEvent.click(await screen.findByRole("option", { name: "paid" }));
 
     expect(screen.getByRole("button", { name: "Channel group" })).toHaveTextContent("paid");
+  });
+
+  it("shows the default group in Chinese and submits its original identifier", async () => {
+    localStorage.setItem("meta-gateway.locale", "zh-CN");
+    stubPreview();
+    const onSave = vi.fn();
+    renderDialog({ existingGroups: ["paid"], onSave });
+    const group = screen.getByRole("button", { name: translate("zh-CN", "channels.group") });
+    expect(group).toHaveTextContent("默认");
+    fireEvent.click(group);
+    expect(await screen.findByRole("option", { name: "paid" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("option", { name: "默认" }));
+    fireEvent.change(screen.getByPlaceholderText("https://api.example.com"), {
+      target: { value: "https://api.example.com" },
+    });
+    fireEvent.change(document.querySelector('input[type="password"]')!, {
+      target: { value: "sk-test" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: translate("zh-CN", "channels.saveAndVerify") }),
+    );
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(onSave.mock.calls[0]?.[0].group_name).toBe("default");
   });
 
   it("lets the operator type a new channel group", async () => {

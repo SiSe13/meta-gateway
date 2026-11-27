@@ -55,7 +55,7 @@ export function UsersLayout({ request }: { request: TeamRequest }) {
   const teamSettings: TeamSettings = settings.data?.settings ?? {
     mode: info.mode,
     branding: {
-      name: "Meta Gateway",
+      name: "Balbo AI",
       accent: "#275b85",
       logo_url: "",
       notice: "",

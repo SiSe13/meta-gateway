@@ -4,6 +4,13 @@ import { MODE_GATED_NAV, modeHiddenNav } from "./topBar";
 import { RUNTIME_GROUPS, runtimeMenuEntries } from "../features/ops/runtimeNavigation";
 
 describe("console navigation registry", () => {
+  it("keeps the main console pages in the requested order", () => {
+    const paths = CHROME_NAV_ITEMS.filter((item) =>
+      ["/", "/keys", "/models", "/logs", "/account"].includes(item.path),
+    ).map((item) => item.path);
+    expect(paths).toEqual(["/", "/keys", "/models", "/logs", "/account"]);
+  });
+
   it("orders the top-level workspaces as requested", () => {
     expect(CHROME_NAV_GROUPS.map((group) => group.id)).toEqual([
       "console",
@@ -17,6 +24,7 @@ describe("console navigation registry", () => {
   it("keeps the requested workspaces and pages in one navigation registry", () => {
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users/members")?.group).toBe("users");
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/users/oauth")?.group).toBe("users");
+    expect(CHROME_NAV_ITEMS.some((item) => item.path === "/users/quotas")).toBe(false);
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/backups")?.group).toBe("backup");
     expect(CHROME_NAV_ITEMS.find((item) => item.path === "/logs")?.roles).toEqual([
       "owner",
@@ -61,9 +69,13 @@ describe("console navigation registry", () => {
   });
 });
 
-it("reserves personal settings for a team account while retaining deployment settings", async () => {
+it("shows personal information only to team accounts", async () => {
   const { CHROME_NAV_ITEMS, canAccessNav } = await import("./chromeNav");
-  expect(CHROME_NAV_ITEMS.some((item) => item.path === "/account")).toBe(false);
+  const account = CHROME_NAV_ITEMS.find((item) => item.path === "/account")!;
+  expect(canAccessNav(account, "admin")).toBe(true);
+  expect(canAccessNav(account, "member")).toBe(true);
+  expect(canAccessNav(account, "owner")).toBe(false);
+  expect(canAccessNav(account, null)).toBe(false);
   const users = CHROME_NAV_ITEMS.find((item) => item.path === "/users/members")!;
   expect(canAccessNav(users, "admin")).toBe(true);
   expect(canAccessNav(users, "member")).toBe(false);

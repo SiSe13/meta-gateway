@@ -4,6 +4,7 @@ import type {
   KeyUpdateInput,
   DiscoveredModel,
   DownstreamKey,
+  DownstreamKeyActivity,
   ModelMetadata,
   RouteOverview,
   UsageSummary,
@@ -24,6 +25,10 @@ import type {
  */
 export type KeysSource = {
   keys: (signal?: AbortSignal) => Promise<DownstreamKey[]>;
+  ownerUsers?: (
+    signal?: AbortSignal,
+  ) => Promise<Array<{ id: number; name: string; username: string }>>;
+  keyActivity?: (signal?: AbortSignal) => Promise<DownstreamKeyActivity[]>;
   discoveredModels: (signal?: AbortSignal) => Promise<Pick<DiscoveredModel, "model_name">[]>;
   usageSummary: (signal?: AbortSignal) => Promise<UsageSummary>;
   routeOverviews: (signal?: AbortSignal) => Promise<RouteOverview[]>;
@@ -64,6 +69,10 @@ export type KeysCapabilities = {
   pricing: boolean;
   /** Upstream detail (routes, aliases, channels behind a key). */
   upstream: boolean;
+  /** Per-key model allow-list shown in the key list. */
+  modelRange: boolean;
+  /** Live in-flight request count per token. */
+  concurrency: boolean;
   /**
    * Team concepts: the tenant group a token is bound to, and the member who
    * owns it. These are the multi-user module's business — an operator running a
@@ -71,15 +80,6 @@ export type KeysCapabilities = {
    * operating mode as well.
    */
   team: boolean;
-  /**
-   * Lay the tokens out as cards rather than as the operator's table.
-   *
-   * A site's token table is scanned by column — many rows, few questions. A
-   * person's own tokens are a handful, and each one is read on its own: which
-   * token is this (the masked tail), what has it cost me, when did I last use
-   * it. That is a card, and the same rows feed both layouts.
-   */
-  cards: boolean;
 };
 
 export const MEMBER_KEY_CAPS: KeysCapabilities = {
@@ -94,8 +94,9 @@ export const MEMBER_KEY_CAPS: KeysCapabilities = {
   advanced: true,
   pricing: true,
   upstream: false,
+  modelRange: true,
+  concurrency: true,
   team: false,
-  cards: true,
 };
 
 export const ADMIN_KEY_CAPS: KeysCapabilities = {
@@ -110,6 +111,7 @@ export const ADMIN_KEY_CAPS: KeysCapabilities = {
   advanced: true,
   pricing: true,
   upstream: true,
+  modelRange: true,
+  concurrency: true,
   team: true,
-  cards: false,
 };

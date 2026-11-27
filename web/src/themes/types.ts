@@ -11,6 +11,7 @@ export type ThemeChromeProps = {
   showAdminAccount: boolean;
   showMemberAccount: boolean;
   onOpenAdminAccount: () => void;
+  onOpenPasswordDialog: () => void;
   appearanceHiddenNav: string[];
   sections: { label: string; items: ThemeNavItem[] }[];
   version: string;

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lan/meta-gateway/internal/domain"
 )
@@ -123,6 +124,97 @@ func TestTeamBatchInviteCodes(t *testing.T) {
 	}
 }
 
+func TestTeamCodeCanBeRevealedUntilItIsNoLongerUsable(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	ids, codes := mintCodes(t, e, map[string]any{"kind": "invite", "count": 1, "policy_id": 1})
+
+	var encrypted string
+	if err := e.db.QueryRow(`SELECT token_enc FROM team_invites WHERE id=?`, ids[0]).Scan(&encrypted); err != nil {
+		t.Fatal(err)
+	}
+	if encrypted == "" || encrypted == codes[0] {
+		t.Fatalf("stored code should be encrypted, got %q", encrypted)
+	}
+
+	var revealed struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(e.admin("POST", "/admin/team/codes/"+strconv.FormatInt(ids[0], 10)+"/reveal", nil, 200), &revealed); err != nil {
+		t.Fatal(err)
+	}
+	if revealed.Code != codes[0] {
+		t.Fatalf("revealed code = %q, want the generated code", revealed.Code)
+	}
+	list := e.admin("GET", "/admin/team/codes", nil, 200)
+	if strings.Contains(string(list), codes[0]) {
+		t.Fatal("the code list leaked the plaintext code")
+	}
+	var rows []teamCodeView
+	if err := json.Unmarshal(list, &rows); err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || !rows[0].Revealable {
+		t.Fatalf("code list revealability = %+v, want one revealable code", rows)
+	}
+
+	e.admin("DELETE", "/admin/team/codes/"+strconv.FormatInt(ids[0], 10), nil, 200)
+	e.admin("POST", "/admin/team/codes/"+strconv.FormatInt(ids[0], 10)+"/reveal", nil, 409)
+}
+
+func TestTeamInviteCodeGrantsMultiplePolicies(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	secondRaw := e.admin("POST", "/admin/team/policies", TeamPolicy{Name: "Research", Models: []string{}, MemberIDs: []int64{}}, 200)
+	var second TeamPolicy
+	if err := json.Unmarshal(secondRaw, &second); err != nil {
+		t.Fatal(err)
+	}
+	_, codes := mintCodes(t, e, map[string]any{
+		"kind": "invite", "count": 1, "policy_ids": []int64{1, second.ID},
+	})
+	acceptWithCode(t, e, codes[0], "multi-policy-member", 200)
+
+	var userID int64
+	if err := e.db.QueryRow(`SELECT id FROM team_users WHERE username='multi-policy-member'`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := e.db.Query(`SELECT policy_id FROM team_user_policies WHERE user_id=? ORDER BY policy_id`, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	var got []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, id)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != 1 || got[1] != second.ID {
+		t.Fatalf("registered user policies = %v, want [1 %d]", got, second.ID)
+	}
+}
+
+func TestUpdateTeamUserConcurrencyLimit(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	alice := e.member("concurrency-edit", "member")
+	e.admin("PATCH", "/admin/team/users/"+strconv.FormatInt(alice.userID, 10), map[string]any{"max_concurrent": 9}, 200)
+	var got int
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, alice.userID).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != 9 {
+		t.Fatalf("account concurrency limit = %d, want 9", got)
+	}
+	e.admin("PATCH", "/admin/team/users/"+strconv.FormatInt(alice.userID, 10), map[string]any{"max_concurrent": 0}, 400)
+}
+
 // A credit voucher tops up the signed-in member's own pool. It is an account
 // operation, not a relay one, and one account cannot redeem the same code twice
 // even when the code has uses left for other people.
@@ -211,6 +303,19 @@ func TestTeamMemberAdministration(t *testing.T) {
 	}
 	if len(imported.Failed) != 1 || imported.Failed[0].Line != 3 {
 		t.Fatalf("import failures = %+v, want the duplicate on line 3", imported.Failed)
+	}
+	generatedPassword := ""
+	suppliedPassword := ""
+	for _, item := range imported.Created {
+		switch item.Username {
+		case "imported":
+			generatedPassword = item.Password
+		case "taken":
+			suppliedPassword = item.Password
+		}
+	}
+	if generatedPassword == "" || suppliedPassword != "secret-password-9" {
+		t.Fatal("import result must include both generated and supplied passwords")
 	}
 	// The 2k shorthand becomes an absolute token count.
 	var takenID int64
@@ -329,6 +434,55 @@ func userByID(t *testing.T, e *teamTestEnv, id int64) *TeamUser {
 		}
 	}
 	return nil
+}
+
+// 用户列表应显示成功登录时间与该账户最近一条模型用量记录的时间。
+func TestTeamUserListIncludesLoginAndModelCallTimes(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	user := e.member("activity-user", "member")
+	user.login("activity-user", "member-password-123")
+	const modelCallAt = "2026-11-25 12:34:56"
+	if _, err := e.db.Exec(`INSERT INTO usage_records(request_id,user_id,model,created_at) VALUES('activity-call',?,'gpt-test',?)`, user.userID, modelCallAt); err != nil {
+		t.Fatal(err)
+	}
+	listed := userByID(t, e, user.userID)
+	if listed == nil {
+		t.Fatal("user missing from list")
+	}
+	if listed.LastLoginAt == "" {
+		t.Fatal("last login time is missing")
+	}
+	if listed.LastModelCallAt != modelCallAt {
+		t.Fatalf("last model call at = %q, want %q", listed.LastModelCallAt, modelCallAt)
+	}
+}
+
+// 批量额度变更应同时更新全部目标，并按选项清零已用额度。
+func TestBulkTeamUserQuotaUpdate(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	first := e.member("quota-first", "member")
+	second := e.member("quota-second", "member")
+	for _, userID := range []int64{first.userID, second.userID} {
+		if _, err := e.db.Exec(`UPDATE team_users SET quota_used_tokens=120,quota_used_cost=3.5 WHERE id=?`, userID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.admin("POST", "/admin/team/users/bulk", map[string]any{
+		"ids":                []int64{first.userID, second.userID},
+		"action":             "quota",
+		"quota_total_tokens": 5000,
+		"quota_total_cost":   25.0,
+		"quota_reset":        true,
+	}, 200)
+	for _, userID := range []int64{first.userID, second.userID} {
+		user := userByID(t, e, userID)
+		if user == nil || user.QuotaTotalTokens != 5000 || user.QuotaTotalCost != 25 ||
+			user.QuotaUsedTokens != 0 || user.QuotaUsedCost != 0 {
+			t.Fatalf("bulk quota update for user %d = %#v", userID, user)
+		}
+	}
 }
 
 func usersID(t *testing.T, e *teamTestEnv, username string) int64 {
@@ -551,6 +705,154 @@ func TestCreditCodeCarriesMoneyAndCurrencyIsConfigurable(t *testing.T) {
 	}
 	// A nonsense rate is refused rather than stored.
 	e.admin("PUT", "/admin/display-settings", map[string]any{"symbol": "$", "rate": 0}, 400)
+}
+
+// 并发码应叠加到用户默认的 5 个请求槽，并返回兑换后的个人上限。
+func TestConcurrencyCodeAddsToMemberLimit(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	alice := e.member("alice-concurrency", "member")
+	_, codes := mintCodes(t, e, map[string]any{"kind": "concurrency", "count": 1, "quota_concurrent": 3})
+
+	raw := alice.request("POST", "/me/redeem", map[string]any{"code": codes[0]}, 200)
+	var redeemed struct {
+		ConcurrencyGranted int `json:"concurrency_granted"`
+		MaxConcurrent      int `json:"max_concurrent"`
+	}
+	if err := json.Unmarshal(raw, &redeemed); err != nil {
+		t.Fatal(err)
+	}
+	if redeemed.ConcurrencyGranted != 3 || redeemed.MaxConcurrent != 8 {
+		t.Fatalf("redeemed concurrency = %+v, want grant 3 and limit 8", redeemed)
+	}
+	var stored int
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE username='alice-concurrency'`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != 8 {
+		t.Fatalf("stored max_concurrent = %d, want 8", stored)
+	}
+}
+
+func TestAdminCanGrantTemporaryConcurrencyToOneMemberAndInBulk(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	alice := e.member("alice-admin-concurrency", "member")
+	bob := e.member("bob-admin-concurrency", "member")
+	path := "/admin/team/users/" + strconv.FormatInt(alice.userID, 10) + "/concurrency"
+	before := time.Now().Unix()
+	e.admin("POST", path, map[string]any{"amount": 3, "grant_validity_days": 7}, 200)
+	var aliceLimit int
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, alice.userID).Scan(&aliceLimit); err != nil {
+		t.Fatal(err)
+	}
+	if aliceLimit != 8 {
+		t.Fatalf("single-member concurrency = %d, want 8", aliceLimit)
+	}
+	var expiresAt int64
+	if err := e.db.QueryRow(`SELECT grant_expires_at FROM team_concurrency_grants WHERE user_id=?`, alice.userID).Scan(&expiresAt); err != nil {
+		t.Fatal(err)
+	}
+	if expiresAt < before+6*24*60*60 || expiresAt > time.Now().Unix()+8*24*60*60 {
+		t.Fatalf("grant expires at %d, want about 7 days from now", expiresAt)
+	}
+	e.admin("POST", "/admin/team/users/bulk", map[string]any{
+		"ids": []int64{alice.userID, bob.userID}, "action": "concurrency",
+		"concurrency": 2, "grant_validity_days": 0,
+	}, 200)
+	var aliceAfter, bobAfter int
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, alice.userID).Scan(&aliceAfter); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, bob.userID).Scan(&bobAfter); err != nil {
+		t.Fatal(err)
+	}
+	if aliceAfter != 10 || bobAfter != 7 {
+		t.Fatalf("bulk concurrency = (%d, %d), want (10, 7)", aliceAfter, bobAfter)
+	}
+}
+
+func TestAdminBulkConcurrencyIsAtomicAtLimit(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	alice := e.member("alice-concurrency-limit", "member")
+	bob := e.member("bob-concurrency-limit", "member")
+	if _, err := e.db.Exec(`UPDATE team_users SET max_concurrent=9999 WHERE id=?`, bob.userID); err != nil {
+		t.Fatal(err)
+	}
+	e.admin("POST", "/admin/team/users/bulk", map[string]any{
+		"ids": []int64{alice.userID, bob.userID}, "action": "concurrency",
+		"concurrency": 2, "grant_validity_days": 7,
+	}, 400)
+	var aliceLimit, grants int
+	if err := e.db.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, alice.userID).Scan(&aliceLimit); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.db.QueryRow(`SELECT count(*) FROM team_concurrency_grants`).Scan(&grants); err != nil {
+		t.Fatal(err)
+	}
+	if aliceLimit != 5 || grants != 0 {
+		t.Fatalf("failed bulk grant partially changed state: alice limit=%d grants=%d", aliceLimit, grants)
+	}
+}
+
+func TestCreditCodeStoresExpiryFromEachRedemption(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	alice := e.member("temporary-credit", "member")
+	_, codes := mintCodes(t, e, map[string]any{
+		"kind": "credit", "quota_tokens": 1000, "grant_validity_days": 30,
+	})
+	before := time.Now().Unix()
+	alice.request("POST", "/me/redeem", map[string]any{"code": codes[0]}, 200)
+	var grantExpiry int64
+	if err := e.db.QueryRow(`SELECT grant_expires_at FROM team_code_redemptions WHERE user_id=?`, alice.userID).Scan(&grantExpiry); err != nil {
+		t.Fatal(err)
+	}
+	if grantExpiry < before+29*24*60*60 || grantExpiry > time.Now().Unix()+31*24*60*60 {
+		t.Fatalf("grant expires at %d, want about 30 days after redemption", grantExpiry)
+	}
+	if _, err := e.db.Exec(`UPDATE team_code_redemptions SET grant_expires_at=? WHERE user_id=?`, before-1, alice.userID); err != nil {
+		t.Fatal(err)
+	}
+	alice.request("GET", "/me/", nil, 200)
+	var quota int64
+	if err := e.db.QueryRow(`SELECT quota_total_tokens FROM team_users WHERE id=?`, alice.userID).Scan(&quota); err != nil {
+		t.Fatal(err)
+	}
+	if quota != 0 {
+		t.Fatalf("expired grant left quota_total_tokens=%d, want restored unlimited value 0", quota)
+	}
+}
+
+func TestTeamCodesCanBePermanent(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+
+	inviteIDs, inviteCodes := mintCodes(t, e, map[string]any{
+		"kind": "invite", "policy_id": 1, "expires_in_hours": 0,
+	})
+	creditIDs, creditCodes := mintCodes(t, e, map[string]any{
+		"kind": "credit", "quota_tokens": 100, "expires_in_hours": 0,
+	})
+	concurrencyIDs, concurrencyCodes := mintCodes(t, e, map[string]any{
+		"kind": "concurrency", "quota_concurrent": 2, "expires_in_hours": 0,
+	})
+	for _, id := range []int64{inviteIDs[0], creditIDs[0], concurrencyIDs[0]} {
+		var expiresAt int64
+		if err := e.db.QueryRow(`SELECT expires_at FROM team_invites WHERE id=?`, id).Scan(&expiresAt); err != nil {
+			t.Fatal(err)
+		}
+		if expiresAt != 0 {
+			t.Fatalf("code %d expires_at = %d, want 0 for no deadline", id, expiresAt)
+		}
+	}
+
+	acceptWithCode(t, e, inviteCodes[0], "permanent-invite", 200)
+	alice := e.member("permanent-credit", "member")
+	alice.request("POST", "/me/redeem", map[string]any{"code": creditCodes[0]}, 200)
+	bob := e.member("permanent-concurrency", "member")
+	bob.request("POST", "/me/redeem", map[string]any{"code": concurrencyCodes[0]}, 200)
 }
 
 // teamItoa keeps URL building in these tests terse. The external test package

@@ -10,7 +10,7 @@ import { ApiError, api } from "../api/client";
 import type { CreatedDownstreamKey, ImportResult } from "../api/types";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
-import { Button, Dialog, Field } from "../components/ui";
+import { Button, Dialog, Field, TextInput } from "../components/ui";
 import { isEncryptedBackup, skipReasonKey } from "../lib/aahBackup";
 import { formatErrorMessage } from "../formatError";
 
@@ -61,7 +61,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
     backup_password: "",
   });
   const [webdavTested, setWebdavTested] = useState(false);
-  const [keyName, setKeyName] = useState("default");
+  const [keyName, setKeyName] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<CreatedDownstreamKey | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [error, setError] = useState("");
@@ -381,7 +381,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
               {connTab === "manual" ? (
                 <>
                   <Field label={t("wizard.name")}>
-                    <input
+                    <TextInput
                       value={connName}
                       onChange={(e) => setConnName(e.target.value)}
                       disabled={channelId != null}
@@ -400,7 +400,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                     />
                   </Field>
                   <Field label={t("wizard.baseUrl")}>
-                    <input
+                    <TextInput
                       required
                       value={baseUrl}
                       onChange={(e) => setBaseUrl(e.target.value)}
@@ -409,7 +409,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                     />
                   </Field>
                   <Field label={t("wizard.secret")}>
-                    <input
+                    <TextInput
                       required
                       type="password"
                       autoComplete="new-password"
@@ -491,7 +491,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                       </label>
                       {needsUnlock ? (
                         <Field label={t("exchange.unlockPassword")}>
-                          <input
+                          <TextInput
                             type="password"
                             autoComplete="off"
                             value={unlockPassword}
@@ -504,7 +504,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                     <>
                       <p className="setup-wizard-desc">{t("wizard.webdavHint")}</p>
                       <Field label={t("wizard.webdavUrl")}>
-                        <input
+                        <TextInput
                           value={webdav.url}
                           onChange={(e) => setWebdav((prev) => ({ ...prev, url: e.target.value }))}
                           placeholder="https://dav.jianguoyun.com/dav/"
@@ -512,7 +512,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                         />
                       </Field>
                       <Field label={t("wizard.webdavUsername")}>
-                        <input
+                        <TextInput
                           value={webdav.username}
                           onChange={(e) =>
                             setWebdav((prev) => ({
@@ -527,7 +527,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                         label={t("wizard.webdavPassword")}
                         hint={t("wizard.webdavPasswordHint")}
                       >
-                        <input
+                        <TextInput
                           type="password"
                           autoComplete="off"
                           value={webdav.password}
@@ -543,7 +543,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                         label={t("wizard.webdavBackupPassword")}
                         hint={t("wizard.webdavBackupPasswordHint")}
                       >
-                        <input
+                        <TextInput
                           type="password"
                           autoComplete="off"
                           value={webdav.backup_password}
@@ -638,8 +638,8 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
               <h2>{t("wizard.keyTitle")}</h2>
               <p className="setup-wizard-desc">{t("wizard.keyDesc")}</p>
               <Field label={t("wizard.keyName")}>
-                <input
-                  value={keyName}
+                <TextInput
+                  value={keyName ?? t("wizard.keyDefaultName")}
                   onChange={(e) => setKeyName(e.target.value)}
                   placeholder={t("keys.namePlaceholder")}
                 />
@@ -671,7 +671,7 @@ export function SetupWizard({ onClose }: { onClose?: () => void } = {}) {
                 <div className="setup-wizard-form-actions">
                   <Button
                     disabled={createKey.isPending}
-                    onClick={() => createKey.mutate(keyName.trim() || "default")}
+                    onClick={() => createKey.mutate(keyName?.trim() || t("wizard.keyDefaultName"))}
                   >
                     {t("wizard.createKey")}
                   </Button>

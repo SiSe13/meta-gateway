@@ -132,7 +132,7 @@ it("shows an unpriced model as unavailable, never as free", async () => {
       </I18nProvider>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText("Pricing is unavailable. Please retry.")).toBeInTheDocument();
+  expect(await screen.findByText("Unpriced")).toBeInTheDocument();
   expect(screen.queryByText("$0.00")).not.toBeInTheDocument();
   expect(calls).not.toHaveBeenCalled();
 });
@@ -153,6 +153,6 @@ it("keeps a batch-resolved model with no quote unavailable", async () => {
       </I18nProvider>
     </QueryClientProvider>,
   );
-  expect(await screen.findByText("Pricing is unavailable. Please retry.")).toBeInTheDocument();
+  expect(await screen.findByText("Unpriced")).toBeInTheDocument();
   expect(calls).not.toHaveBeenCalled();
 });

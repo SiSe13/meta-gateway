@@ -4,7 +4,14 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { api } from "../../api/client";
 import type { PluginConfigField } from "../../api/types";
-import { ErrorState, Loading } from "../../components/ui";
+import {
+  ErrorState,
+  Loading,
+  TextInput,
+  TextAreaControl,
+  SelectControl,
+  CheckboxControl,
+} from "../../components/ui";
 import { Button } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
@@ -134,7 +141,7 @@ export function PluginConfigForm({
         );
       case "text":
         return (
-          <textarea
+          <TextAreaControl
             rows={4}
             className="mono"
             value={String(value ?? "")}
@@ -143,7 +150,7 @@ export function PluginConfigForm({
         );
       case "number":
         return (
-          <input
+          <TextInput
             type="number"
             value={String(value ?? 0)}
             onChange={(event) =>
@@ -154,8 +161,7 @@ export function PluginConfigForm({
       case "bool":
         return (
           <label className="check">
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={Boolean(value)}
               onChange={(event) => set(field.key, event.target.checked)}
             />
@@ -167,7 +173,7 @@ export function PluginConfigForm({
         // gateway can actually route, so the field cannot be set to something
         // that has no route.
         return (
-          <select
+          <SelectControl
             value={String(value ?? "")}
             onChange={(event) => set(field.key, event.target.value)}
           >
@@ -177,11 +183,11 @@ export function PluginConfigForm({
                 {model}
               </option>
             ))}
-          </select>
+          </SelectControl>
         );
       case "select":
         return (
-          <select
+          <SelectControl
             value={String(value ?? "")}
             onChange={(event) => set(field.key, event.target.value)}
           >
@@ -190,11 +196,11 @@ export function PluginConfigForm({
                 {option}
               </option>
             ))}
-          </select>
+          </SelectControl>
         );
       default:
         return (
-          <input
+          <TextInput
             type={field.type === "secret" ? "password" : "text"}
             className="mono"
             value={String(value ?? "")}
@@ -226,7 +232,7 @@ export function PluginConfigForm({
       <div className="plugin-config-form">
         <label className="field">
           <span>{t("plugins.configJsonLabel")}</span>
-          <textarea
+          <TextAreaControl
             className="mono"
             rows={8}
             value={raw}

@@ -17,6 +17,7 @@ import { Button, Panel } from "../../components/ui";
 import { ModelDirectoryTable } from "./ModelDirectoryTable";
 import { modelGroup } from "./modelGroups";
 import { primaryMember, candidateState } from "./routingPolicy";
+import { formatGroupName } from "../../lib/format";
 
 /**
  * The models directory: the search and its three filters, the table rows (routing
@@ -194,7 +195,7 @@ export function RouteDirectory(props: RouteDirectoryProps) {
             placeholder={t("modelsPage.allGroups")}
             options={[
               { value: "", label: t("modelsPage.allGroups") },
-              ...modelGroups.map((group) => ({ value: group, label: group })),
+              ...modelGroups.map((group) => ({ value: group, label: formatGroupName(group, t) })),
             ]}
             value={groupFilter}
             onChange={(nextGroup) => {

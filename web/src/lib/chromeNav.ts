@@ -8,8 +8,8 @@ import {
   KeyRound,
   Package,
   FileClock,
+  Receipt,
   ScrollText,
-  Settings,
   UserRound,
   Users,
   Eye,
@@ -57,6 +57,8 @@ export interface ChromeNavItem {
 
 /** 所有已登录用户可见的控制台页面。 */
 const ALL: ConsoleRole[] = ["owner", "admin", "member"];
+/** A team principal has a personal information page and password controls. */
+const ACCOUNT: ConsoleRole[] = ["admin", "member"];
 /** 网关运维页面只对站点管理员开放。 */
 const STAFF: ConsoleRole[] = ["owner", "admin"];
 /** 团队管理中的策略和财务配置由站长管理。 */
@@ -64,21 +66,28 @@ const OWNER: ConsoleRole[] = ["owner"];
 
 export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
   { path: "/", labelKey: "app.nav.overview", icon: Activity, group: "console", roles: ALL },
-  {
-    path: "/channels",
-    labelKey: "app.nav.channels",
-    icon: Cable,
-    group: "console",
-    roles: STAFF,
-  },
-  { path: "/models", labelKey: "app.nav.models", icon: Boxes, group: "console", roles: ALL },
   { path: "/keys", labelKey: "app.nav.keys", icon: KeyRound, group: "console", roles: ALL },
+  { path: "/models", labelKey: "app.nav.models", icon: Boxes, group: "console", roles: ALL },
   {
     path: "/logs",
     labelKey: "app.nav.logs",
     icon: ScrollText,
     group: "console",
     roles: ALL,
+  },
+  {
+    path: "/account",
+    labelKey: "app.nav.account",
+    icon: UserRound,
+    group: "console",
+    roles: ACCOUNT,
+  },
+  {
+    path: "/channels",
+    labelKey: "app.nav.channels",
+    icon: Cable,
+    group: "console",
+    roles: STAFF,
   },
   {
     path: "/system-logs",
@@ -130,13 +139,6 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
     roles: OWNER,
   },
   {
-    path: "/users/quotas",
-    labelKey: "users.nav.quotas",
-    icon: Users,
-    group: "users",
-    roles: OWNER,
-  },
-  {
     path: "/users/codes",
     labelKey: "users.nav.codes",
     icon: KeyRound,
@@ -146,7 +148,7 @@ export const CHROME_NAV_ITEMS: ChromeNavItem[] = [
   {
     path: "/users/pricing",
     labelKey: "users.nav.pricing",
-    icon: Settings,
+    icon: Receipt,
     group: "users",
     roles: OWNER,
   },

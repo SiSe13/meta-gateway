@@ -17,18 +17,20 @@ import (
 )
 
 type teamKeyView struct {
-	ID         int64   `json:"id"`
-	Name       string  `json:"name"`
-	Enabled    bool    `json:"enabled"`
-	Hint       string  `json:"hint"`
-	Models     string  `json:"models"`
-	ExpiresAt  string  `json:"expires_at"`
-	AllowedIPs string  `json:"allowed_ips"`
-	PlanID     int64   `json:"plan_id"`
-	CreatedAt  string  `json:"created_at"`
-	LastUsedAt string  `json:"last_used_at"`
-	UsedTokens int64   `json:"used_tokens"`
-	Cost       float64 `json:"cost"`
+	ID                  int64    `json:"id"`
+	Name                string   `json:"name"`
+	Enabled             bool     `json:"enabled"`
+	Hint                string   `json:"hint"`
+	Models              string   `json:"models"`
+	ExpiresAt           string   `json:"expires_at"`
+	AllowedIPs          string   `json:"allowed_ips"`
+	PlanID              int64    `json:"plan_id"`
+	CreatedAt           string   `json:"created_at"`
+	LastUsedAt          string   `json:"last_used_at"`
+	UsedTokens          int64    `json:"used_tokens"`
+	Cost                float64  `json:"cost"`
+	CurrentConcurrent   int      `json:"current_concurrent"`
+	AuthorizationGroups []string `json:"authorization_groups"`
 }
 
 func (h *TeamHandler) keyViews(w http.ResponseWriter, userID int64) {
@@ -49,6 +51,43 @@ func (h *TeamHandler) keyViews(w http.ResponseWriter, userID int64) {
 			return
 		}
 		items = append(items, k)
+	}
+	if err := rows.Err(); err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	if err := rows.Close(); err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	// 个人可查看自己账号所属的授权分组，便于识别令牌可用范围。
+	groupRows, err := h.db.Query(`SELECT p.name FROM team_user_policies up
+		JOIN team_policies p ON p.id=up.policy_id WHERE up.user_id=? ORDER BY p.id`, userID)
+	if err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	var groups []string
+	for groupRows.Next() {
+		var name string
+		if groupRows.Scan(&name) != nil {
+			_ = groupRows.Close()
+			teamFail(w, 500, "load_failed")
+			return
+		}
+		groups = append(groups, name)
+	}
+	if err := groupRows.Err(); err != nil {
+		_ = groupRows.Close()
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	_ = groupRows.Close()
+	for i := range items {
+		items[i].AuthorizationGroups = groups
+		if h.keyInFlight != nil {
+			items[i].CurrentConcurrent = h.keyInFlight(items[i].ID)
+		}
 	}
 	teamJSON(w, 200, items)
 }
@@ -81,6 +120,15 @@ type teamKeyInput struct {
 	AllowedIPs string `json:"allowed_ips"`
 	PlanID     int64  `json:"plan_id"`
 	Enabled    *bool  `json:"enabled"`
+}
+
+type teamKeyPatchInput struct {
+	Name       *string `json:"name"`
+	Models     *string `json:"models"`
+	ExpiresAt  *string `json:"expires_at"`
+	AllowedIPs *string `json:"allowed_ips"`
+	PlanID     *int64  `json:"plan_id"`
+	Enabled    *bool   `json:"enabled"`
 }
 
 func (h *TeamHandler) validateKey(w http.ResponseWriter, r *http.Request, in *teamKeyInput) bool {
@@ -147,13 +195,49 @@ func (h *TeamHandler) updateKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	var patch teamKeyPatchInput
+	if !teamRead(w, r, &patch) {
+		return
+	}
+	// PATCH 只校验并更新请求中明确提供的字段，模型弹窗不会误清其他配置。
 	var in teamKeyInput
-	if !teamRead(w, r, &in) || !h.validateKey(w, r, &in) {
+	if err := h.db.QueryRow(`SELECT name,model_allowlist,expires_at,allowed_ips,team_plan_id FROM downstream_keys WHERE id=? AND user_id=? AND team_deleted_at=''`, id, teamActor(r).User.ID).Scan(&in.Name, &in.Models, &in.ExpiresAt, &in.AllowedIPs, &in.PlanID); err != nil {
+		teamFail(w, 404, "not_found")
+		return
+	}
+	if patch.Name != nil {
+		in.Name = *patch.Name
+	}
+	if patch.Models != nil {
+		in.Models = *patch.Models
+	}
+	if patch.ExpiresAt != nil {
+		in.ExpiresAt = *patch.ExpiresAt
+	}
+	if patch.AllowedIPs != nil {
+		in.AllowedIPs = *patch.AllowedIPs
+	}
+	if patch.PlanID != nil {
+		in.PlanID = *patch.PlanID
+	}
+	if !h.validateKey(w, r, &in) {
 		return
 	}
 	// Never write back usage counters, user ownership, group selection or prices.
-	_, err := h.db.Exec(`UPDATE downstream_keys SET name=?,model_allowlist=?,expires_at=?,allowed_ips=?,team_plan_id=?,enabled=COALESCE(?,enabled)
-		WHERE id=? AND user_id=? AND team_deleted_at=''`, in.Name, in.Models, in.ExpiresAt, in.AllowedIPs, in.PlanID, in.Enabled, id, teamActor(r).User.ID)
+	_, err := h.db.Exec(`UPDATE downstream_keys SET
+		name=CASE WHEN ? THEN ? ELSE name END,
+		model_allowlist=CASE WHEN ? THEN ? ELSE model_allowlist END,
+		expires_at=CASE WHEN ? THEN ? ELSE expires_at END,
+		allowed_ips=CASE WHEN ? THEN ? ELSE allowed_ips END,
+		team_plan_id=CASE WHEN ? THEN ? ELSE team_plan_id END,
+		enabled=COALESCE(?,enabled)
+		WHERE id=? AND user_id=? AND team_deleted_at=''`,
+		patch.Name != nil, in.Name,
+		patch.Models != nil, in.Models,
+		patch.ExpiresAt != nil, in.ExpiresAt,
+		patch.AllowedIPs != nil, in.AllowedIPs,
+		patch.PlanID != nil, in.PlanID,
+		patch.Enabled, id, teamActor(r).User.ID)
 	if err != nil {
 		teamFail(w, 500, "save_failed")
 		return

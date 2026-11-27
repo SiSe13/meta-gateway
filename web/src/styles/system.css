@@ -400,7 +400,10 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 :where(input[type="checkbox"], input[type="radio"], input[type="range"]):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 :where(input[type="checkbox"], input[type="radio"]):not(.switch) { width: 14px; height: 14px; min-height: 0; padding: 0; accent-color: var(--primary); }
 .field { display: flex; flex-direction: column; min-width: 0; gap: 8px; margin: 0; }
+.field-label-action { display: inline-flex; align-items: center; }
 .field-label { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-soft); font: 550 13px/1.5 var(--font); }
+.button-link { min-height: auto; padding: 0; color: var(--primary); background: transparent; border: 0; box-shadow: none; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.button-link:hover:not([data-disabled="true"]) { color: var(--primary-hover); background: transparent; }
 .field-hint { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .field-required { color: var(--danger); font-weight: 600; }
 .field-error { color: var(--danger); font-size: 11.5px; line-height: 1.6; }
@@ -596,16 +599,13 @@ summary:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--primary-soft)
    label — a second surface that imports only this layer must get both.
    The console-side `.console-language select` variant loads after this file. */
 .language-switcher { display: inline-flex; align-items: center; }
-.language-switcher select {
-  min-width: 104px;
-  min-height: 31px;
-  padding: 4px 8px;
-  color: var(--ink);
-  background: var(--surface-subtle);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
-  font-size: 11px;
-}
+.language-switcher-trigger { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; padding: 0 9px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink-soft); font: 550 11px/1.2 var(--font); white-space: nowrap; cursor: pointer; }
+.language-switcher-trigger:hover { border-color: var(--line-strong); background: var(--surface-subtle); }
+.language-switcher-trigger > span { display: inline; }
+.language-switcher-popover { min-width: 140px; padding: 5px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow-md); }
+.language-switcher-popover [role="menu"] { display: flex; flex-direction: column; gap: 2px; outline: 0; }
+.language-switcher-popover [role="menuitem"] { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 34px; padding: 7px 9px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); font: 12px/1.3 var(--font); text-align: left; cursor: pointer; }
+.language-switcher-popover [role="menuitem"]:hover, .language-switcher-popover [role="menuitem"]:focus-visible { background: var(--primary-soft); color: var(--primary-active); outline: 0; }
 .sr-only {
   position: absolute;
   width: 1px;

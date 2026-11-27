@@ -21,7 +21,7 @@ export function LoginShell({
   description,
   children,
   cardFocused = false,
-  footerLeft = "Meta Gateway",
+  footerLeft = "Balbo AI",
   footerRight,
   rootRef,
   className,
@@ -61,7 +61,7 @@ export function LoginShell({
           <span className="console-brand-mark">
             <BrandMark size={23} />
           </span>
-          <strong>Meta Gateway</strong>
+          <strong>Balbo AI</strong>
         </div>
         <div className="login-tools">{tools}</div>
       </header>

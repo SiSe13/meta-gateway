@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Field, Panel, SelectControl } from "../components/ui";
+import { Button, Field, Panel, SelectControl, TextInput } from "../components/ui";
+import { useConfirm } from "../components/ConfirmProvider";
 import { teamText, teamError } from "./text";
 import type { ModeInfo, TeamRequest } from "./types";
 import "./team.css";
@@ -26,6 +27,7 @@ export function ModePanel({
   className?: string;
 }) {
   const t = teamText(locale);
+  const confirm = useConfirm();
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ["team", "mode"],
@@ -79,9 +81,18 @@ export function ModePanel({
       ) : query.data ? (
         <>
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault();
-              if (mode === "personal" && query.data.mode === "team" && !confirm(t("disableHint")))
+              if (
+                mode === "personal" &&
+                query.data.mode === "team" &&
+                !(await confirm({
+                  title: t("disableTeamTitle"),
+                  message: t("disableHint"),
+                  confirmLabel: t("disableTeamConfirm"),
+                  danger: true,
+                }))
+              )
                 return;
               void save("/admin/mode", "PATCH", { mode });
             }}
@@ -134,7 +145,7 @@ export function ModePanel({
                   <fieldset className="team-modal-content" disabled={busy}>
                     <div className="form-grid">
                       <Field label={t("username")}>
-                        <input
+                        <TextInput
                           name="username"
                           minLength={3}
                           maxLength={64}
@@ -143,10 +154,10 @@ export function ModePanel({
                         />
                       </Field>
                       <Field label={t("name")}>
-                        <input name="name" maxLength={80} required />
+                        <TextInput name="name" maxLength={80} required />
                       </Field>
                       <Field label={`${t("password")} · ${t("passwordHint")}`}>
-                        <input
+                        <TextInput
                           name="password"
                           type="password"
                           required
@@ -154,7 +165,7 @@ export function ModePanel({
                         />
                       </Field>
                       <Field label={t("totp")}>
-                        <input name="totp" inputMode="numeric" autoComplete="one-time-code" />
+                        <TextInput name="totp" inputMode="numeric" autoComplete="one-time-code" />
                       </Field>
                     </div>
                     <Button type="submit" variant="secondary">

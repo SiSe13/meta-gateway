@@ -6,11 +6,13 @@ export function TeamModal({
   children,
   busy,
   onClose,
+  dialogClassName,
 }: {
   title: string;
   children: ReactNode;
   busy?: boolean;
   onClose: () => void;
+  dialogClassName?: string;
 }) {
   // 团队弹窗始终由父级挂载状态控制，关闭请求统一回传给业务页面。
   const state = useOverlayState({
@@ -25,7 +27,7 @@ export function TeamModal({
       <Modal.Trigger className="team-modal-trigger" aria-hidden="true" tabIndex={-1} />
       <Modal.Backdrop className="team-modal-backdrop" isDismissable={false}>
         <Modal.Container className="team-modal-container" size="lg" scroll="inside">
-          <Modal.Dialog className="team-modal">
+          <Modal.Dialog className={["team-modal", dialogClassName].filter(Boolean).join(" ")}>
             <Modal.Header className="team-modal-header">
               <Modal.Heading>{title}</Modal.Heading>
               <Modal.CloseTrigger
@@ -71,14 +73,15 @@ export function TeamField({
         "aria-labelledby"?: string;
         "aria-describedby"?: string;
         type?: string;
+        name?: string;
       }>(child) ||
-      typeof child.type !== "string" ||
-      !["input", "select", "textarea"].includes(child.type) ||
+      !["input", "select", "textarea"].includes(typeof child.type === "string" ? child.type : "") ||
       (child.type === "input" && child.props.type === "hidden")
     ) {
       return child;
     }
 
+    if (typeof child.type !== "string") return child;
     return cloneElement(child, {
       id: fieldID,
       "aria-labelledby": labelID,

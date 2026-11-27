@@ -5,6 +5,7 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { I18nProvider } from "./i18n";
 import { SessionProvider } from "./session";
 import { ToastProvider } from "./toast";
+import { ConfirmProvider } from "./components/ConfirmProvider";
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { installPreloadRecovery } from "./lib/preloadRecovery";
@@ -70,9 +71,11 @@ createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <ToastProvider>
-          <SessionProvider>
-            <RouterProvider router={router} />
-          </SessionProvider>
+          <ConfirmProvider>
+            <SessionProvider>
+              <RouterProvider router={router} />
+            </SessionProvider>
+          </ConfirmProvider>
         </ToastProvider>
       </I18nProvider>
     </QueryClientProvider>

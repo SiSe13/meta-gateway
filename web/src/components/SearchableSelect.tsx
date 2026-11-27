@@ -36,19 +36,20 @@ export function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder,
+  className,
   allowCustom,
   customLabel,
   customPlaceholder,
   disabled,
   groups,
+  placeholder,
   ariaLabel,
   onOpenChange,
 }: {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
+  className?: string;
   /** When true, selecting the "custom" sentinel reveals a free-text input. */
   allowCustom?: boolean;
   /** What that free-text escape hatch is called for this field. */
@@ -63,6 +64,7 @@ export function SearchableSelect({
    * a labelled form field ("Backend · OpenAI" never says it picks a model).
    */
   ariaLabel?: string;
+  placeholder?: string;
   /** Lets an owning modal treat the portaled picker as an active child overlay. */
   onOpenChange?: (open: boolean) => void;
 }) {
@@ -300,10 +302,10 @@ export function SearchableSelect({
     ? // The marker itself is not a name: showing it here printed
       // "__custom__" in the trigger whenever custom entry was left untyped.
       (value === "__custom__" ? "" : value) || customValue || placeholder || ""
-    : (selectedLabel ?? value);
+    : selectedLabel || placeholder || value;
 
   return (
-    <div className="searchable-select" ref={rootRef}>
+    <div className={["searchable-select", className].filter(Boolean).join(" ")} ref={rootRef}>
       {!customMode ? (
         <HeroButton
           ref={triggerRef}

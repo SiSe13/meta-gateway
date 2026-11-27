@@ -213,6 +213,34 @@ describe("channel-first shell", () => {
     vi.unstubAllGlobals();
   });
 
+  it("waits for a remembered team session before rendering the sign-in page", async () => {
+    sessionStorage.setItem("meta-gateway.team-console", "1");
+    let resolveMe!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input).split("?")[0];
+        if (path === "/me")
+          return await new Promise<Response>((resolve) => {
+            resolveMe = resolve;
+          });
+        if (path === "/healthz") return jsonResponse({ version: "test" });
+        if (path === "/me/display-settings") return jsonResponse({ symbol: "$", rate: 1 });
+        return jsonResponse([]);
+      }),
+    );
+
+    renderApp(["/"]);
+    expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveMe(jsonResponse({ user: { role: "member" }, csrf: "restored-csrf" }));
+    });
+
+    await waitFor(() => expect(document.querySelector(".console-shell")).toBeInTheDocument());
+    expect(screen.queryByLabelText("Username")).not.toBeInTheDocument();
+  });
+
   it("shows setup as a blurred global dialog over the console with personal mode selected", async () => {
     localStorage.setItem("meta-gateway.admin-token", "test-session");
     vi.stubGlobal("fetch", stubAdminFetch());
@@ -559,6 +587,7 @@ describe("channel-first shell", () => {
     renderApp(["/models"]);
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
     await waitFor(() => expect(topNavLabels()).not.toContain("User management"));
+    expect(topNavLabels()).toEqual([]);
   });
 
   it("has no check-in shortcut in the chrome", async () => {
@@ -600,7 +629,7 @@ describe("channel-first shell", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
 
     // A push through the shell's own nav.
-    fireEvent.click(screen.getByRole("link", { name: "Logs" }));
+    fireEvent.click(screen.getByRole("link", { name: "Request history" }));
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/logs"));
     expect(await screen.findByRole("heading", { name: "Logs" })).toBeInTheDocument();
 

@@ -5,21 +5,23 @@ import "strings"
 // TeamAccess is an immutable, request-scoped authorization snapshot.
 // A nil snapshot means a legacy system key; empty grants on a team key deny all.
 type TeamAccess struct {
-	UserID    int64
-	Models    []string
-	AllModels bool
-	MemberIDs map[int64]bool
+	UserID int64
+	// MaxConcurrent is the user's account-wide in-flight request limit.
+	MaxConcurrent int
+	Models        []string
+	AllModels     bool
+	MemberIDs     map[int64]bool
 	// Plan holds the member overrides from the key's route arrangement, and
 	// PlanModels names the models that arrangement actually covers. A model
 	// outside PlanModels keeps the site's own members and order — the user only
 	// rearranged the models they touched.
-	Plan            map[int64]TeamRouteMember
-	PlanModels      map[string]bool
-	RPM             int
-	AllowRouting             bool
+	Plan                    map[int64]TeamRouteMember
+	PlanModels              map[string]bool
+	RPM                     int
+	AllowRouting            bool
 	AllowRequestPreferences bool
-	DisableFailover bool
-	RetryLimit      *int
+	DisableFailover         bool
+	RetryLimit              *int
 	// QuotaTotalTokens is the account-level credit pool in tokens (0 =
 	// unlimited). It is a SECOND, independent limit next to the key's own
 	// quota: a key says "this credential may spend X", the pool says "this

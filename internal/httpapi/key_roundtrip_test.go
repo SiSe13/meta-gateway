@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
+
+	"github.com/lan/meta-gateway/internal/domain"
 )
 
 // The regression tests here pin field-level round-trips through the admin
@@ -48,6 +51,34 @@ func TestCreateKeyResponseEchoesExpiryAndIPs(t *testing.T) {
 	}
 	if created["allowed_ips"] != "10.0.0.1" {
 		t.Fatalf("allowed_ips = %v, want echo", created["allowed_ips"])
+	}
+}
+
+func TestDownstreamKeyListIncludesOwningUserName(t *testing.T) {
+	srv, db, _ := revealTestServer(t)
+
+	if _, err := db.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id)
+		VALUES('alice-login','Alice Example','hash','member',1)`); err != nil {
+		t.Fatalf("insert team user: %v", err)
+	}
+	var userID int64
+	if err := db.QueryRow(`SELECT id FROM team_users WHERE username='alice-login'`).Scan(&userID); err != nil {
+		t.Fatalf("read team user ID: %v", err)
+	}
+	status, created, _ := adminCall(t, srv.URL, http.MethodPost, "/admin/downstream-keys", map[string]any{
+		"name": "alice-key",
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create key status = %d", status)
+	}
+	keyID := created["id"].(float64)
+	if _, err := db.Exec(`UPDATE downstream_keys SET user_id=? WHERE id=?`, userID, int64(keyID)); err != nil {
+		t.Fatalf("bind key to user: %v", err)
+	}
+
+	entry := keyByID(t, srv.URL, keyID)
+	if entry["owner_name"] != "Alice Example" || entry["owner_username"] != "alice-login" {
+		t.Fatalf("owner identity = %v/%v, want Alice Example/alice-login", entry["owner_name"], entry["owner_username"])
 	}
 }
 
@@ -110,6 +141,79 @@ func TestDownstreamKeyRouteGroupRoundTrip(t *testing.T) {
 	}
 	if entry := keyByID(t, base, id); routeGroupOf(entry) != "" {
 		t.Fatalf("route_group_name after clear = %v, want empty (default routing)", entry["route_group_name"])
+	}
+}
+
+func TestDownstreamKeyListIncludesUsageAndCurrentConcurrency(t *testing.T) {
+	srv, db, _ := revealTestServer(t)
+	status, created, _ := adminCall(t, srv.URL, http.MethodPost, "/admin/downstream-keys", map[string]any{
+		"name": "team-token",
+	})
+	if status != http.StatusCreated {
+		t.Fatalf("create key status = %d", status)
+	}
+	keyID := int64(created["id"].(float64))
+	if _, err := db.Exec(`UPDATE team_settings SET mode='team' WHERE id=1`); err != nil {
+		t.Fatalf("enable team mode: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO team_policies(name) VALUES('DeepSeek')`); err != nil {
+		t.Fatalf("seed authorization group: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id) VALUES('key-owner','Owner','hash','member',1)`); err != nil {
+		t.Fatalf("seed team owner: %v", err)
+	}
+	var userID int64
+	if err := db.QueryRow(`SELECT id FROM team_users WHERE username='key-owner'`).Scan(&userID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO team_user_policies(user_id,policy_id) VALUES(?,2)`, userID); err != nil {
+		t.Fatalf("add second authorization group: %v", err)
+	}
+	if _, err := db.Exec(`UPDATE downstream_keys SET user_id=? WHERE id=?`, userID, keyID); err != nil {
+		t.Fatalf("bind key to team owner: %v", err)
+	}
+	seed := func(requestID string, tokens int, cost float64, at time.Time) {
+		t.Helper()
+		id, err := db.Usage.Insert(&domain.UsageRecord{
+			RequestID: requestID, DownstreamKeyID: keyID, ChannelID: 1,
+			Model: "gpt-test", Path: "chat/completions", TotalTokens: tokens,
+			Status: 200, Cost: cost,
+		})
+		if err != nil {
+			t.Fatalf("seed usage: %v", err)
+		}
+		if _, err := db.Exec(`UPDATE usage_records SET created_at=? WHERE id=?`, at.UTC().Format("2006-01-02 15:04:05"), id); err != nil {
+			t.Fatalf("date usage: %v", err)
+		}
+	}
+	now := time.Now()
+	seed("today", 10, 0.25, now)
+	seed("recent", 20, 0.5, now.Add(-10*24*time.Hour))
+
+	entry := keyByID(t, srv.URL, float64(keyID))
+	status, _, activityBody := adminCall(t, srv.URL, http.MethodGet, "/admin/downstream-keys/activity", nil)
+	if status != http.StatusOK {
+		t.Fatalf("key activity status = %d", status)
+	}
+	var activities []map[string]any
+	if err := json.Unmarshal([]byte(activityBody), &activities); err != nil {
+		t.Fatalf("decode key activity: %v", err)
+	}
+	if len(activities) != 1 || activities[0]["id"] != float64(keyID) || activities[0]["current_concurrent"] != float64(0) {
+		t.Fatalf("key activity = %v, want idle key %d", activities, keyID)
+	}
+	if entry["today_tokens"] != float64(10) || entry["today_cost"] != 0.25 {
+		t.Fatalf("today usage = %v / %v, want 10 tokens / 0.25", entry["today_tokens"], entry["today_cost"])
+	}
+	if entry["last_30_days_tokens"] != float64(30) || entry["last_30_days_cost"] != 0.75 {
+		t.Fatalf("30-day usage = %v / %v, want 30 tokens / 0.75", entry["last_30_days_tokens"], entry["last_30_days_cost"])
+	}
+	if entry["current_concurrent"] != float64(0) {
+		t.Fatalf("current concurrency = %v, want 0 when idle", entry["current_concurrent"])
+	}
+	groups, ok := entry["authorization_groups"].([]any)
+	if !ok || len(groups) != 2 || groups[0] != "Default" || groups[1] != "DeepSeek" {
+		t.Fatalf("authorization groups = %v, want Default and DeepSeek", entry["authorization_groups"])
 	}
 }
 

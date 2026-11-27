@@ -1,4 +1,3 @@
-import { ModelFamilyFilters } from "../features/models/ModelFamilyFilters";
 import { ModelWorkspaceLayout } from "../features/models/ModelWorkspaceLayout";
 import {
   ModelPriceSummary,
@@ -10,15 +9,12 @@ import { ModelDirectoryToolbar } from "../components/ModelDirectoryToolbar";
 import { useI18n } from "../i18n";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, Boxes, RefreshCw, SlidersHorizontal, Activity } from "lucide-react";
-import { Button, Page, Panel, Loading, ErrorState } from "../components/ui";
-import { NoticeBar } from "../components/NoticeBar";
+import { RefreshCw } from "lucide-react";
+import { Button, ErrorState, Loading, Page, Panel, SelectControl } from "../components/ui";
 import { EmptyHero } from "../components/EmptyHero";
 import { ListShell } from "../components/ListShell";
 import { PaginationBar } from "../components/PaginationBar";
-import { TelemetryStrip } from "../components/TelemetryStrip";
 import { useClientPagination } from "../hooks/useClientPagination";
-import { formatCost } from "../lib/format";
 import { autoModelGroup } from "../lib/modelGroups";
 import { ModelCard, ModelCardGrid } from "../features/models/ModelCard";
 import { accountRequest } from "../team/transport";
@@ -31,10 +27,35 @@ import type {
   RouteList,
   UserModel,
 } from "../team/types";
-import { RouteOrderDialog } from "./RouteOrderDialog";
 
 /** The orderings a member picks between; the default is the catalogue's own. */
 type ModelSort = "default" | "usage" | "latency" | "recent";
+
+const OTHER_SUPPLIER = "__other__";
+
+/** 将接口里的供应商名归一化，并在缺失时从模型名识别常见厂商。 */
+function modelSupplier(model: UserModel): string {
+  const source = `${model.vendor} ${model.name}`.toLowerCase();
+  const suppliers: Array<[string, RegExp]> = [
+    ["DeepSeek", /deepseek/],
+    ["Google", /google|gemini|gemma|palm/],
+    ["Moonshot", /moonshot|kimi/],
+    ["智谱", /zhipu|z-ai|(^|\W)zai|glm|chatglm/],
+    ["MiniMax", /minimax|abab/],
+    ["阿里巴巴", /alibaba|aliyun|qwen|tongyi|通义|千问/],
+    ["OpenAI", /openai|chatgpt|(^|\W)gpt|(^|\W)o[134](-|\W)/],
+    ["Anthropic", /anthropic|claude/],
+    ["xAI", /xai|grok/],
+    ["字节跳动", /bytedance|doubao|豆包/],
+    ["Meta", /meta|llama/],
+    ["Mistral", /mistral|mixtral|codestral/],
+    ["腾讯", /tencent|hunyuan|混元/],
+    ["NVIDIA", /nvidia|nemotron/],
+  ];
+  const known = suppliers.find(([, pattern]) => pattern.test(source));
+  if (known) return known[0];
+  return model.vendor.trim() || OTHER_SUPPLIER;
+}
 
 /** The gateway caps one reference-price batch at this many models. */
 const MODEL_PRICE_BATCH_LIMIT = 100;
@@ -74,7 +95,7 @@ async function fetchModelPrices(
  *
  * `/me/model-catalog` already intersects the account's grant with the enabled
  * routes and channels, so this page never filters for authorization; it groups,
- * searches and pages. Arranging edits the member's own order for one model,
+ * searches and pages by supplier. Arranging edits the member's own order for one model,
  * which is why the badge and the editor live on this list rather than on a
  * separate routing page.
  */
@@ -86,7 +107,6 @@ export function ModelsWorkspace({
   planId,
   onPlanChange,
   onCreatePlan,
-  onConnect,
 }: {
   userID: number;
   locale: string;
@@ -95,7 +115,6 @@ export function ModelsWorkspace({
   planId: number;
   onPlanChange: (id: number) => void;
   onCreatePlan: () => void;
-  onConnect: (model: string) => void;
 }) {
   const t = teamText(locale);
   const { t: ui } = useI18n();
@@ -117,16 +136,15 @@ export function ModelsWorkspace({
     queryKey: ["user", userID, "model-stats"],
     queryFn: ({ signal }) => accountRequest<MemberModelStats>("/me/model-stats", { signal }),
   });
-  const health = useQuery({
+  const availability = useQuery({
     queryKey: ["user", userID, "model-availability"],
     queryFn: ({ signal }) =>
       accountRequest<MemberModelAvailability[]>("/me/model-availability", { signal }),
+    staleTime: 60000,
   });
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState("all");
+  const [supplier, setSupplier] = useState("");
   const [sort, setSort] = useState<ModelSort>("default");
-  const [arranging, setArranging] = useState("");
-  const [selection, setSelection] = useState("");
 
   const items = useMemo(() => query.data ?? [], [query.data]);
   const arrangedModels = useMemo(() => new Set(arranged.data?.models ?? []), [arranged.data]);
@@ -135,34 +153,31 @@ export function ModelsWorkspace({
       new Map<string, MemberModelStat>((stats.data?.models ?? []).map((row) => [row.model, row])),
     [stats.data],
   );
-  const healthByModel = useMemo(
+  const availabilityByModel = useMemo(
     () =>
-      new Map<string, MemberModelAvailability>((health.data ?? []).map((row) => [row.model, row])),
-    [health.data],
+      new Map(
+        (availability.data ?? []).filter((row) => row.samples > 0).map((row) => [row.model, row]),
+      ),
+    [availability.data],
   );
-  const totals = useMemo(() => {
-    const rows = stats.data?.models ?? [];
-    const ok = rows.reduce((sum, row) => sum + row.ok, 0);
-    return {
-      requests: rows.reduce((sum, row) => sum + row.requests, 0),
-      ok,
-      cost: rows.reduce((sum, row) => sum + row.cost, 0),
-    };
-  }, [stats.data]);
-  const groups = useMemo(
-    () => [...new Set(items.map((model) => autoModelGroup(model.name, model.vendor)))].sort(),
-    [items],
-  );
+  const suppliers = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const model of items) {
+      const name = modelSupplier(model);
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((left, right) => left[0].localeCompare(right[0], locale));
+  }, [items, locale]);
   const filtered = useMemo(
     () =>
       items.filter(
         (model) =>
-          (group === "all" || autoModelGroup(model.name, model.vendor) === group) &&
-          `${model.name} ${model.vendor} ${model.kind}`
+          (!supplier || modelSupplier(model) === supplier) &&
+          `${model.name} ${model.vendor} ${model.kind} ${modelSupplier(model)}`
             .toLowerCase()
             .includes(search.toLowerCase()),
       ),
-    [items, group, search],
+    [items, supplier, search],
   );
   // Ordering by a figure the account does not have for a model must not move
   // that model to the top with a zero: models with no data rank last.
@@ -184,7 +199,6 @@ export function ModelsWorkspace({
     });
   }, [filtered, sort, statsByModel]);
   const pagination = useClientPagination(ordered);
-  const selected = filtered.find((model) => model.name === selection) ?? filtered[0];
   // The figures are whatever window the endpoint answered with, so the card
   // says that window rather than the one the console happens to default to.
   const windowLabel = useMemo(() => {
@@ -230,55 +244,10 @@ export function ModelsWorkspace({
         </Button>
       }
     >
-      <TelemetryStrip
-        items={[
-          {
-            label: t("authorizedModels"),
-            value: items.length,
-            icon: <Boxes size={16} />,
-          },
-          { label: t("modelFamilies"), value: groups.length },
-          // The account's own traffic, not the gateway's: this is the member's
-          // page, and the two numbers that tell them whether yesterday worked
-          // are how much they used and what it cost.
-          {
-            label: ui("modelsPage.stats.windowRequests"),
-            value: stats.isPending ? "—" : totals.requests,
-            hint:
-              totals.requests > 0
-                ? ui("modelsPage.stats.windowSuccess", {
-                    percent: Math.round((totals.ok / totals.requests) * 100),
-                  })
-                : undefined,
-            icon: <Activity size={16} />,
-          },
-          {
-            label: ui("modelsPage.stats.windowSpend"),
-            value: stats.isPending ? "—" : formatCost(totals.cost),
-          },
-          ...(canRoute ? [{ label: t("arrangedBadge"), value: arrangedModels.size }] : []),
-        ]}
-      />
       <ModelWorkspaceLayout
         variant="cards"
         directory={
           <Panel className="ops-list-panel model-directory" title={ui("modelsPage.listTitle")}>
-            <ModelFamilyFilters
-              groups={groups}
-              value={group === "all" ? "" : group}
-              onChange={(value) => {
-                setGroup(value || "all");
-                pagination.setPage(1);
-              }}
-            />
-            {/* One line in the deployment's own voice, above the list it applies
-                to. The announcement board (operator-authored) renders here too,
-                with the same component. */}
-            <NoticeBar
-              tone="info"
-              title={ui("modelsPage.memberTipTitle")}
-              body={ui("modelsPage.memberTipBody")}
-            />
             <ModelDirectoryToolbar
               value={search}
               label={ui("routing.searchPlaceholder")}
@@ -293,8 +262,9 @@ export function ModelsWorkspace({
               <div className="models-toolbar-controls">
                 <label className="models-sort-picker">
                   <span>{ui("modelsPage.sortLabel")}</span>
-                  <select
+                  <SelectControl
                     value={sort}
+                    aria-label={ui("modelsPage.sortLabel")}
                     onChange={(event) => {
                       setSort(event.target.value as ModelSort);
                       pagination.setPage(1);
@@ -304,13 +274,14 @@ export function ModelsWorkspace({
                     <option value="usage">{ui("modelsPage.sort.usage")}</option>
                     <option value="latency">{ui("modelsPage.sort.latency")}</option>
                     <option value="recent">{ui("modelsPage.sort.recent")}</option>
-                  </select>
+                  </SelectControl>
                 </label>
                 {canRoute ? (
                   <label className="models-plan-picker">
                     <span>{t("planScope")}</span>
-                    <select
+                    <SelectControl
                       value={planId}
+                      aria-label={t("planScope")}
                       onChange={(event) => {
                         const value = Number(event.target.value);
                         if (value === -1) onCreatePlan();
@@ -326,190 +297,182 @@ export function ModelsWorkspace({
                           </option>
                         ))}
                       <option value={-1}>{t("newPlanOption")}</option>
-                    </select>
+                    </SelectControl>
                   </label>
                 ) : null}
               </div>
             </ModelDirectoryToolbar>
-            {query.isPending ? (
-              <Loading />
-            ) : query.error ? (
-              <ErrorState error={query.error} retry={() => void query.refetch()} />
-            ) : !items.length ? (
-              <EmptyHero title={t("noModels")} body={t("modelsWorkspaceHint")} />
-            ) : !filtered.length ? (
-              <EmptyHero
-                title={ui("modelsPage.noMatches")}
-                body={ui("modelsPage.noMatchesHint")}
-                actions={
+            <div className="member-model-browser">
+              <aside
+                className="member-model-suppliers"
+                aria-label={ui("modelsPage.suppliers.title")}
+              >
+                <h2>{ui("modelsPage.suppliers.title")}</h2>
+                <div className="member-model-supplier-list">
                   <Button
-                    variant="secondary"
+                    type="button"
+                    className={!supplier ? "is-selected" : ""}
+                    aria-pressed={!supplier}
                     onClick={() => {
-                      setSearch("");
-                      setGroup("all");
+                      setSupplier("");
+                      pagination.setPage(1);
                     }}
                   >
-                    {ui("modelsPage.clearFilters")}
+                    <span>{ui("modelsPage.suppliers.all")}</span>
+                    <small>{items.length}</small>
                   </Button>
-                }
-              />
-            ) : (
-              <ListShell
-                footer={
-                  <PaginationBar
-                    {...pagination}
-                    onPageChange={pagination.setPage}
-                    onPageSizeChange={pagination.setPageSize}
+                  {suppliers.map(([name, count]) => (
+                    <Button
+                      key={name}
+                      type="button"
+                      className={supplier === name ? "is-selected" : ""}
+                      aria-pressed={supplier === name}
+                      onClick={() => {
+                        setSupplier(name);
+                        pagination.setPage(1);
+                      }}
+                    >
+                      <span>
+                        {name === OTHER_SUPPLIER ? ui("modelsPage.suppliers.other") : name}
+                      </span>
+                      <small>{count}</small>
+                    </Button>
+                  ))}
+                </div>
+              </aside>
+              <section className="member-model-results" aria-label={ui("modelsPage.listTitle")}>
+                <div className="member-model-results-heading">
+                  <strong>{ui("modelsPage.suppliers.showing", { count: filtered.length })}</strong>
+                  {supplier ? (
+                    <span>
+                      {supplier === OTHER_SUPPLIER ? ui("modelsPage.suppliers.other") : supplier}
+                    </span>
+                  ) : null}
+                </div>
+                {query.isPending ? (
+                  <Loading />
+                ) : query.error ? (
+                  <ErrorState error={query.error} retry={() => void query.refetch()} />
+                ) : !items.length ? (
+                  <EmptyHero title={t("noModels")} body={t("modelsWorkspaceHint")} />
+                ) : !filtered.length ? (
+                  <EmptyHero
+                    title={ui("modelsPage.noMatches")}
+                    body={ui("modelsPage.noMatchesHint")}
+                    actions={
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setSearch("");
+                          setSupplier("");
+                        }}
+                      >
+                        {ui("modelsPage.clearFilters")}
+                      </Button>
+                    }
                   />
-                }
-              >
-                {/* The console's own directory table (ModelDirectoryTable): same
+                ) : (
+                  <ListShell
+                    footer={
+                      <PaginationBar
+                        {...pagination}
+                        onPageChange={pagination.setPage}
+                        onPageSizeChange={pagination.setPageSize}
+                      />
+                    }
+                  >
+                    {/* The console's own directory table (ModelDirectoryTable): same
               name cell, group + metadata badges, actions column. The member
               view drops the operator columns (upstream, status) and renders
               its own actions per row — the rows are the same object, seen
               without the site's internals. */}
-                {/* Cards, not table rows: a row answers "does this model exist", a
+                    {/* Cards, not table rows: a row answers "does this model exist", a
                     card has to answer "should I use it" — identity, real specs, the
                     capabilities those specs imply, and the price as this member pays
                     it (group multiplier included). */}
-                <ModelCardGrid>
-                  {pagination.pageItems.map((model) => {
-                    const stat = statsByModel.get(model.name);
-                    const probe = healthByModel.get(model.name);
-                    return (
-                      <ModelCard
-                        key={model.name}
-                        name={model.name}
-                        vendor={model.vendor || model.kind || undefined}
-                        group={autoModelGroup(model.name)}
-                        arranged={arrangedModels.has(model.name)}
-                        capabilities={memberCapabilities(ui, model)}
-                        facts={
-                          <ModelFacts
-                            compact
-                            contextWindow={model.context_window}
-                            input={model.input_modalities}
-                            output={model.output_modalities}
-                            thinking={model.supports_thinking}
+                    <ModelCardGrid
+                      className={
+                        pagination.pageItems.length === 1
+                          ? "is-single-model"
+                          : pagination.pageItems.length === 2
+                            ? "is-two-models"
+                            : ""
+                      }
+                    >
+                      {pagination.pageItems.map((model) => {
+                        const stat = statsByModel.get(model.name);
+                        const health = availabilityByModel.get(model.name);
+                        return (
+                          <ModelCard
+                            key={model.name}
+                            name={model.name}
+                            vendor={model.vendor || model.kind || undefined}
+                            group={autoModelGroup(model.name)}
+                            arranged={arrangedModels.has(model.name)}
+                            capabilities={memberCapabilities(ui, model)}
+                            facts={
+                              <ModelFacts
+                                compact
+                                contextWindow={model.context_window}
+                                input={model.input_modalities}
+                                output={model.output_modalities}
+                                thinking={model.supports_thinking}
+                              />
+                            }
+                            stats={{
+                              requests: stat?.requests ?? 0,
+                              ok: stat?.ok ?? 0,
+                              failed: stat?.failed ?? 0,
+                              successRate:
+                                stat && stat.requests > 0 ? stat.ok / stat.requests : null,
+                              // Only a model this account actually called has a
+                              // latency; a stored 0 would read as "instant".
+                              avgLatencyMs: stat && stat.requests > 0 ? stat.avg_latency_ms : null,
+                              p95Ms: stat && stat.requests > 0 ? stat.p95_ms : null,
+                              tokens: stat?.total_tokens ?? 0,
+                              cost: stat?.cost ?? 0,
+                              windowLabel,
+                            }}
+                            health={
+                              health
+                                ? {
+                                    upstreams: health.upstreams,
+                                    probed: health.probed,
+                                    healthy: health.healthy,
+                                    samples: health.samples,
+                                    okSamples: health.ok_samples,
+                                    availability: health.availability,
+                                    avgLatencyMs: health.avg_latency_ms,
+                                  }
+                                : undefined
+                            }
+                            prices={
+                              !/[*?]/.test(model.name) ? (
+                                <ModelPriceSummary
+                                  model={model.name}
+                                  scope="member"
+                                  request={accountRequest}
+                                  batch={{
+                                    data: priceBatch.data?.get(model.name),
+                                    pending: priceBatch.isPending,
+                                    error: priceBatch.error,
+                                    retry: () => void priceBatch.refetch(),
+                                  }}
+                                />
+                              ) : null
+                            }
                           />
-                        }
-                        stats={
-                          stat
-                            ? {
-                                requests: stat.requests,
-                                ok: stat.ok,
-                                failed: stat.failed,
-                                successRate: stat.requests > 0 ? stat.ok / stat.requests : null,
-                                // Only a model this account actually called has a
-                                // latency; a stored 0 would read as "instant".
-                                avgLatencyMs: stat.requests > 0 ? stat.avg_latency_ms : null,
-                                p95Ms: stat.requests > 0 ? stat.p95_ms : null,
-                                tokens: stat.total_tokens,
-                                cost: stat.cost,
-                                windowLabel,
-                              }
-                            : undefined
-                        }
-                        health={
-                          probe
-                            ? {
-                                upstreams: probe.upstreams,
-                                healthy: probe.healthy,
-                                probed: probe.probed,
-                                samples: probe.samples,
-                                availability: probe.availability,
-                                avgLatencyMs: probe.avg_latency_ms,
-                              }
-                            : undefined
-                        }
-                        prices={
-                          !/[*?]/.test(model.name) ? (
-                            <ModelPriceSummary
-                              model={model.name}
-                              scope="member"
-                              request={accountRequest}
-                              batch={{
-                                data: priceBatch.data?.get(model.name),
-                                pending: priceBatch.isPending,
-                                error: priceBatch.error,
-                                retry: () => void priceBatch.refetch(),
-                              }}
-                            />
-                          ) : null
-                        }
-                        selected={selected?.name === model.name}
-                        onSelect={() => setSelection(model.name)}
-                        actions={
-                          <>
-                            <Button
-                              variant="quiet"
-                              data-model-details
-                              aria-label={ui("modelsPage.viewDetails", { model: model.name })}
-                              onClick={() => setSelection(model.name)}
-                            >
-                              {ui("modelsPage.cardDetailsShort")}
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              icon={<ArrowUpRight size={14} />}
-                              onClick={() => onConnect(model.name)}
-                            >
-                              {t("connect")}
-                            </Button>
-                          </>
-                        }
-                      />
-                    );
-                  })}
-                </ModelCardGrid>
-              </ListShell>
-            )}
+                        );
+                      })}
+                    </ModelCardGrid>
+                  </ListShell>
+                )}
+              </section>
+            </div>
           </Panel>
         }
-        detail={
-          selected ? (
-            <>
-              <div className="detail-head">
-                <div>
-                  <h2 className="mono">{selected.name}</h2>
-                  <small>{selected.vendor || selected.kind || t("unspecified")}</small>
-                </div>
-              </div>
-              <div className="detail-primary-bar">
-                <Button icon={<ArrowUpRight size={14} />} onClick={() => onConnect(selected.name)}>
-                  {t("connect")}
-                </Button>
-                {canRoute ? (
-                  <Button
-                    variant="secondary"
-                    icon={<SlidersHorizontal size={14} />}
-                    onClick={() => setArranging(selected.name)}
-                  >
-                    {t("arrange")}
-                  </Button>
-                ) : null}
-              </div>
-              <ModelFacts
-                contextWindow={selected.context_window}
-                input={selected.input_modalities}
-                output={selected.output_modalities}
-                thinking={selected.supports_thinking}
-              />
-            </>
-          ) : (
-            <div className="detail-empty">{ui("modelsPage.selectHint")}</div>
-          )
-        }
+        detail={null}
       />
-      {arranging ? (
-        <RouteOrderDialog
-          model={arranging}
-          planId={planId}
-          locale={locale}
-          onClose={() => setArranging("")}
-          onSaved={() => void arranged.refetch()}
-        />
-      ) : null}
     </Page>
   );
 }

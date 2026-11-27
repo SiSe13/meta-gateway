@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Check, ChevronDown, Languages } from "lucide-react";
+import { Dropdown, Label } from "@heroui/react";
 
 import { en } from "./en";
 import { zh } from "./zh";
@@ -102,16 +104,32 @@ export function useI18n() {
 export function LanguageSwitcher({ className = "" }: { className?: string }) {
   const { locale, setLocale, t } = useI18n();
   return (
-    <label className={`language-switcher ${className}`.trim()}>
-      <span className="sr-only">{t("lang.switch")}</span>
-      <select
-        aria-label={t("lang.switch")}
-        value={locale}
-        onChange={(e) => setLocale(e.target.value as Locale)}
-      >
-        <option value="en">{t("lang.en")}</option>
-        <option value="zh-CN">{t("lang.zh")}</option>
-      </select>
-    </label>
+    <div className={`language-switcher ${className}`.trim()}>
+      <Dropdown>
+        <Dropdown.Trigger className="language-switcher-trigger" aria-label={t("lang.switch")}>
+          <Languages size={14} aria-hidden="true" />
+          <span>{t(locale === "en" ? "lang.en" : "lang.zh")}</span>
+          <ChevronDown size={12} aria-hidden="true" />
+        </Dropdown.Trigger>
+        <Dropdown.Popover className="language-switcher-popover" placement="bottom end">
+          <Dropdown.Menu
+            aria-label={t("lang.switch")}
+            onAction={(key) => setLocale(String(key) as Locale)}
+          >
+            {(
+              [
+                ["en", t("lang.en")],
+                ["zh-CN", t("lang.zh")],
+              ] as const
+            ).map(([value, label]) => (
+              <Dropdown.Item key={value} id={value} textValue={label}>
+                <Label>{label}</Label>
+                {locale === value ? <Check size={14} aria-hidden="true" /> : null}
+              </Dropdown.Item>
+            ))}
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown>
+    </div>
   );
 }

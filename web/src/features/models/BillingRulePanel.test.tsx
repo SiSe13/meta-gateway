@@ -1,8 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../i18n";
+import { ConfirmProvider } from "../../components/ConfirmProvider";
 import { ApiClient } from "../../api/client";
 import { BillingRulePanel, BillingRuleDialog } from "./BillingRulePanel";
 import { QuoteActions } from "./QuoteActions";
@@ -49,7 +50,9 @@ function wrap(
   return (
     <MemoryRouter>
       <QueryClientProvider client={qc}>
-        <I18nProvider>{ui}</I18nProvider>
+        <I18nProvider>
+          <ConfirmProvider>{ui}</ConfirmProvider>
+        </I18nProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
@@ -128,14 +131,14 @@ it("keeps dirty input after a version conflict", async () => {
 });
 it("guards escape-close of a dirty billing dialog", async () => {
   const close = vi.fn();
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   render(wrap(<BillingRuleDialog model="m" onClose={close} />));
   fireEvent.change(await screen.findByLabelText("Ordinary input (USD / 1M tokens)"), {
     target: { value: "7" },
   });
   await act(async () => {});
   fireEvent.keyDown(document, { key: "Escape" });
-  expect(confirm).toHaveBeenCalledTimes(1);
+  const confirmation = await screen.findByRole("dialog", { name: "Unsaved changes" });
+  fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
   expect(close).not.toHaveBeenCalled();
 });
 it("freezes a copy target, requires native conversion and submits the reviewed revision", async () => {

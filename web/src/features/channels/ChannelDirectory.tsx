@@ -9,7 +9,7 @@ import { EmptyHero } from "../../components/EmptyHero";
 import { EntityState } from "../../components/EntityState";
 import { ListShell } from "../../components/ListShell";
 import { PaginationBar } from "../../components/PaginationBar";
-import { Button, DataTable, InfoTip, Panel } from "../../components/ui";
+import { Button, DataTable, InfoTip, Panel, CheckboxControl } from "../../components/ui";
 import { ChannelStatusBadges } from "./badges";
 import { Pin } from "lucide-react";
 import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
@@ -22,6 +22,7 @@ import { CheckinSettingsDialog } from "./CheckinSettingsDialog";
 import { parseCredentialMeta } from "../credentialMeta";
 import { userCredentialFor } from "./channelCredentials";
 import { useToast } from "../../toast";
+import { formatGroupName } from "../../lib/format";
 
 /**
  * The connections directory: the search and filters, the table, its bulk bar and
@@ -255,7 +256,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
   ];
   const groupOptions: SelectOption[] = [
     { value: "all", label: t("channels.allGroups") },
-    ...filterOptions.groups.map((group) => ({ value: group, label: group })),
+    ...filterOptions.groups.map((group) => ({ value: group, label: formatGroupName(group, t) })),
   ];
   return (
     <Panel className="ops-list-panel channels-directory">
@@ -496,8 +497,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                   >
                     {bulkMode ? (
                       <td className="bulk-cell" onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
+                        <CheckboxControl
                           aria-label={t("channels.bulkSelectOne", { name: ch.name })}
                           checked={bulkSelected.has(ch.id)}
                           onChange={() => toggleBulkSelected(ch.id)}
@@ -514,7 +514,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                     </td>
                     <td className="channel-group-cell">
                       <span className="capability-chip is-group">
-                        {ch.group_name || t("routing.groupDefault")}
+                        {formatGroupName(ch.group_name, t)}
                       </span>
                     </td>
                     <td className="status-col channel-status-cell">
@@ -565,7 +565,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                       onClick={(event) => event.stopPropagation()}
                     >
                       {overview.checkin_supported ? (
-                        <button
+                        <Button
                           type="button"
                           className={`capability-chip is-interactive ${overview.checkin_enabled ? "is-checkin" : "is-muted"}`}
                           title={
@@ -584,7 +584,7 @@ export function ChannelDirectory(props: ChannelDirectoryProps) {
                           {overview.checkin_enabled
                             ? t("channels.checkinEnabled")
                             : t("channels.checkinDisabled")}
-                        </button>
+                        </Button>
                       ) : (
                         <span className="capability-chip is-muted">—</span>
                       )}

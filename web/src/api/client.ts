@@ -14,6 +14,7 @@ import type {
   ConnectionCreateResponse,
   CheckinLog,
   CreatedDownstreamKey,
+  DownstreamKeyActivity,
   KeyCreateInput,
   KeyUpdateInput,
   Credential,
@@ -539,6 +540,8 @@ export const api = (client: ApiClient) => ({
     ),
   sticky: (signal?: AbortSignal) => client.get<StickySnapshot>("/admin/sticky", signal),
   keys: (signal?: AbortSignal) => client.getList<DownstreamKey>("/admin/downstream-keys", signal),
+  keyActivity: (signal?: AbortSignal) =>
+    client.getList<DownstreamKeyActivity>("/admin/downstream-keys/activity", signal),
   createKey: (body: KeyCreateInput) =>
     client.post<CreatedDownstreamKey>("/admin/downstream-keys", body),
   updateKey: (id: number, body: KeyUpdateInput) =>

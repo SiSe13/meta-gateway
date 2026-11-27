@@ -10,7 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Button as HeroButton, Dropdown, Label, Separator } from "@heroui/react";
 import { BrandMark } from "../../components/BrandMark";
 import { IconButton } from "../../components/ui";
@@ -83,6 +83,7 @@ export function MetapiChrome({
   showAdminAccount,
   showMemberAccount,
   onOpenAdminAccount,
+  onOpenPasswordDialog,
   appearanceHiddenNav,
   version,
   theme,
@@ -99,7 +100,6 @@ export function MetapiChrome({
   const { t } = useI18n();
   const topBar = useTopBarControls();
   const location = useLocation();
-  const navigate = useNavigate();
   const [updateOpen, setUpdateOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [avatar] = useState<AvatarPreference>(createAvatarPreference);
@@ -116,10 +116,19 @@ export function MetapiChrome({
             <BrandMark size={25} />
           </span>
           <span className="metapi-brand-copy">
-            <strong>Meta Gateway</strong>
+            <strong>Balbo AI</strong>
             <small>{t("shell.workspace")}</small>
           </span>
         </div>
+        {!observationView ? (
+          <IconButton
+            className="console-sidebar-toggle"
+            label={t(collapsed ? "shell.expandNav" : "shell.collapseNav")}
+            onClick={onCollapse}
+          >
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </IconButton>
+        ) : null}
         {observationView ? null : (
           <IconButton
             className="console-mobile-trigger"
@@ -129,22 +138,24 @@ export function MetapiChrome({
             <Menu size={19} />
           </IconButton>
         )}
-        <nav className="metapi-top-navigation" aria-label={t("app.topNav.ariaLabel")}>
-          {topNavigation.map((item) => (
-            <Link
-              key={item.id}
-              to={item.to}
-              className={item.id === activeTopNavigation ? "active" : ""}
-              aria-current={item.id === activeTopNavigation ? "page" : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                onSelectTopNavigation(item.to);
-              }}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        {topNavigation.length ? (
+          <nav className="metapi-top-navigation" aria-label={t("app.topNav.ariaLabel")}>
+            {topNavigation.map((item) => (
+              <Link
+                key={item.id}
+                to={item.to}
+                className={item.id === activeTopNavigation ? "active" : ""}
+                aria-current={item.id === activeTopNavigation ? "page" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onSelectTopNavigation(item.to);
+                }}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         <div className="console-global-actions">
           {topBar.update && update ? (
             <HeroButton
@@ -154,6 +165,15 @@ export function MetapiChrome({
               onPress={() => setUpdateOpen(true)}
             >
               {t("app.updateAvailable", { version: update.latest })}
+            </HeroButton>
+          ) : topBar.update && showAdminAccount ? (
+            <HeroButton
+              type="button"
+              variant="ghost"
+              className="console-update"
+              onPress={() => setUpdateOpen(true)}
+            >
+              {t("appearance.chrome.updatePreview")}
             </HeroButton>
           ) : null}
           {topBar.theme ? (
@@ -191,7 +211,7 @@ export function MetapiChrome({
                     if (key === "appearance") setAppearanceOpen(true);
                     if (key === "account") {
                       if (showAdminAccount) onOpenAdminAccount();
-                      else navigate("/account");
+                      else onOpenPasswordDialog();
                     }
                     if (key === "logout") onDisconnect();
                   }}
@@ -201,14 +221,9 @@ export function MetapiChrome({
                     <Label>{t("profile.appearance")}</Label>
                   </Dropdown.Item>
                   {showAdminAccount || showMemberAccount ? (
-                    <Dropdown.Item
-                      id="account"
-                      textValue={t(showAdminAccount ? "profile.adminAccount" : "profile.account")}
-                    >
+                    <Dropdown.Item id="account" textValue={t("profile.account")}>
                       <UserRound size={16} aria-hidden="true" />
-                      <Label>
-                        {t(showAdminAccount ? "profile.adminAccount" : "profile.account")}
-                      </Label>
+                      <Label>{t("profile.account")}</Label>
                     </Dropdown.Item>
                   ) : null}
                   <Separator className="metapi-profile-divider" />
@@ -221,8 +236,19 @@ export function MetapiChrome({
             </Dropdown>
           </div>
         </div>
-        {updateOpen && update ? (
-          <UpdateDialog update={update} onClose={() => setUpdateOpen(false)} />
+        {updateOpen && (update || showAdminAccount) ? (
+          <UpdateDialog
+            update={
+              update ?? {
+                enabled: false,
+                current: "—",
+                latest: "—",
+                has_update: false,
+                release_url: "",
+              }
+            }
+            onClose={() => setUpdateOpen(false)}
+          />
         ) : null}
       </header>
       {observationView ? null : (
@@ -246,12 +272,6 @@ export function MetapiChrome({
             ) : null}
             <div className="console-sidebar-meta">
               <span>{version}</span>
-              <IconButton
-                label={t(collapsed ? "shell.expandNav" : "shell.collapseNav")}
-                onClick={onCollapse}
-              >
-                {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-              </IconButton>
             </div>
           </div>
         </aside>

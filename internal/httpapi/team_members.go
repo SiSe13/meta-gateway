@@ -1,10 +1,12 @@
 package httpapi
 
 import (
+	"database/sql"
 	"errors"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Member management: creating accounts directly, importing a pasted list, and
@@ -21,16 +23,34 @@ const (
 	teamQuotaMaxCost = 1_000_000.0
 )
 
+var errTeamConcurrencyLimit = errors.New("team concurrency limit exceeded")
+
+// grantUserConcurrency 原子增加并发额度，并保存这次授予的回收时间。
+func grantUserConcurrency(tx *sql.Tx, userID int64, amount int, expiresAt int64) error {
+	var updated int
+	err := tx.QueryRow(`UPDATE team_users SET max_concurrent=max_concurrent+?
+		WHERE id=? AND max_concurrent<=? RETURNING max_concurrent`, amount, userID, teamCodeMaxConcurrent-amount).Scan(&updated)
+	if errors.Is(err, sql.ErrNoRows) {
+		return errTeamConcurrencyLimit
+	}
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`INSERT INTO team_concurrency_grants(user_id,quota_concurrent,grant_expires_at)
+		VALUES(?,?,?)`, userID, amount, expiresAt)
+	return err
+}
+
 // createUserRequest is shared by the single-create and import paths so both
 // refuse the same shapes for the same reasons.
 type createUserRequest struct {
-	Username string `json:"username"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	Username  string  `json:"username"`
+	Name      string  `json:"name"`
+	Password  string  `json:"password"`
 	PolicyID  int64   `json:"policy_id"`
 	PolicyIDs []int64 `json:"policy_ids"`
-	Role     string `json:"role"`
-	Quota    int64  `json:"quota_tokens"`
+	Role      string  `json:"role"`
+	Quota     int64   `json:"quota_tokens"`
 	// QuotaCost is the same allowance in money (0 = unlimited). Both budgets are
 	// enforced, so a member may be capped by either.
 	QuotaCost float64 `json:"quota_cost"`
@@ -278,7 +298,8 @@ func (h *TeamHandler) importUsers(w http.ResponseWriter, r *http.Request) {
 				fail = "username_taken"
 			default:
 				h.audit(r, "team.user.create", id)
-				out.Created = append(out.Created, createdRow{ID: id, Username: item.Username, Name: item.Name, Password: item.Generated})
+				// 导入结果只返回给当前管理员，用于一次性核对并交付本次提交的凭据。
+				out.Created = append(out.Created, createdRow{ID: id, Username: item.Username, Name: item.Name, Password: item.Password})
 				continue
 			}
 		}
@@ -331,10 +352,15 @@ func parseTokenAmount(raw string) (int64, error) {
 // destructive one and is deliberately precise about what it removes.
 func (h *TeamHandler) bulkUsers(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		IDs      []int64 `json:"ids"`
-		Action   string  `json:"action"`
-		PolicyID int64   `json:"policy_id"`
-		PolicyIDs []int64 `json:"policy_ids"`
+		IDs               []int64  `json:"ids"`
+		Action            string   `json:"action"`
+		PolicyID          int64    `json:"policy_id"`
+		PolicyIDs         []int64  `json:"policy_ids"`
+		QuotaTotalTokens  *int64   `json:"quota_total_tokens"`
+		QuotaTotalCost    *float64 `json:"quota_total_cost"`
+		QuotaReset        bool     `json:"quota_reset"`
+		Concurrency       int      `json:"concurrency"`
+		GrantValidityDays int      `json:"grant_validity_days"`
 	}
 	if !teamRead(w, r, &req) {
 		return
@@ -433,6 +459,96 @@ func (h *TeamHandler) bulkUsers(w http.ResponseWriter, r *http.Request) {
 		n := int64(len(eligible))
 		h.audit(r, "team.users.policy", actorID)
 		teamJSON(w, 200, map[string]any{"updated": n})
+	case "quota":
+		if !owner {
+			teamFail(w, 403, "owner_required")
+			return
+		}
+		if req.QuotaTotalTokens == nil || req.QuotaTotalCost == nil ||
+			*req.QuotaTotalTokens < 0 || *req.QuotaTotalTokens > teamQuotaMaxTokens ||
+			*req.QuotaTotalCost < 0 || *req.QuotaTotalCost > teamQuotaMaxCost {
+			teamFail(w, 400, "invalid_quota")
+			return
+		}
+		// 批量额度在单个事务中统一写入，避免部分成员成功、部分成员失败。
+		tx, err := h.db.Begin()
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		defer tx.Rollback()
+		set := `UPDATE team_users SET quota_total_tokens=?,quota_total_cost=?`
+		if req.QuotaReset {
+			set += `,quota_used_tokens=0,quota_used_cost=0`
+		}
+		result, err := tx.Exec(set+` WHERE id IN (`+inList+`)`+scope,
+			append([]any{*req.QuotaTotalTokens, *req.QuotaTotalCost}, args...)...)
+		if err == nil {
+			err = tx.Commit()
+		}
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		updated, _ := result.RowsAffected()
+		h.audit(r, "team.users.quota", actorID)
+		teamJSON(w, 200, map[string]any{"updated": updated})
+	case "concurrency":
+		if !owner {
+			teamFail(w, 403, "owner_required")
+			return
+		}
+		if req.Concurrency < 1 || req.Concurrency > teamCodeMaxConcurrent || req.GrantValidityDays < 0 || req.GrantValidityDays > teamCodeMaxGrantValidityDays {
+			teamFail(w, 400, "invalid_request")
+			return
+		}
+		tx, err := h.db.Begin()
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		defer tx.Rollback()
+		rows, err := tx.Query(`SELECT id FROM team_users WHERE id IN (`+inList+`)`+scope, args...)
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		eligible := []int64{}
+		for rows.Next() {
+			var userID int64
+			if err = rows.Scan(&userID); err != nil {
+				break
+			}
+			eligible = append(eligible, userID)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		expiresAt := int64(0)
+		if req.GrantValidityDays > 0 {
+			expiresAt = time.Now().Add(time.Duration(req.GrantValidityDays) * 24 * time.Hour).Unix()
+		}
+		for _, userID := range eligible {
+			if err = grantUserConcurrency(tx, userID, req.Concurrency, expiresAt); err != nil {
+				if errors.Is(err, errTeamConcurrencyLimit) {
+					teamFail(w, 400, "concurrency_limit_exceeded")
+				} else {
+					teamFail(w, 500, "save_failed")
+				}
+				return
+			}
+		}
+		if err = tx.Commit(); err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		h.audit(r, "team.users.concurrency", actorID)
+		teamJSON(w, 200, map[string]any{"updated": len(eligible)})
 	case "revoke_sessions":
 		res, err := h.db.Exec(`DELETE FROM team_sessions WHERE user_id IN (`+inList+`) AND user_id IN (SELECT id FROM team_users WHERE role <> 'owner'`+ownerGuard(owner)+`)`, args...)
 		if err != nil {

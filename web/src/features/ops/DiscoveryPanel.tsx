@@ -15,6 +15,7 @@ import {
   Panel,
   StatusBadge,
   formatDate,
+  SelectControl,
 } from "../../components/ui";
 
 const DISCOVERY_INVALIDATE_KEYS: QueryKey[] = [
@@ -59,7 +60,7 @@ export function DiscoveryPanel() {
     <Panel
       actions={
         <>
-          <select
+          <SelectControl
             aria-label={t("ops.filterChannel")}
             value={filter}
             onChange={(e) => {
@@ -73,7 +74,7 @@ export function DiscoveryPanel() {
                 {c.name}
               </option>
             ))}
-          </select>
+          </SelectControl>
           {filter > 0 && (
             <Button
               variant="secondary"

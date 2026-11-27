@@ -110,7 +110,7 @@ export function ModelPriceSummary({
       ) : !data || data.status === "unpriced" ? (
         // No authorized candidate resolved, or every candidate is unpriced: the
         // zero rates here mean "no price configured", never "free".
-        <p className="field-hint">{t("pricing.unavailable")}</p>
+        <p className="field-hint">{t("modelsPage.noConfiguredPrice")}</p>
       ) : (
         <>
           <dl className="model-price-grid">

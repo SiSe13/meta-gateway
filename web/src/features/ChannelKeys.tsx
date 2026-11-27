@@ -14,6 +14,7 @@ import { SecretRevealDialog } from "../components/SecretRevealDialog";
 import { Button, CheckboxControl, ConfirmDialog, Dialog, Field, InfoTip } from "../components/ui";
 import { useAdminMutation } from "../hooks/useAdminMutation";
 import { useI18n } from "../i18n";
+import { formatGroupName } from "../lib/format";
 import { apiKeyLooksWrong, keyHintFor, splitApiKeys } from "../lib/apiKeyPaste";
 import { useSession } from "../session";
 import { parseCredentialMeta } from "./credentialMeta";
@@ -310,7 +311,7 @@ export function ChannelKeysDialog({
               const meta = parseCredentialMeta(item.meta_json);
               const enabled = item.status === "enabled";
               const label = meta.name?.trim() || t("channels.apiKeyUnnamed", { id: item.id });
-              const groupLabel = meta.group?.trim() || t("channels.apiKeyGroupDefault");
+              const groupLabel = formatGroupName(meta.group, t);
               const selectedModels = (keyModelsDraft[item.id] ?? item.models_csv ?? "")
                 .split(",")
                 .map((model) => model.trim())

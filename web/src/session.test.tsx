@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import { SessionProvider, useSession } from "./session";
@@ -35,6 +35,40 @@ describe("admin session", () => {
     const { result } = renderHook(() => useSession(), { wrapper });
     expect(result.current.token).toBe("kept-token");
   });
+});
+
+it("keeps the session unresolved until a remembered cookie session is restored", async () => {
+  localStorage.clear();
+  sessionStorage.clear();
+  sessionStorage.setItem("meta-gateway.team-console", "1");
+  let resolveFetch!: (response: Response) => void;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    ),
+  );
+
+  const { result, unmount } = renderHook(() => useSession(), { wrapper });
+  expect(result.current.sessionReady).toBe(false);
+  expect(result.current.token).toBeNull();
+
+  await act(async () => {
+    resolveFetch(
+      new Response(JSON.stringify({ user: { role: "member" }, csrf: "restored-csrf" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  });
+  await waitFor(() => expect(result.current.sessionReady).toBe(true));
+  expect(result.current.role).toBe("member");
+  expect(result.current.token).toBe("@team-cookie");
+  unmount();
+  vi.unstubAllGlobals();
 });
 
 it("clears expired member identity locally without a logout request", () => {

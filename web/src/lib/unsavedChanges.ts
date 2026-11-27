@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from "react";
 import { useBeforeUnload, useLocation } from "react-router-dom";
 import { useI18n } from "../i18n";
+import { useConfirm } from "../components/ConfirmProvider";
 
 /**
  * Keeps unsaved work from disappearing without a word.
@@ -70,13 +71,14 @@ export function leavesDirtyZone(currentPathname: string, nextPathname: string): 
  * router guard refuses to navigate away from it. Must run inside a router
  * (`useLocation`).
  *
- * The returned predicate stays for callers that own a same-pathname move the
+ * The returned async guard stays for callers that own a same-pathname move the
  * router guard deliberately ignores — the settings page's `?tab=` switches.
- * Call it before navigating, and the guard will not ask a second time because
- * the pathname did not change.
+ * Await it before navigating, and the router guard will not ask a second time
+ * because the pathname did not change.
  */
 export function useUnsavedChanges(dirty: boolean) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -103,5 +105,13 @@ export function useUnsavedChanges(dirty: boolean) {
   useBeforeUnload(beforeUnload);
 
   /** True when the caller may proceed; false when the operator chose to stay. */
-  return useCallback(() => !dirty || window.confirm(t("common.unsavedConfirm")), [dirty, t]);
+  return useCallback(
+    async () =>
+      !dirty ||
+      (await confirm({
+        title: t("common.unsavedTitle"),
+        message: t("common.unsavedConfirm"),
+      })),
+    [confirm, dirty, t],
+  );
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ChannelOverview } from "../../api/types";
 import { api } from "../../api/client";
-import { Button, Dialog, ErrorState, Field } from "../../components/ui";
+import { Button, Dialog, ErrorState, Field, TextInput } from "../../components/ui";
 import { SearchableSelect } from "../../components/SearchableSelect";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { credentialPatch, credentialShouldBeRemoved } from "./credentialPatch";
@@ -244,7 +244,7 @@ export function CheckinSettingsDialog({
                   : t("channels.userTokenHint")
               }
             >
-              <input
+              <TextInput
                 type="password"
                 autoComplete="new-password"
                 value={userToken}
@@ -267,7 +267,7 @@ export function CheckinSettingsDialog({
                   : t("channels.userCookieHint")
               }
             >
-              <input
+              <TextInput
                 type="password"
                 autoComplete="new-password"
                 value={userCookie}
@@ -288,7 +288,7 @@ export function CheckinSettingsDialog({
                 hint={t("channels.checkinPathHint", { path: defaultCheckinPath })}
                 error={checkinPathInvalid ? t("channels.checkinPathInvalid") : undefined}
               >
-                <input
+                <TextInput
                   type="text"
                   value={checkinPath}
                   onChange={(event) => setCheckinPath(event.target.value)}
@@ -318,7 +318,7 @@ export function CheckinSettingsDialog({
               required={enabled}
               error={userIDInvalid ? t("channels.userIDInvalid") : undefined}
             >
-              <input
+              <TextInput
                 inputMode="numeric"
                 value={userID}
                 onChange={(event) => setUserID(event.target.value.trim())}

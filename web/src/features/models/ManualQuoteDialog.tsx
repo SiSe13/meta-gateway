@@ -66,8 +66,8 @@ export function ManualQuoteDialog({
       onClose();
     },
   });
-  const close = () => {
-    if (!save.isPending && guard()) onClose();
+  const close = async () => {
+    if (!save.isPending && (await guard())) onClose();
   };
   return (
     <Dialog

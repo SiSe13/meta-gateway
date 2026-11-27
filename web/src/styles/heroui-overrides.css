@@ -95,7 +95,7 @@
   box-shadow: 0 0 0 3px var(--primary-glow);
 }
 
-.theme-metapi .console-language select:focus-visible {
+.theme-metapi .console-language .language-switcher-trigger:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 1px var(--primary);
 }
@@ -195,16 +195,60 @@
   box-shadow: var(--shadow-lg);
 }
 
+:root[data-appearance="metapi"] .dialog.redemption-history-dialog {
+  width: min(900px, calc(100vw - 48px));
+  max-width: min(900px, calc(100vw - 48px));
+}
+
+.redemption-history-dialog .table-wrap {
+  width: 100%;
+  max-height: min(62dvh, 560px);
+  overflow: auto;
+}
+
+.redemption-history-dialog .table-wrap table {
+  width: 100%;
+  min-width: 720px;
+}
+
+.redemption-history-empty {
+  margin: 0;
+  padding: 20px 12px;
+  text-align: center;
+}
+
+:root[data-appearance="metapi"] .dialog.ratio-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: min(760px, calc(100vw - 32px));
+}
+
 :root[data-appearance="metapi"] .dialog.channel-models-dialog {
   width: min(1000px, calc(100vw - 40px));
   max-width: min(1000px, calc(100vw - 40px));
   max-height: min(96dvh, 1100px);
 }
 
+:root[data-appearance="metapi"] .dialog.key-model-range-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-width: min(760px, calc(100vw - 32px));
+  min-height: min(520px, calc(100dvh - 40px));
+}
+
 :root[data-appearance="metapi"] .dialog.channel-keys-dialog {
   width: min(1080px, calc(100vw - 40px));
   max-width: min(1080px, calc(100vw - 40px));
   max-height: min(92dvh, 960px);
+}
+
+:root[data-appearance="metapi"] .dialog.policy-editor-dialog {
+  width: min(840px, calc(100vw - 48px));
+  max-width: min(840px, calc(100vw - 48px));
+}
+
+:root[data-appearance="metapi"] .dialog.member-edit-dialog {
+  width: min(820px, calc(100vw - 48px));
+  max-width: min(820px, calc(100vw - 48px));
+  max-height: min(92dvh, 900px);
 }
 
 :root[data-appearance="metapi"] .dialog.channel-models-dialog [data-slot="modal-body"] {
@@ -227,7 +271,7 @@
 :root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-status-count {
   min-width: 15px;
   padding: 2px 4px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 :root[data-appearance="metapi"] .dialog.channel-models-dialog .channel-model-add-input {
@@ -284,6 +328,15 @@
 }
 
 :root[data-appearance="metapi"] .dialog.channels-add-dialog .overlay-actions {
+  justify-content: center;
+}
+
+:root[data-appearance="metapi"] .dialog.team-code-mint-dialog [data-slot="modal-footer"] {
+  justify-content: center;
+}
+
+:root[data-appearance="metapi"] .dialog.team-code-mint-dialog .overlay-actions {
+  width: auto;
   justify-content: center;
 }
 
@@ -508,9 +561,26 @@
     border-radius: 14px;
   }
 
+  :root[data-appearance="metapi"] .dialog.redemption-history-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  :root[data-appearance="metapi"] .dialog.ratio-dialog {
+    width: calc(100vw - 40px);
+    max-width: calc(100vw - 40px);
+  }
+
   :root[data-appearance="metapi"] .dialog.channel-models-dialog {
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  :root[data-appearance="metapi"] .dialog.key-model-range-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    min-height: min(520px, calc(100dvh - 24px));
     max-height: calc(100dvh - 24px);
   }
 
@@ -518,6 +588,16 @@
     width: calc(100vw - 24px);
     max-width: calc(100vw - 24px);
     max-height: calc(100dvh - 24px);
+  }
+
+  :root[data-appearance="metapi"] .dialog.policy-editor-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+
+  :root[data-appearance="metapi"] .dialog.member-edit-dialog {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
   }
 
   :root[data-appearance="metapi"] .dialog [data-slot="modal-header"],

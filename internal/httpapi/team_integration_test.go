@@ -230,6 +230,67 @@ func TestTeamModeLifecycleAndRoles(t *testing.T) {
 	member.login("alice", "member-password-123")
 	member.request("GET", "/me/keys", nil, 200)
 }
+
+func TestTeamSessionDetailsAndLogoutOthers(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	member := e.member("alice", "member")
+	member.login("alice", "member-password-123")
+	member.login("alice", "member-password-123")
+	otherDevice := e.browser()
+	otherDevice.login("alice", "member-password-123")
+
+	type session struct {
+		ID           string `json:"id"`
+		Device       string `json:"device"`
+		IPAddress    string `json:"ip_address"`
+		LoginMethod  string `json:"login_method"`
+		LastActiveAt int64  `json:"last_active_at"`
+		Current      bool   `json:"current"`
+	}
+	readSessions := func(browser *teamTestBrowser) []session {
+		t.Helper()
+		var items []session
+		if err := json.Unmarshal(browser.request("GET", "/me/sessions", nil, 200), &items); err != nil {
+			t.Fatal(err)
+		}
+		return items
+	}
+	sessions := readSessions(member)
+	var currentID string
+	for _, item := range sessions {
+		if item.Current {
+			currentID = item.ID
+		}
+	}
+	if currentID == "" {
+		t.Fatalf("current session missing: %+v", sessions)
+	}
+	if _, err := e.db.Exec(`INSERT INTO team_sessions(token_hash,user_id,version,created_at,expires_at,device,ip_address,login_method,last_active_at)
+		SELECT ?,user_id,version,created_at-1,expires_at,device,ip_address,login_method,last_active_at FROM team_sessions WHERE token_hash=?`, teamHash("legacy-duplicate"), currentID); err != nil {
+		t.Fatal(err)
+	}
+	sessions = readSessions(member)
+	if len(sessions) != 2 {
+		t.Fatalf("got %d sessions, want one session for each browser after removing legacy duplicate", len(sessions))
+	}
+	seenPassword, seenCurrent := false, false
+	for _, item := range sessions {
+		if item.Device == "" || item.IPAddress == "" || item.LastActiveAt == 0 {
+			t.Fatalf("session metadata missing: %+v", item)
+		}
+		seenPassword = seenPassword || item.LoginMethod == "password"
+		seenCurrent = seenCurrent || item.Current
+	}
+	if !seenPassword || !seenCurrent {
+		t.Fatalf("session methods/current flag missing: %+v", sessions)
+	}
+	member.request("DELETE", "/me/sessions/others", nil, 200)
+	sessions = readSessions(member)
+	if len(sessions) != 1 || !sessions[0].Current {
+		t.Fatalf("logout other sessions left unexpected sessions: %+v", sessions)
+	}
+}
 func TestTeamOwnershipCSRFAndKeyLifecycle(t *testing.T) {
 	e := newTeamTestEnv(t)
 	e.enable()
@@ -266,6 +327,9 @@ func TestTeamOwnershipCSRFAndKeyLifecycle(t *testing.T) {
 	if bytes.Contains(list, []byte(raw)) || bytes.Contains(list, []byte("password_hash")) {
 		t.Fatal("list leaked secret")
 	}
+	if !bytes.Contains(list, []byte(`"current_concurrent"`)) || !bytes.Contains(list, []byte(`"authorization_groups"`)) {
+		t.Fatal("member key list is missing authorization groups or current concurrency")
+	}
 	_, _, headers := e.call(a.client, "POST", fmt.Sprintf("/me/keys/%d/reveal", id), map[string]any{}, "", a.csrf)
 	if headers.Get("Cache-Control") != "no-store" {
 		t.Fatal("reveal cacheable")
@@ -298,6 +362,33 @@ func TestTeamOwnershipCSRFAndKeyLifecycle(t *testing.T) {
 	a.request("POST", "/me/logout", map[string]any{}, 200)
 	a.request("GET", "/me", nil, 401)
 }
+
+func TestTeamKeyPartialPatchPreservesOmittedFields(t *testing.T) {
+	e := newTeamTestEnv(t)
+	e.enable()
+	member := e.member("alice", "member")
+	created := member.request("POST", "/me/keys", teamKeyInput{
+		Name: "models-key", ExpiresAt: "2099-01-01T00:00:00Z", AllowedIPs: "192.0.2.10",
+	}, 201)
+	var key struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.Unmarshal(created, &key); err != nil {
+		t.Fatal(err)
+	}
+	id := key.ID
+	member.request("PATCH", fmt.Sprintf("/me/keys/%d", id), map[string]string{"models": "model-a,model-b"}, 200)
+
+	var name, models, expiresAt, allowedIPs string
+	var planID int64
+	if err := e.db.QueryRow(`SELECT name,model_allowlist,expires_at,allowed_ips,team_plan_id FROM downstream_keys WHERE id=?`, id).Scan(&name, &models, &expiresAt, &allowedIPs, &planID); err != nil {
+		t.Fatal(err)
+	}
+	if name != "models-key" || models != "model-a,model-b" || expiresAt != "2099-01-01T00:00:00Z" || allowedIPs != "192.0.2.10" || planID != 0 {
+		t.Fatalf("partial model update changed unrelated key fields: name=%q models=%q expires=%q ips=%q plan=%d", name, models, expiresAt, allowedIPs, planID)
+	}
+}
+
 func TestTeamConcurrentKeyLimitAndInviteSingleUse(t *testing.T) {
 	e := newTeamTestEnv(t)
 	e.enable()

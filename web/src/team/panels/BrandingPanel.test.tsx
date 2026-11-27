@@ -1,9 +1,10 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { I18nProvider } from "../../i18n";
+import { ConfirmProvider } from "../../components/ConfirmProvider";
 import { UnsavedChangesBoundary } from "../../lib/RouterBoundary";
 import { teamText } from "../text";
 import { BrandingPanel } from "./BrandingPanel";
@@ -72,25 +73,26 @@ function mount(fail = false) {
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <I18nProvider>
-        <RouterProvider router={router} />
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
       </I18nProvider>
     </QueryClientProvider>,
   );
   return { request, update: (v: TeamSettings) => act(() => update(v)) };
 }
 it("keeps branding drafts through refresh and a refused navigation", async () => {
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   const { update } = mount();
   const field = screen.getByLabelText("Site name");
   fireEvent.change(field, { target: { value: "Draft" } });
   update({ ...settings, branding: { ...settings.branding, name: "Remote" } });
   expect(field).toHaveValue("Draft");
   fireEvent.click(screen.getByRole("link", { name: "leave" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  const dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(field).toHaveValue("Draft");
 });
 it("uses the real unwrapped settings response and clears the leave guard after save", async () => {
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   const { request } = mount();
   fireEvent.change(screen.getByLabelText("Site name"), { target: { value: "Saved brand" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -109,15 +111,15 @@ it("uses the real unwrapped settings response and clears the leave guard after s
   });
   fireEvent.click(screen.getByRole("link", { name: "leave" }));
   await screen.findByText("Other page");
-  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog", { name: "Unsaved changes" })).not.toBeInTheDocument();
 });
 it("retains branding input and leave guard when saving fails", async () => {
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   mount(true);
   fireEvent.change(screen.getByLabelText("Site name"), { target: { value: "Unsaved brand" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await screen.findByRole("alert");
   fireEvent.click(screen.getByRole("link", { name: "leave" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  const dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(screen.getByLabelText("Site name")).toHaveValue("Unsaved brand");
 });

@@ -104,6 +104,7 @@
   z-index: 70;
   min-height: 64px;
   height: 64px;
+  justify-content: flex-start;
   margin: 0;
   padding: 0 22px 0 0;
   border: 0;
@@ -123,6 +124,28 @@
   padding: 0 18px;
   border-right: 1px solid var(--line-light);
   white-space: nowrap;
+}
+
+.theme-metapi .console-sidebar-toggle {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  margin-left: 2px;
+  color: var(--muted);
+}
+
+.theme-metapi .console-sidebar-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-hover);
+}
+
+.theme-metapi.is-collapsed .metapi-brand {
+  justify-content: center;
+  padding: 0 10px;
+}
+
+.theme-metapi.is-collapsed .metapi-brand-copy {
+  display: none;
 }
 
 .theme-metapi .metapi-brand-mark {
@@ -156,13 +179,16 @@
 }
 
 .theme-metapi .metapi-top-navigation {
+  position: absolute;
+  inset: 0 260px 0 var(--nav-width);
   display: flex;
-  align-self: stretch;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  pointer-events: none;
 }
 
 .theme-metapi .metapi-top-navigation::-webkit-scrollbar {
@@ -181,6 +207,7 @@
   font-weight: 550;
   text-decoration: none;
   white-space: nowrap;
+  pointer-events: auto;
 }
 
 .theme-metapi .metapi-top-navigation a:hover,
@@ -314,6 +341,7 @@
 
 .theme-metapi .console-global-actions {
   gap: 7px;
+  margin-left: auto;
 }
 
 .theme-metapi .console-global-actions .icon-button {
@@ -567,15 +595,21 @@
   }
 
   .theme-metapi .console-language {
-    width: 34px;
-    min-width: 34px;
-    overflow: hidden;
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
   }
 
-  .theme-metapi .console-language select {
+  .theme-metapi .console-language .language-switcher-trigger {
     width: 34px;
-    padding: 0 2px;
+    min-width: 34px;
+    padding: 0;
     color: transparent;
+  }
+
+  .theme-metapi .console-language .language-switcher-trigger > span,
+  .theme-metapi .console-language .language-switcher-trigger > svg:last-child {
+    display: none;
   }
 
   .theme-metapi .metapi-avatar-trigger {

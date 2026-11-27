@@ -143,6 +143,14 @@ describe("ChannelKeysDialog model allowlist", () => {
     vi.unstubAllGlobals();
   });
 
+  it("shows the upstream default group in Chinese", async () => {
+    renderDrawer([
+      { ...GEMINI_KEY, meta_json: JSON.stringify({ name: "upstream-key", group: "default" }) },
+    ]);
+    expect(await screen.findByText(/^默认 · #143/)).toBeInTheDocument();
+    expect(screen.queryByText(/default/)).not.toBeInTheDocument();
+  });
+
   it("offers the key's own synced models, not the channel-wide union", async () => {
     renderDrawer();
     await expandAllowlist();

@@ -18,6 +18,14 @@ type UsageStore struct {
 	db *sql.DB
 }
 
+// KeyUsageTotals 保存下游令牌列表展示的两个用量时间窗。
+type KeyUsageTotals struct {
+	TodayTokens int64
+	TodayCost   float64
+	MonthTokens int64
+	MonthCost   float64
+}
+
 // Insert writes one usage record.
 func (s *UsageStore) Insert(record *domain.UsageRecord) (int64, error) {
 	id, err := insertUsage(s.db, record)
@@ -474,6 +482,30 @@ func (s *UsageStore) CostByKey() (map[int64]float64, error) {
 		out[id] = cost
 	}
 	return out, rows.Err()
+}
+
+// KeyUsageByWindow 按令牌批量汇总今日和近 30 天的用量。
+func (s *UsageStore) KeyUsageByWindow(todaySince, thirtyDaysSince time.Time) (map[int64]KeyUsageTotals, error) {
+	rows, err := s.db.Query(`SELECT downstream_key_id,
+		COALESCE(SUM(CASE WHEN created_at >= ? THEN total_tokens ELSE 0 END), 0),
+		COALESCE(SUM(CASE WHEN created_at >= ? THEN cost ELSE 0 END), 0),
+		COALESCE(SUM(total_tokens), 0), COALESCE(SUM(cost), 0)
+		FROM usage_records WHERE downstream_key_id > 0 AND created_at >= ? GROUP BY downstream_key_id`,
+		sqliteUTC(todaySince), sqliteUTC(todaySince), sqliteUTC(thirtyDaysSince))
+	if err != nil {
+		return nil, fmt.Errorf("usage key windows: %w", err)
+	}
+	defer rows.Close()
+	result := make(map[int64]KeyUsageTotals)
+	for rows.Next() {
+		var keyID int64
+		var totals KeyUsageTotals
+		if err := rows.Scan(&keyID, &totals.TodayTokens, &totals.TodayCost, &totals.MonthTokens, &totals.MonthCost); err != nil {
+			return nil, fmt.Errorf("usage key windows scan: %w", err)
+		}
+		result[keyID] = totals
+	}
+	return result, rows.Err()
 }
 
 // CostByRequestIDs returns the persisted billing amount for each request id.

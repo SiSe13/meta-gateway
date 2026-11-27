@@ -5,10 +5,35 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/lan/meta-gateway/internal/auth"
 	"github.com/lan/meta-gateway/internal/domain"
+	"github.com/lan/meta-gateway/internal/store"
 )
+
+type downstreamKeyActivity struct {
+	ID                int64 `json:"id"`
+	CurrentConcurrent int   `json:"current_concurrent"`
+}
+
+// listDownstreamKeyActivity 返回所有令牌的实时请求数快照。
+func (h *AdminHandler) listDownstreamKeyActivity(w http.ResponseWriter, r *http.Request) {
+	keys, err := h.db.DownstreamKey.List()
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	result := make([]downstreamKeyActivity, 0, len(keys))
+	for _, key := range keys {
+		current := 0
+		if h.keyInFlight != nil {
+			current = h.keyInFlight(key.ID)
+		}
+		result = append(result, downstreamKeyActivity{ID: key.ID, CurrentConcurrent: current})
+	}
+	writeJSON(w, http.StatusOK, result)
+}
 
 func (h *AdminHandler) listDownstreamKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.db.DownstreamKey.List()
@@ -27,10 +52,56 @@ func (h *AdminHandler) listDownstreamKeys(w http.ResponseWriter, r *http.Request
 			log.Printf("admin: downstream key costs: %v", costErr)
 		}
 	}
+	usageByKey := map[int64]store.KeyUsageTotals{}
+	if h.db.Usage != nil {
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		if totals, usageErr := h.db.Usage.KeyUsageByWindow(today, now.AddDate(0, 0, -30)); usageErr == nil {
+			usageByKey = totals
+		} else {
+			log.Printf("admin: downstream key usage windows: %v", usageErr)
+		}
+	}
+	groupsByUser := make(map[int64][]string)
+	// 管理界面需要显示令牌所属用户的名称与登录名，避免只展示无法识别的内部 ID。
+	type keyOwner struct {
+		name     string
+		username string
+	}
+	ownersByUser := make(map[int64]keyOwner)
+	groupRows, groupErr := h.db.Query(`SELECT u.id,u.name,u.username,COALESCE(p.name,'')
+		FROM team_users u
+		LEFT JOIN team_user_policies up ON up.user_id=u.id
+		LEFT JOIN team_policies p ON p.id=up.policy_id
+		WHERE u.id IN (SELECT user_id FROM downstream_keys WHERE user_id>0 AND team_deleted_at='')
+		ORDER BY u.id,p.id`)
+	if groupErr != nil {
+		log.Printf("admin: downstream key authorization groups: %v", groupErr)
+	} else {
+		for groupRows.Next() {
+			var userID int64
+			var owner keyOwner
+			var group string
+			if err := groupRows.Scan(&userID, &owner.name, &owner.username, &group); err != nil {
+				log.Printf("admin: downstream key authorization groups scan: %v", err)
+				break
+			}
+			ownersByUser[userID] = owner
+			if group != "" {
+				groupsByUser[userID] = append(groupsByUser[userID], group)
+			}
+		}
+		if err := groupRows.Err(); err != nil {
+			log.Printf("admin: downstream key authorization groups rows: %v", err)
+		}
+		_ = groupRows.Close()
+	}
 	// Never expose token_hash.
 	type safeKey struct {
 		ID               int64  `json:"id"`
 		UserID           int64  `json:"user_id,omitempty"`
+		OwnerName        string `json:"owner_name,omitempty"`
+		OwnerUsername    string `json:"owner_username,omitempty"`
 		Name             string `json:"name"`
 		Enabled          bool   `json:"enabled"`
 		Scopes           string `json:"scopes,omitempty"`
@@ -47,35 +118,55 @@ func (h *AdminHandler) listDownstreamKeys(w http.ResponseWriter, r *http.Request
 		// The tenant group this token is bound to (its quota/rate-limit
 		// container). Returned so the console can show and resubmit it; without
 		// the field the binding was write-only.
-		GroupName string  `json:"group_name,omitempty"`
-		Cost      float64 `json:"cost"`
-		CreatedAt string  `json:"created_at"`
-		HasToken  bool    `json:"has_token"`
+		GroupName           string   `json:"group_name,omitempty"`
+		Cost                float64  `json:"cost"`
+		TodayTokens         int64    `json:"today_tokens"`
+		TodayCost           float64  `json:"today_cost"`
+		Last30DaysTokens    int64    `json:"last_30_days_tokens"`
+		Last30DaysCost      float64  `json:"last_30_days_cost"`
+		CurrentConcurrent   int      `json:"current_concurrent"`
+		AuthorizationGroups []string `json:"authorization_groups,omitempty"`
+		CreatedAt           string   `json:"created_at"`
+		HasToken            bool     `json:"has_token"`
 	}
 	result := make([]safeKey, 0, len(keys))
 	for _, k := range keys {
 		// Re-viewable plaintext is available only for keys created after
 		// plaintext storage landed (token_enc set).
 		hasToken := len(k.TokenEnc) > 0
+		usage := usageByKey[k.ID]
+		currentConcurrent := 0
+		if h.keyInFlight != nil {
+			currentConcurrent = h.keyInFlight(k.ID)
+		}
+		owner := ownersByUser[k.UserID]
 		result = append(result, safeKey{
-			ID:               k.ID,
-			UserID:           k.UserID,
-			Name:             k.Name,
-			Enabled:          k.Enabled,
-			Scopes:           k.Scopes,
-			QuotaTotalTokens: k.QuotaTotalTokens,
-			QuotaUsedTokens:  k.QuotaUsedTokens,
-			QuotaTotalCost:   k.QuotaTotalCost,
-			QuotaUsedCost:    k.QuotaUsedCost,
-			ModelAllowlist:   k.ModelAllowlist,
-			ModelDenylist:    k.ModelDenylist,
-			ExpiresAt:        k.ExpiresAt,
-			AllowedIPs:       k.AllowedIPs,
-			RouteGroupName:   k.RouteGroupName,
-			GroupName:        k.GroupName,
-			Cost:             costByKey[k.ID],
-			CreatedAt:        k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			HasToken:         hasToken,
+			ID:                  k.ID,
+			UserID:              k.UserID,
+			OwnerName:           owner.name,
+			OwnerUsername:       owner.username,
+			Name:                k.Name,
+			Enabled:             k.Enabled,
+			Scopes:              k.Scopes,
+			QuotaTotalTokens:    k.QuotaTotalTokens,
+			QuotaUsedTokens:     k.QuotaUsedTokens,
+			QuotaTotalCost:      k.QuotaTotalCost,
+			QuotaUsedCost:       k.QuotaUsedCost,
+			ModelAllowlist:      k.ModelAllowlist,
+			ModelDenylist:       k.ModelDenylist,
+			ExpiresAt:           k.ExpiresAt,
+			AllowedIPs:          k.AllowedIPs,
+			RouteGroupName:      k.RouteGroupName,
+			GroupName:           k.GroupName,
+			Cost:                costByKey[k.ID],
+			TodayTokens:         usage.TodayTokens,
+			TodayCost:           usage.TodayCost,
+			Last30DaysTokens:    usage.MonthTokens,
+			Last30DaysCost:      usage.MonthCost,
+			CurrentConcurrent:   currentConcurrent,
+			AuthorizationGroups: groupsByUser[k.UserID],
+			CreatedAt:           k.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			HasToken:            hasToken,
 		})
 	}
 	writeJSON(w, http.StatusOK, result)

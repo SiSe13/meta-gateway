@@ -78,6 +78,36 @@ func TestUsageSummaryRangeExcludesOutsideWindow(t *testing.T) {
 	}
 }
 
+// KeyUsageByWindow 应按令牌分别计算今日和近 30 天的 token 与费用。
+func TestUsageKeyWindowTotals(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now().UTC().Truncate(time.Minute)
+	todaySince := now.Add(-6 * time.Hour)
+	thirtyDaysSince := now.Add(-30 * 24 * time.Hour)
+	seedKeyUsage := func(requestID string, keyID int64, tokens int, cost float64, at time.Time) {
+		t.Helper()
+		id := seedUsage(t, db, requestID, "gpt-a", tokens, 200, cost, at)
+		if _, err := db.Exec(`UPDATE usage_records SET downstream_key_id=? WHERE id=?`, keyID, id); err != nil {
+			t.Fatalf("assign usage to key %d: %v", keyID, err)
+		}
+	}
+	seedKeyUsage("today-a", 11, 100, 0.2, now.Add(-time.Hour))
+	seedKeyUsage("recent-a", 11, 200, 0.4, now.Add(-20*24*time.Hour))
+	seedKeyUsage("old-a", 11, 400, 0.8, now.Add(-40*24*time.Hour))
+	seedKeyUsage("today-b", 12, 50, 0.1, now.Add(-2*time.Hour))
+
+	totals, err := db.Usage.KeyUsageByWindow(todaySince, thirtyDaysSince)
+	if err != nil {
+		t.Fatalf("key usage windows: %v", err)
+	}
+	if got := totals[11]; got.TodayTokens != 100 || got.TodayCost != 0.2 || got.MonthTokens != 300 || got.MonthCost != 0.6 {
+		t.Fatalf("key 11 windows = %+v, want today 100/0.2 and 30-day 300/0.6", got)
+	}
+	if got := totals[12]; got.TodayTokens != 50 || got.MonthTokens != 50 || got.TodayCost != 0.1 || got.MonthCost != 0.1 {
+		t.Fatalf("key 12 windows = %+v, want 50/0.1 in both windows", got)
+	}
+}
+
 // The series endpoint powers the overview chart, so buckets must be
 // contiguous, epoch-aligned and complete even where no request landed.
 func TestUsageSeriesBucketsAndAlignment(t *testing.T) {

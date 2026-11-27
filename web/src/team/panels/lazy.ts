@@ -23,9 +23,6 @@ export const MembersPanel = lazy(() =>
 export const PoliciesPanel = lazy(() =>
   import("./PoliciesPanel").then((m) => ({ default: m.PoliciesPanel })),
 );
-export const QuotasPanel = lazy(() =>
-  import("./QuotasPanel").then((m) => ({ default: m.QuotasPanel })),
-);
 export const PricingPanel = lazy(() =>
   import("./PricingPanel").then((m) => ({ default: m.PricingPanel })),
 );

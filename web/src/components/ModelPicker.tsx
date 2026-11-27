@@ -1,7 +1,9 @@
+import { CheckboxControl } from "./ui";
 import { ChevronDown, Search, X } from "lucide-react";
 import { Button as HeroButton, Input as HeroInput } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
+import { formatGroupName } from "../lib/format";
 import { MODEL_GROUP_ORDER, autoModelGroup } from "../lib/modelGroups";
 import { SearchableSelect } from "./SearchableSelect";
 
@@ -319,7 +321,7 @@ export function ModelPicker({
                   >
                     <ChevronDown size={13} />
                     <span className="model-picker-group-name">
-                      {group === "GPT" ? "Gpt" : group}
+                      {group === "GPT" ? "Gpt" : formatGroupName(group, t)}
                     </span>
                     <span className="model-picker-group-count">{items.length}</span>
                   </HeroButton>
@@ -333,8 +335,7 @@ export function ModelPicker({
                         key={option.name}
                         className={`model-picker-item${option.disabled ? " is-unroutable" : ""}`}
                       >
-                        <input
-                          type="checkbox"
+                        <CheckboxControl
                           checked={selectedSet.has(option.name)}
                           onChange={() => toggle(option.name)}
                         />

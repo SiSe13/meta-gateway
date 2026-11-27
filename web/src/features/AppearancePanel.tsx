@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button as HeroButton } from "@heroui/react";
 import { api } from "../api/client";
-import { Button, Field } from "../components/ui";
+import { Button, Field, TextInput } from "../components/ui";
 import { formatErrorMessage } from "../formatError";
 import { setCurrency } from "../lib/format";
 import { useOptionalSession } from "../session";
@@ -199,7 +199,7 @@ export function AppearancePanel({
         <legend>{t("appearance.mode")}</legend>
         <div className="appearance-scheme-control">
           <Sun size={17} aria-hidden="true" />
-          <button
+          <Button
             type="button"
             role="switch"
             aria-checked={scheme === "dark"}
@@ -208,7 +208,7 @@ export function AppearancePanel({
             onClick={() => setScheme(scheme === "dark" ? "light" : "dark")}
           >
             <span />
-          </button>
+          </Button>
           <Moon size={17} aria-hidden="true" />
         </div>
       </fieldset>
@@ -371,7 +371,7 @@ function CurrencySettings() {
     <div className="currency-settings">
       <div className="form-grid">
         <Field label={t("appearance.currencySymbol")} hint={t("appearance.currencySymbolHint")}>
-          <input
+          <TextInput
             value={symbol}
             maxLength={8}
             onChange={(e) => {
@@ -382,7 +382,7 @@ function CurrencySettings() {
           />
         </Field>
         <Field label={t("appearance.currencyRate")} hint={t("appearance.currencyRateHint")}>
-          <input
+          <TextInput
             type="number"
             min={0.0001}
             step="0.01"

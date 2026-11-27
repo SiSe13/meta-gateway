@@ -232,7 +232,7 @@ export function UpdateDialog({
         </div>
       ) : null}
       {applyError ? <ErrorState error={applyError} /> : null}
-      <div className="update-dialog-actions">
+      <div className="update-dialog-actions update-dialog-actions--centered">
         {status.release_url ? (
           <a
             className="update-release-link"

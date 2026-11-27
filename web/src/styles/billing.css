@@ -1,6 +1,40 @@
 /* Pricing is an editor plus separate observations, not another dashboard. */
 .dialog:has(.billing-workspace) { width: min(840px, calc(100vw - 32px)); }
 .billing-workspace { min-width: 0; display: grid; gap: 24px; }
+.pricing-panel-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.team-pricing-panel > .panel-lede { max-width: 76ch; margin: -4px 0 18px; }
+.pricing-ratio-empty { min-height: 92px; display: grid; place-items: center; padding: 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface-subtle); text-align: center; }
+.pricing-ratio-empty strong { color: var(--muted-strong); font-size: 13px; font-weight: 500; }
+.team-pricing-panel > .pricing-rules { margin: 18px 0 0; border-top: 1px solid var(--line); padding-top: 12px; }
+.ratio-dialog .dialog-body { padding: 28px 32px; }
+.ratio-form { display: grid; gap: 22px; }
+.ratio-form .field { gap: 9px; }
+.ratio-form input[type="number"] { max-width: 240px; min-height: 44px; font-variant-numeric: tabular-nums; }
+.ratio-model-fixed { display: flex; min-height: 46px; align-items: center; padding: 0 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-subtle); }
+.ratio-model-picker { position: relative; min-width: 0; }
+.ratio-model-picker[aria-disabled="true"] { opacity: .65; }
+.ratio-model-trigger { display: flex; min-height: 46px; align-items: center; justify-content: space-between; gap: 12px; padding: 0 13px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 13px; list-style: none; }
+.ratio-model-trigger::-webkit-details-marker { display: none; }
+.ratio-model-picker[open] .ratio-model-trigger { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+.ratio-model-menu { position: static; z-index: 5; overflow: hidden; margin-top: 8px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface-raised); box-shadow: var(--shadow-md); }
+.ratio-model-search { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.ratio-model-search input { width: 100%; min-width: 0; min-height: 30px; border: 0; outline: 0; background: transparent; color: var(--ink); font: 13px var(--font); }
+.ratio-model-options { max-height: 260px; overflow-y: auto; padding: 5px 9px; }
+.ratio-model-group + .ratio-model-group { border-top: 1px solid var(--line-light); }
+.ratio-model-group-head { display: flex; width: 100%; min-height: 34px; align-items: center; gap: 7px; padding: 0 5px; border: 0; background: transparent; color: var(--muted-strong); cursor: pointer; font: 600 11px var(--font); text-align: left; }
+.ratio-model-group-head svg { flex: none; transition: transform var(--dur-fast) var(--ease-out); }
+.ratio-model-group-head.is-collapsed svg { transform: rotate(-90deg); }
+.ratio-model-group-head span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ratio-model-group-head small { display: inline-grid; min-width: 18px; height: 18px; place-items: center; padding: 0 5px; border-radius: 999px; background: var(--surface-subtle); color: var(--muted); font-size: 11px; }
+.ratio-model-group-items { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 2px 6px; padding: 0 0 5px; }
+.ratio-model-option { display: flex; min-width: 0; min-height: 34px; align-items: center; gap: 8px; padding: 0 8px; border-radius: 7px; color: var(--ink-soft); cursor: pointer; font-size: 12px; }
+.ratio-model-option:hover { background: var(--surface-subtle); color: var(--ink); }
+.ratio-model-option input { accent-color: var(--primary); }
+.ratio-model-option span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ratio-model-option svg { color: var(--primary); }
+.ratio-model-empty { margin: 0; padding: 18px 12px; color: var(--muted); font-size: 12px; text-align: center; }
+.ratio-model-selected { display: flex; max-height: 72px; flex-wrap: wrap; gap: 6px; margin-top: 8px; overflow-y: auto; }
+.ratio-model-chip { max-width: 100%; overflow: hidden; padding: 4px 9px; border: 1px solid var(--primary-hairline); border-radius: 999px; background: var(--primary-soft); color: var(--primary-ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .billing-workspace > .panel-hint { margin: 0; max-width: 70ch; }
 .billing-readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; padding: 0 0 16px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
 .billing-readout > span { color: var(--ink); font-weight: 600; font-size: 15px; }
@@ -93,6 +127,9 @@
 .billing-copy-table td small { display:block; }
 .route-billing-entry { margin: 0; }
 @media (max-width:760px) {
+ .pricing-panel-actions { flex-wrap: wrap; }
+ .ratio-dialog .dialog-body { padding: 22px 20px; }
+ .ratio-form input[type="number"] { max-width: none; }
  .dialog:has(.billing-workspace) { width:calc(100vw - 16px); max-height:calc(100dvh - 16px); }
  .billing-rate-grid, .quote-rate-list { grid-template-columns:minmax(0,1fr); }
  .billing-workspace input, .billing-workspace select { font-size:16px; min-height:44px; }

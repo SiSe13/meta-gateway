@@ -34,6 +34,8 @@ function toDownstreamKey(key: UserKey): DownstreamKey {
     // round-trip, and the last time the gateway saw it.
     token_hint: key.hint ?? "",
     last_used_at: key.last_used_at ?? "",
+    current_concurrent: key.current_concurrent ?? 0,
+    authorization_groups: key.authorization_groups ?? [],
     cost: key.cost ?? 0,
     created_at: key.created_at,
   };
@@ -45,6 +47,8 @@ type MemberKey = UserKey & {
   cost?: number;
   last_used_at?: string;
   plan_id?: number;
+  current_concurrent?: number;
+  authorization_groups?: string[];
 };
 
 export const memberKeysSource: KeysSource = {
@@ -59,13 +63,11 @@ export const memberKeysSource: KeysSource = {
     return models.map((model_name) => ({ model_name }));
   },
   usageSummary: (signal) => accountRequest<UsageSummary>("/me/usage/summary", { signal }),
-  // Members have no visibility into routes, groups or the catalogue behind a
-  // key: the capability flags keep these out of the UI, and these stubs keep
-  // the shared renderer from having to special-case their absence.
+  // Members do not see routes, route groups or the catalogue behind a key;
+  // these stubs keep the shared renderer from special-casing missing sources.
   routeOverviews: async () => [],
   routeGroups: async () => ({ groups: [] }),
-  // A member is not told which tenant group their token belongs to; the
-  // capability flag keeps the field out of the UI regardless.
+  // Tenant quota groups remain private to the management console.
   keyGroups: async () => ({ groups: [] }),
   modelMetadata: async () => ({ items: [] }),
 

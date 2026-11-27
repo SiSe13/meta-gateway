@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { I18nProvider } from "../i18n";
+import { I18nProvider, translate } from "../i18n";
 import { SessionProvider } from "../session";
 import { ToastProvider } from "../toast";
 import { Keys, KeysView } from "./Keys";
@@ -72,6 +72,7 @@ function firstCreateKeyButton() {
 function keyEditFetch() {
   const key = {
     id: 9,
+    user_id: 4,
     name: "audit-key",
     enabled: true,
     scopes: "relay",
@@ -80,6 +81,13 @@ function keyEditFetch() {
     quota_total_cost: 25,
     group_name: "standard",
     cost: 1,
+    today_tokens: 2,
+    today_cost: 1,
+    last_30_days_tokens: 2,
+    last_30_days_cost: 1,
+    current_concurrent: 2,
+    authorization_groups: ["DS", "GLM"],
+    expires_at: "2027-01-01T00:00:00Z",
     has_token: true,
     created_at: "2026-10-06",
   };
@@ -92,6 +100,8 @@ function keyEditFetch() {
     if (path === "/admin/downstream-keys") return jsonResponse([key]);
     if (path === "/admin/mode")
       return jsonResponse({ mode: "team", has_owner: true, role: "owner" });
+    if (path === "/admin/team/users")
+      return jsonResponse([{ id: 4, name: "Alice Example", username: "alice" }]);
     if (path === "/admin/groups") return jsonResponse([{ name: "standard" }, { name: "vip" }]);
     if (path === "/admin/route-groups") return jsonResponse({ groups: ["default"] });
     if (path === "/admin/model-metadata") return jsonResponse({ items: [] });
@@ -421,85 +431,91 @@ describe("Keys page", () => {
     fireEvent.click(within(viewDialog).getAllByRole("button", { name: "Close" })[0]!);
 
     // Rotate confirms, then shows the fresh token.
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     // A key is a relay credential, not a user account. The retired
     // key-bound portal must not leave a sign-in management action here.
     expect(
-      screen.queryByRole("menuitem", { name: /Sign-in methods|keys\.portal/ }),
+      screen.queryByRole("button", { name: /Sign-in methods|keys\.portal/ }),
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Rotate token" }));
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate token" }));
     expect(await screen.findByText(/A new token will be generated/i)).toBeInTheDocument();
-    const rotateDialog = screen.getByRole("dialog", { name: "Rotate token" });
-    fireEvent.click(within(rotateDialog).getByRole("button", { name: "Rotate token" }));
+    const rotateDialog = screen.getByRole("dialog", { name: "Regenerate token" });
+    fireEvent.click(within(rotateDialog).getByRole("button", { name: "Regenerate token" }));
     expect(await screen.findByText("mg-rotated-new")).toBeInTheDocument();
   });
 
-  it("sends the route group and spend limit when editing a key", async () => {
-    // Both controls collected a value the update never sent, and an omitted
-    // field means "keep what is stored": picking a route group or a spend
-    // limit looked saved and was not. Assert on the request body, because
-    // that is the layer where the value was being lost.
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const path = String(input);
-      const method = (init?.method ?? "GET").toUpperCase();
-      if (path.endsWith("/admin/downstream-keys") && method === "GET") {
-        return jsonResponse([
-          {
-            id: 9,
-            name: "tiered",
-            enabled: true,
-            scopes: "relay",
-            quota_used_tokens: 0,
-            quota_total_tokens: 0,
-            quota_total_cost: 0,
-            cost: 0,
-            has_token: true,
-            created_at: "2026-07-17T00:00:00Z",
-          },
-        ]);
-      }
-      if (path.endsWith("/admin/route-groups")) {
-        return jsonResponse({ groups: ["default", "vip"] });
-      }
-      if (path.endsWith("/admin/downstream-keys/9") && method === "PUT") {
-        return jsonResponse({ id: 9, name: "tiered" });
-      }
-      if (path.includes("/admin/discovery/models") || path.endsWith("/admin/routes/overview")) {
-        return jsonResponse([]);
-      }
-      return jsonResponse({ error: `unexpected ${method} ${path}` }, 500);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    renderKeys();
+  it.each([
+    { locale: "en" as const, group: "vip", label: "vip" },
+    { locale: "zh-CN" as const, group: "default", label: "默认" },
+  ])(
+    "sends the route group and spend limit when editing a key ($locale)",
+    async ({ locale, group, label }) => {
+      localStorage.setItem("meta-gateway.locale", locale);
+      const t = (key: string) => translate(locale, key);
+      // Both controls collected a value the update never sent, and an omitted
+      // field means "keep what is stored": picking a route group or a spend
+      // limit looked saved and was not. Assert on the request body, because
+      // that is the layer where the value was being lost.
+      const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const path = String(input);
+        const method = (init?.method ?? "GET").toUpperCase();
+        if (path.endsWith("/admin/downstream-keys") && method === "GET") {
+          return jsonResponse([
+            {
+              id: 9,
+              name: "tiered",
+              enabled: true,
+              scopes: "relay",
+              quota_used_tokens: 0,
+              quota_total_tokens: 0,
+              quota_total_cost: 0,
+              cost: 0,
+              has_token: true,
+              created_at: "2026-07-17T00:00:00Z",
+            },
+          ]);
+        }
+        if (path.endsWith("/admin/route-groups")) {
+          return jsonResponse({ groups: ["default", "vip"] });
+        }
+        if (path.endsWith("/admin/downstream-keys/9") && method === "PUT") {
+          return jsonResponse({ id: 9, name: "tiered" });
+        }
+        if (path.includes("/admin/discovery/models") || path.endsWith("/admin/routes/overview")) {
+          return jsonResponse([]);
+        }
+        return jsonResponse({ error: `unexpected ${method} ${path}` }, 500);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      renderKeys();
 
-    expect(await screen.findByText("tiered")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
+      expect(await screen.findByText("tiered")).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: t("keys.edit") }));
 
-    const dialog = await screen.findByRole("dialog", {
-      name: /Edit token quota/,
-    });
-    fireEvent.click(within(dialog).getByText("Quota"));
-    fireEvent.change(within(dialog).getByLabelText("Spend limit"), {
-      target: { value: "25" },
-    });
-    fireEvent.click(within(dialog).getByText("Advanced"));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Route group" }));
-    fireEvent.click(await screen.findByRole("option", { name: "vip" }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+      const dialog = await screen.findByRole("dialog", {
+        name: t("keys.editDialog"),
+      });
+      fireEvent.click(within(dialog).getByText(t("keys.sectionBilling")));
+      fireEvent.change(within(dialog).getByLabelText(t("keys.quotaCost")), {
+        target: { value: "25" },
+      });
+      fireEvent.click(within(dialog).getByText(t("keys.sectionAdvanced")));
+      fireEvent.click(within(dialog).getByRole("button", { name: t("keys.routeGroup") }));
+      fireEvent.click(await screen.findByRole("option", { name: label }));
+      fireEvent.click(within(dialog).getByRole("button", { name: t("common.save") }));
 
-    await waitFor(() => {
-      const put = fetchMock.mock.calls.find(
-        ([input, init]) =>
-          String(input).endsWith("/admin/downstream-keys/9") &&
-          (init?.method ?? "GET").toUpperCase() === "PUT",
-      );
-      expect(put).toBeTruthy();
-      const body = JSON.parse(String(put?.[1]?.body));
-      expect(body.route_group_name).toBe("vip");
-      expect(body.quota_total_cost).toBe(25);
-    });
-  });
+      await waitFor(() => {
+        const put = fetchMock.mock.calls.find(
+          ([input, init]) =>
+            String(input).endsWith("/admin/downstream-keys/9") &&
+            (init?.method ?? "GET").toUpperCase() === "PUT",
+        );
+        expect(put).toBeTruthy();
+        const body = JSON.parse(String(put?.[1]?.body));
+        expect(body.route_group_name).toBe(group);
+        expect(body.quota_total_cost).toBe(25);
+      });
+    },
+  );
 
   it("renders for a member with no console session and no team vocabulary", async () => {
     // The member app mounts this same renderer with its own source and
@@ -520,7 +536,10 @@ describe("Keys page", () => {
           group_name: "vip",
         } as never,
       ],
-      discoveredModels: async () => [],
+      discoveredModels: async () =>
+        ["deepseek-v4.1-flash", "glm-5.3", "glm-5.3-flash", "kimi-k3", "minimax-m3"].map(
+          (model_name) => ({ model_name }),
+        ),
       usageSummary: async () =>
         ({
           request_count: 0,
@@ -553,13 +572,14 @@ describe("Keys page", () => {
     expect(screen.queryByText("Tenant group")).not.toBeInTheDocument();
   });
 
-  it("reads a member's tokens as cards: masked tail, their own usage, one-click copy", async () => {
+  it("shows a member's tokens in the management table with one-click copy", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: { writeText },
     });
     const revealed: number[] = [];
+    const updateKey = vi.fn(async () => undefined);
     const source: KeysSource = {
       keys: async () => [
         {
@@ -569,20 +589,30 @@ describe("Keys page", () => {
           quota_used_tokens: 2500,
           quota_total_tokens: 0,
           cost: 1.25,
+          today_tokens: 2500,
+          today_cost: 1.25,
+          last_30_days_tokens: 2500,
+          last_30_days_cost: 1.25,
+          current_concurrent: 3,
+          authorization_groups: ["Standard", "Research"],
           created_at: "2026-10-01",
           has_token: true,
           token_hint: "ab12",
           last_used_at: new Date(Date.now() - 3 * 86_400_000).toISOString(),
-          model_allowlist: "",
+          model_allowlist: "glm-5.3, kimi-k3, deepseek-v4.1-flash, minimax-m3",
           expires_at: "",
           allowed_ips: "",
         } as never,
       ],
-      discoveredModels: async () => [],
+      discoveredModels: async () =>
+        ["deepseek-v4.1-flash", "glm-5.3", "glm-5.3-flash", "kimi-k3", "minimax-m3"].map(
+          (model_name) => ({ model_name }),
+        ),
       usageSummary: async () => ({ request_count: 0, total_tokens: 0, total_cost: 0 }) as never,
       routeOverviews: async () => [],
       routeGroups: async () => ({ groups: [] }),
       modelMetadata: async () => ({ items: [] }),
+      updateKey,
       revealKey: async (id: number) => {
         revealed.push(id);
         return { token: "sk-member-secret" };
@@ -603,19 +633,40 @@ describe("Keys page", () => {
     );
 
     expect(await screen.findByText("cursor")).toBeInTheDocument();
-    // The operator's table is not what a member gets.
-    expect(screen.queryByRole("table")).not.toBeInTheDocument();
-    // The masked tail is the only identity a token has on screen, and it comes
-    // from the gateway's stored hint — never from a fabricated prefix.
-    expect(screen.getByText(/••••••••••ab12/)).toBeInTheDocument();
-    expect(screen.getByText("2.5k")).toBeInTheDocument();
-    expect(screen.getByText("$1.25")).toBeInTheDocument();
-    expect(screen.getByText("3 d ago")).toBeInTheDocument();
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(document.querySelector(".key-card-grid")).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Key" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Usage" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Model scope" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Current concurrency" })).toBeInTheDocument();
+    expect(screen.getByText("Can call 4 models")).toBeInTheDocument();
+    expect(screen.getByText("3", { selector: ".key-current-concurrent" })).toBeInTheDocument();
+    expect(screen.getByText("mg-••••••••")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Copy the token for cursor/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Copy token" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("sk-member-secret"));
     expect(revealed).toEqual([7]);
-    expect(await screen.findByText("Copied")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "View models" }));
+    const modelRangeDialog = await screen.findByRole("dialog", {
+      name: "Callable models",
+    });
+    expect(within(modelRangeDialog).getByText("glm-5.3")).toBeInTheDocument();
+    expect(within(modelRangeDialog).getByText("minimax-m3")).toBeInTheDocument();
+
+    fireEvent.click(within(modelRangeDialog).getByRole("button", { name: "Edit models" }));
+    expect(screen.queryByRole("dialog", { name: "Edit token settings" })).not.toBeInTheDocument();
+    fireEvent.click(within(modelRangeDialog).getByRole("button", { name: "Remove glm-5.3" }));
+    fireEvent.click(within(modelRangeDialog).getByRole("checkbox", { name: /glm-5.3-flash/ }));
+    fireEvent.click(within(modelRangeDialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(updateKey).toHaveBeenCalled());
+    expect(updateKey).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        model_allowlist: "kimi-k3,deepseek-v4.1-flash,minimax-m3,glm-5.3-flash",
+      }),
+    );
   });
 
   it("keeps the site's table for an operator, even though the rows are the same", async () => {
@@ -624,6 +675,50 @@ describe("Keys page", () => {
     expect(await screen.findByText("audit-key")).toBeInTheDocument();
     expect(screen.getByRole("table")).toBeInTheDocument();
     expect(document.querySelector(".key-card-grid")).toBeNull();
+    expect(screen.getByRole("columnheader", { name: "Key" })).toBeInTheDocument();
+    expect(screen.getByText("mg-••••••••")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Copy token" })).toHaveLength(1);
+    expect(screen.getByRole("columnheader", { name: "Usage" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Access" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("columnheader", { name: "Authorization groups" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Model scope" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Current concurrency" })).toBeInTheDocument();
+    expect(await screen.findByText("User: Alice Example (@alice)")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Expires at" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View token" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit settings" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate token" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete key" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More actions" })).not.toBeInTheDocument();
+    expect(screen.getByText("Account models")).toBeInTheDocument();
+    expect(
+      screen.getByRole("row", { name: /audit-key/ }).querySelector(".key-current-concurrent"),
+    ).toHaveTextContent("2");
+    expect(screen.getByText("Today")).toBeInTheDocument();
+    expect(screen.getByText("Last 30 days")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /audit-key/ })).toHaveTextContent("2027");
+    expect(screen.queryByText("#9")).not.toBeInTheDocument();
+  });
+
+  it("shows and copies the current gateway API address", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.stubGlobal("fetch", keyEditFetch());
+    renderKeys();
+
+    fireEvent.click(await screen.findByRole("button", { name: "API address" }));
+    const address = new URL("/v1", window.location.href).href;
+    expect(await screen.findByText(address)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Copy API address" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(address));
+    expect(await screen.findByLabelText("Copied")).toBeInTheDocument();
+    fireEvent.pointerDown(document.body);
+    await waitFor(() => expect(screen.queryByText(address)).not.toBeInTheDocument());
   });
 
   it.each(["vip", ""])(
@@ -633,8 +728,7 @@ describe("Keys page", () => {
       vi.stubGlobal("fetch", fetcher);
       renderKeys();
       await screen.findByText("audit-key");
-      fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
+      fireEvent.click(screen.getByRole("button", { name: "Edit settings" }));
       const field = await screen.findByLabelText("Tenant group");
       fireEvent.click(field);
       fireEvent.click(
@@ -646,8 +740,7 @@ describe("Keys page", () => {
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
       const put = fetcher.mock.calls.find(([, init]) => init?.method === "PUT");
       expect(JSON.parse(String(put?.[1]?.body)).group_name).toBe(group);
-      fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-      fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
+      fireEvent.click(screen.getByRole("button", { name: "Edit settings" }));
       // An explicitly cleared group no longer automatically opens Advanced.
       if (!screen.queryByLabelText("Tenant group")) fireEvent.click(screen.getByText("Advanced"));
       expect(await screen.findByLabelText("Tenant group")).toHaveTextContent(
@@ -665,8 +758,7 @@ describe("Keys page", () => {
     vi.stubGlobal("fetch", fetcher);
     renderKeys();
     await screen.findByText("audit-key");
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit settings" }));
     fireEvent.change(await screen.findByLabelText(label), { target: { value } });
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveTextContent(/non-negative/);
@@ -681,9 +773,11 @@ describe("Keys page", () => {
     renderKeys();
     await screen.findByText("audit-key");
     act(() => setCurrency({ symbol: "¥", rate: 7 }));
-    expect(await screen.findByText("¥7.00")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "Edit quota" }));
+    const usageCell = screen
+      .getByRole("row", { name: /audit-key/ })
+      .querySelector(".key-usage-cell");
+    expect(usageCell).toHaveTextContent("¥7.00");
+    fireEvent.click(screen.getByRole("button", { name: "Edit settings" }));
     expect(await screen.findByLabelText("Spend limit")).toHaveValue(25);
     expect(fetcher.mock.calls.some(([, init]) => init?.method === "PUT")).toBe(false);
   });

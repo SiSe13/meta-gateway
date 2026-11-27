@@ -1,5 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Button, Field, Panel } from "../../components/ui";
+import {
+  Button,
+  Field,
+  Panel,
+  TextInput,
+  TextAreaControl,
+  CheckboxControl,
+} from "../../components/ui";
 import { useUnsavedChanges } from "../../lib/unsavedChanges";
 import { teamError } from "../text";
 import { useTeamMutation } from "../useTeamMutation";
@@ -69,7 +76,7 @@ function BrandingForm({
         <fieldset className="overlay-fields" disabled={busy}>
           <div className="meta-form">
             <Field label={t("publicName")}>
-              <input
+              <TextInput
                 value={b.name}
                 maxLength={80}
                 required
@@ -84,14 +91,14 @@ function BrandingForm({
               />
             </Field>
             <Field label={t("logo")}>
-              <input
+              <TextInput
                 type="url"
                 value={b.logo_url}
                 onChange={(e) => patch({ logo_url: e.target.value })}
               />
             </Field>
             <Field label={t("apiURL")}>
-              <input
+              <TextInput
                 type="url"
                 value={b.api_base_url}
                 placeholder="https://gateway.example/v1"
@@ -100,30 +107,28 @@ function BrandingForm({
             </Field>
           </div>
           <Field label={t("loginDescription")}>
-            <textarea
+            <TextAreaControl
               value={b.login_description}
               maxLength={1000}
               onChange={(e) => patch({ login_description: e.target.value })}
             />
           </Field>
           <Field label={t("notice")}>
-            <textarea
+            <TextAreaControl
               value={b.notice}
               maxLength={2000}
               onChange={(e) => patch({ notice: e.target.value })}
             />
           </Field>
           <label className="check marginless">
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={b.show_usage}
               onChange={(e) => patch({ show_usage: e.target.checked })}
             />
             <span>{t("showUsage")}</span>
           </label>
           <label className="check marginless">
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={b.show_routing}
               onChange={(e) => patch({ show_routing: e.target.checked })}
             />

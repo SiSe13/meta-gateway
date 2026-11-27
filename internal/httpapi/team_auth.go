@@ -161,15 +161,27 @@ func (h *TeamHandler) publicAuthNavigate(w http.ResponseWriter, r *http.Request)
 	return h.admitLoginRate(w, r)
 }
 
-// startSession opens a session for one member and sets its cookie, without
-// writing a response body. Callers that answer with JSON (the password login)
-// and callers that answer with a redirect (the OAuth callback) share it.
-func (h *TeamHandler) startSession(w http.ResponseWriter, r *http.Request, u *TeamUser) (string, error) {
+// startSession 创建带设备和来源信息的成员会话，并写入会话 Cookie。
+func (h *TeamHandler) startSession(w http.ResponseWriter, r *http.Request, u *TeamUser, loginMethod string) (string, error) {
 	raw, err := teamRandom()
 	if err != nil {
 		return "", err
 	}
 	now := time.Now().Unix()
+	device := sessionDevice(r.UserAgent())
+	ip := ClientIP(r).String()
+	deviceCookie, cookieErr := r.Cookie(teamDeviceCookie)
+	deviceID := ""
+	if cookieErr == nil && len(deviceCookie.Value) <= 128 {
+		deviceID = deviceCookie.Value
+	}
+	if deviceID == "" {
+		deviceID, err = teamRandom()
+		if err != nil {
+			return "", err
+		}
+	}
+	deviceKey := teamHash(deviceID)
 	tx, err := h.db.Begin()
 	if err != nil {
 		return "", err
@@ -178,9 +190,13 @@ func (h *TeamHandler) startSession(w http.ResponseWriter, r *http.Request, u *Te
 	_, err = tx.Exec(`DELETE FROM team_sessions WHERE expires_at<=? OR token_hash IN
 		(SELECT token_hash FROM team_sessions WHERE user_id=? ORDER BY created_at DESC LIMIT -1 OFFSET 9)`, now, u.ID)
 	if err == nil {
+		// 同一浏览器重复登录时替换原会话；迁移前无设备标识的会话按 UA 与 IP 清理。
+		_, err = tx.Exec(`DELETE FROM team_sessions WHERE user_id=? AND (device_key=? OR (device_key='' AND device=? AND ip_address=?))`, u.ID, deviceKey, device, ip)
+	}
+	if err == nil {
 		var result sql.Result
-		result, err = tx.Exec(`INSERT INTO team_sessions(token_hash,user_id,version,created_at,expires_at)
-		SELECT ?,id,session_version,?,? FROM team_users WHERE id=? AND status='active' AND session_version=?`, teamHash(raw), now, now+12*3600, u.ID, u.Version)
+		result, err = tx.Exec(`INSERT INTO team_sessions(token_hash,user_id,version,created_at,expires_at,device,ip_address,login_method,last_active_at,device_key)
+		SELECT ?,id,session_version,?,?,?,?,?,?,? FROM team_users WHERE id=? AND status='active' AND session_version=?`, teamHash(raw), now, now+12*3600, device, ip, loginMethod, now, deviceKey, u.ID, u.Version)
 		if err == nil {
 			n, _ := result.RowsAffected()
 			if n != 1 {
@@ -189,11 +205,15 @@ func (h *TeamHandler) startSession(w http.ResponseWriter, r *http.Request, u *Te
 		}
 	}
 	if err == nil {
+		_, err = tx.Exec(`UPDATE team_users SET last_login_at=datetime('now') WHERE id=?`, u.ID)
+	}
+	if err == nil {
 		err = tx.Commit()
 	}
 	if err != nil {
 		return "", err
 	}
+	h.cookie(w, r, teamDeviceCookie, deviceID, 365*24*3600)
 	h.cookie(w, r, teamCookie, raw, 12*3600)
 	return teamCSRF(raw), nil
 }
@@ -202,8 +222,8 @@ func (h *TeamHandler) startSession(w http.ResponseWriter, r *http.Request, u *Te
 // or its session version moved between the read and the write.
 var errSessionRefused = errors.New("session refused")
 
-func (h *TeamHandler) issueSession(w http.ResponseWriter, r *http.Request, u *TeamUser) {
-	csrf, err := h.startSession(w, r, u)
+func (h *TeamHandler) issueSession(w http.ResponseWriter, r *http.Request, u *TeamUser, loginMethod string) {
+	csrf, err := h.startSession(w, r, u, loginMethod)
 	if err != nil {
 		if errors.Is(err, errSessionRefused) {
 			teamFail(w, 401, "invalid_credentials")
@@ -235,7 +255,7 @@ func (h *TeamHandler) login(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 401, "invalid_credentials")
 		return
 	}
-	h.issueSession(w, r, u)
+	h.issueSession(w, r, u, "password")
 }
 func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 	if !h.publicAuthRequest(w, r) {
@@ -273,7 +293,7 @@ func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	var policyID, quotaTokens int64
+	var inviteID, policyID, quotaTokens int64
 	var quotaCost float64
 	var role string
 	// Both invitation shapes go through this one statement: a single-use link
@@ -281,10 +301,11 @@ func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 	// used_count >= max_uses, so nothing has to rewrite the row later.
 	consume := func(hash string) error {
 		return tx.QueryRow(`UPDATE team_invites
-			SET used_count = used_count + 1, consumed_at = COALESCE(consumed_at, ?)
-			WHERE token_hash=? AND kind='invite' AND revoked=0 AND expires_at>? AND used_count < max_uses
-			RETURNING policy_id, role, quota_tokens, quota_cost`,
-			time.Now().Unix(), hash, time.Now().Unix()).Scan(&policyID, &role, &quotaTokens, &quotaCost)
+			SET used_count = used_count + 1, consumed_at = COALESCE(consumed_at, ?),
+				token_enc=CASE WHEN used_count + 1 >= max_uses THEN '' ELSE token_enc END
+			WHERE token_hash=? AND kind='invite' AND revoked=0 AND (expires_at=0 OR expires_at>?) AND used_count < max_uses
+			RETURNING id, policy_id, role, quota_tokens, quota_cost`,
+			time.Now().Unix(), hash, time.Now().Unix()).Scan(&inviteID, &policyID, &role, &quotaTokens, &quotaCost)
 	}
 	// A failed UPDATE matches no row and therefore changes nothing, so trying
 	// the normalized spelling first is safe. Short codes are typed by hand (so
@@ -300,6 +321,35 @@ func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "invitation_invalid")
 		return
 	}
+	policyRows, err := tx.Query(`SELECT policy_id FROM team_invite_policies WHERE invite_id=? ORDER BY position`, inviteID)
+	if err != nil {
+		h.mu.Unlock()
+		teamFail(w, 500, "save_failed")
+		return
+	}
+	policyIDs := make([]int64, 0, 1)
+	for policyRows.Next() {
+		var id int64
+		if err := policyRows.Scan(&id); err != nil {
+			_ = policyRows.Close()
+			h.mu.Unlock()
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		policyIDs = append(policyIDs, id)
+	}
+	if err := policyRows.Err(); err != nil {
+		_ = policyRows.Close()
+		h.mu.Unlock()
+		teamFail(w, 500, "save_failed")
+		return
+	}
+	_ = policyRows.Close()
+	if len(policyIDs) == 0 {
+		policyIDs = []int64{policyID}
+	} else {
+		policyID = policyIDs[0]
+	}
 	// An invitation may carry a starting credit — tokens, money, or both: the
 	// operator hands out the account and its first allowance in one code.
 	result, err := tx.Exec(`INSERT INTO team_users(username,name,password_hash,role,policy_id,quota_total_tokens,quota_total_cost) VALUES(?,?,?,?,?,?,?)`, req.Username, req.Name, hash, role, policyID, quotaTokens, quotaCost)
@@ -309,6 +359,13 @@ func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := result.LastInsertId()
+	for _, extraPolicyID := range policyIDs[1:] {
+		if _, err := tx.Exec(`INSERT INTO team_user_policies(user_id,policy_id) VALUES(?,?)`, id, extraPolicyID); err != nil {
+			h.mu.Unlock()
+			teamFail(w, 500, "save_failed")
+			return
+		}
+	}
 	err = tx.Commit()
 	h.mu.Unlock()
 	if err != nil {
@@ -320,7 +377,7 @@ func (h *TeamHandler) accept(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 500, "auth_unavailable")
 		return
 	}
-	h.issueSession(w, r, u)
+	h.issueSession(w, r, u, "invitation")
 }
 func (h *TeamHandler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 	if !h.publicAuthRequest(w, r) {
@@ -434,7 +491,37 @@ func (h *TeamHandler) changePassword(w http.ResponseWriter, r *http.Request) {
 }
 func (h *TeamHandler) sessions(w http.ResponseWriter, r *http.Request) {
 	p := teamActor(r)
-	rows, err := h.db.Query(`SELECT token_hash,created_at,expires_at FROM team_sessions WHERE user_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 20`, p.User.ID, time.Now().Unix())
+	// 首次部署设备标识前创建的重复记录，借当前浏览器标识归并并保留当前会话。
+	deviceCookie, cookieErr := r.Cookie(teamDeviceCookie)
+	deviceID := ""
+	if cookieErr == nil && len(deviceCookie.Value) <= 128 {
+		deviceID = deviceCookie.Value
+	}
+	if deviceID == "" {
+		deviceID, cookieErr = teamRandom()
+		if cookieErr != nil {
+			teamFail(w, 500, "auth_unavailable")
+			return
+		}
+		h.cookie(w, r, teamDeviceCookie, deviceID, 365*24*3600)
+	}
+	deviceKey := teamHash(deviceID)
+	if _, err := h.db.Exec(`UPDATE team_sessions SET device_key=? WHERE token_hash=? AND device_key=''`, deviceKey, p.SessionHash); err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	var currentDevice, currentIP string
+	if err := h.db.QueryRow(`SELECT device,ip_address FROM team_sessions WHERE token_hash=?`, p.SessionHash).Scan(&currentDevice, &currentIP); err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	if currentDevice != "" && currentIP != "" {
+		if _, err := h.db.Exec(`DELETE FROM team_sessions WHERE user_id=? AND token_hash<>? AND device_key='' AND device=? AND ip_address=?`, p.User.ID, p.SessionHash, currentDevice, currentIP); err != nil {
+			teamFail(w, 500, "load_failed")
+			return
+		}
+	}
+	rows, err := h.db.Query(`SELECT token_hash,created_at,expires_at,device,ip_address,login_method,last_active_at FROM team_sessions WHERE user_id=? AND expires_at>? ORDER BY created_at DESC LIMIT 20`, p.User.ID, time.Now().Unix())
 	if err != nil {
 		teamFail(w, 500, "load_failed")
 		return
@@ -443,14 +530,26 @@ func (h *TeamHandler) sessions(w http.ResponseWriter, r *http.Request) {
 	items := make([]map[string]any, 0)
 	for rows.Next() {
 		var id string
-		var created, expiry int64
-		if rows.Scan(&id, &created, &expiry) != nil {
+		var created, expiry, lastActive int64
+		var device, ip, loginMethod string
+		if rows.Scan(&id, &created, &expiry, &device, &ip, &loginMethod, &lastActive) != nil {
 			teamFail(w, 500, "load_failed")
 			return
 		}
-		items = append(items, map[string]any{"id": id, "created_at": created, "expires_at": expiry, "current": id == p.SessionHash})
+		items = append(items, map[string]any{"id": id, "created_at": created, "expires_at": expiry, "current": id == p.SessionHash, "device": device, "ip_address": ip, "login_method": loginMethod, "last_active_at": lastActive})
 	}
 	teamJSON(w, 200, items)
+}
+
+// logoutOtherSessions 结束当前账号的其他有效登录会话。
+func (h *TeamHandler) logoutOtherSessions(w http.ResponseWriter, r *http.Request) {
+	p := teamActor(r)
+	_, err := h.db.Exec(`DELETE FROM team_sessions WHERE user_id=? AND token_hash<>?`, p.User.ID, p.SessionHash)
+	if err != nil {
+		teamFail(w, 500, "save_failed")
+		return
+	}
+	teamJSON(w, 200, map[string]bool{"ok": true})
 }
 func (h *TeamHandler) deleteSession(w http.ResponseWriter, r *http.Request) {
 	p := teamActor(r)

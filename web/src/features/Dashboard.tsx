@@ -35,7 +35,6 @@ import { HourlyTrafficChart } from "../components/charts";
 import { Button, Page, Panel } from "../components/ui";
 import { formatCost, formatLatency, formatTokens, relativeTime } from "../lib/format";
 import { channelHealthState } from "./channelHealth";
-import { MemberHome } from "../member/MemberHome";
 import { SiteNewsPanel } from "./SiteNewsPanel";
 
 /** Bucket labels are formatted here so they follow the viewer's timezone. */
@@ -464,7 +463,6 @@ export function DashboardView({
         {/* The member's own band answers "where do I connect, what is left, what
             next" in one place; the endpoint strip below it is the operator's
             version of the same line, so a host renders one or the other. */}
-        {caps.memberHome ? <MemberHome /> : null}
         {caps.setup ? <SetupGuide /> : null}
 
         {caps.memberHome ? null : <EndpointStrip />}

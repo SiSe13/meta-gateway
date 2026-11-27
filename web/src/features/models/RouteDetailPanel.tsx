@@ -15,6 +15,7 @@ import type { Route, RoutingCandidate } from "../../api/types";
 import { ActionMenu } from "../../components/ActionMenu";
 import { Button, Empty, InfoTip } from "../../components/ui";
 import { useAvailability } from "../../hooks/useAvailability";
+import { formatGroupName } from "../../lib/format";
 import { AvailabilityIndicator } from "../../components/AvailabilityIndicator";
 import { RouteDetailHeader, type RouteDetailHeaderProps } from "./RouteDetailHeader";
 import { RouteMemberList, type RouteMemberListProps } from "./RouteMemberList";
@@ -117,7 +118,7 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
     <>
       <RouteDetailHeader
         {...props.header}
-        scopeLabel={t("availability.scope", { group: activeGroup })}
+        scopeLabel={t("availability.scope", { group: formatGroupName(activeGroup, t) })}
         availability={
           <AvailabilityIndicator
             item={availability.data?.routes.find((item) => item.route_id === route.id)}
@@ -245,7 +246,7 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
                         onPress={() => setActiveGroup(name)}
                       >
                         <span className="member-group-tab-main">
-                          {name === "default" ? t("routing.groupDefault") : name}
+                          {formatGroupName(name, t)}
                           <span className="member-group-count">{count}</span>
                         </span>
                       </HeroButton>
@@ -351,10 +352,10 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
             <p className="member-group-hint" role="status">
               {groupFallback.routeGroup
                 ? t("routing.groupFallback", {
-                    name: activeGroup,
-                    target: groupFallback.routeGroup,
+                    name: formatGroupName(activeGroup, t),
+                    target: formatGroupName(groupFallback.routeGroup, t),
                   })
-                : t("routing.groupFallbackAll", { name: activeGroup })}
+                : t("routing.groupFallbackAll", { name: formatGroupName(activeGroup, t) })}
             </p>
           ) : null}
           {props.totalMemberCount === 0 ? (
@@ -363,7 +364,7 @@ export function RouteDetailPanel(props: RouteDetailPanelProps) {
             <div className="routing-group-empty">
               <span>
                 {t("routing.groupEmpty", {
-                  name: activeGroup === "default" ? t("routing.groupDefault") : activeGroup,
+                  name: formatGroupName(activeGroup, t),
                 })}
               </span>
               <Button variant="secondary" icon={<Plus size={14} />} onClick={openAddMember}>

@@ -5,8 +5,17 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import { ModelPicker } from "../../components/ModelPicker";
 import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
-import { Button, Dialog, ErrorState, Field, InfoTip } from "../../components/ui";
+import {
+  Button,
+  Dialog,
+  ErrorState,
+  Field,
+  InfoTip,
+  TextInput,
+  SelectControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import { PROVIDER_BASE_URLS } from "../../connectionTypes";
 import { apiKeyLooksWrong, keyHintFor } from "../../lib/apiKeyPaste";
 import { useSession } from "../../session";
@@ -107,7 +116,7 @@ export function AddChannelDialog({
   const canFetchModels = canSubmit && !pending && !fetchingModels;
   const groupOptions: SelectOption[] = Array.from(
     new Set(["default", ...existingGroups.map((group) => group.trim()).filter(Boolean)]),
-  ).map((group) => ({ value: group, label: group, group: "existing" }));
+  ).map((group) => ({ value: group, label: formatGroupName(group, t), group: "existing" }));
 
   // Re-resolved whenever either half of the answer changes: the base URL and
   // the type are separate questions, and the preview is the join of the two.
@@ -234,7 +243,7 @@ export function AddChannelDialog({
       </div>
       <div className="form-grid form-grid-single">
         <Field label={t("common.name")}>
-          <input
+          <TextInput
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("channels.namePlaceholder")}
@@ -242,7 +251,7 @@ export function AddChannelDialog({
           />
         </Field>
         <Field label={t("common.baseUrl")} hint={t("channels.baseUrlHint")}>
-          <input
+          <TextInput
             type="url"
             required
             value={baseUrl}
@@ -361,7 +370,7 @@ export function AddChannelDialog({
           />
         </Field>
         <Field label={t("common.secret")} hint={secretHint || undefined}>
-          <input
+          <TextInput
             type="password"
             autoComplete="new-password"
             required
@@ -460,7 +469,7 @@ export function AddChannelDialog({
             {/* Only touched fields are sent (see ConnectionAdvancedPatch): the
                 empty box means "backend default", not "zero". */}
             <Field label={t("common.priority")} hint={t("channels.priorityHint")}>
-              <input
+              <TextInput
                 type="number"
                 value={advanced.priority ?? ""}
                 placeholder="0"
@@ -474,7 +483,7 @@ export function AddChannelDialog({
               />
             </Field>
             <Field label={t("common.weight")} hint={t("channels.weightHint")}>
-              <input
+              <TextInput
                 type="number"
                 value={advanced.weight ?? ""}
                 placeholder="100"
@@ -491,7 +500,7 @@ export function AddChannelDialog({
               label={t("channels.maxReasoningEffort")}
               hint={t("channels.maxReasoningEffortHint")}
             >
-              <select
+              <SelectControl
                 value={advanced.max_reasoning_effort ?? ""}
                 onChange={(event) =>
                   setAdvancedField(
@@ -507,10 +516,10 @@ export function AddChannelDialog({
                     {level}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("channels.maxConcurrent")} hint={t("channels.maxConcurrentHint")}>
-              <input
+              <TextInput
                 type="number"
                 min={0}
                 max={10000}
@@ -528,7 +537,7 @@ export function AddChannelDialog({
               />
             </Field>
             <Field label={t("channels.nonStreamTimeout")} hint={t("channels.nonStreamTimeoutHint")}>
-              <input
+              <TextInput
                 type="number"
                 min={0}
                 max={86400}
@@ -546,7 +555,7 @@ export function AddChannelDialog({
               />
             </Field>
             <Field label={t("channels.streamPolicy")} hint={t("channels.streamPolicyHint")}>
-              <select
+              <SelectControl
                 value={advanced.stream_policy ?? ""}
                 onChange={(event) =>
                   setAdvancedField(
@@ -561,10 +570,10 @@ export function AddChannelDialog({
                 <option value="">{t("channels.streamPolicyDefault")}</option>
                 <option value="force_stream">{t("channels.streamPolicyForceStream")}</option>
                 <option value="force_non_stream">{t("channels.streamPolicyForceNonStream")}</option>
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("channels.proxyUrl")} hint={t("channels.proxyUrlHint")}>
-              <input
+              <TextInput
                 type="url"
                 value={advanced.proxy_url ?? ""}
                 placeholder="http://127.0.0.1:7897"
@@ -578,7 +587,7 @@ export function AddChannelDialog({
               />
             </Field>
             <Field label={t("channels.callPolicy")} hint={t("channels.callPolicyHint")}>
-              <select
+              <SelectControl
                 value={advanced.call_policy ?? ""}
                 onChange={(event) =>
                   setAdvancedField(
@@ -595,7 +604,7 @@ export function AddChannelDialog({
                 <option value="real_calls_only">
                   {t("channels.keepalive.policyRealCallsOnly")}
                 </option>
-              </select>
+              </SelectControl>
             </Field>
           </div>
           <div className="stack-tight">

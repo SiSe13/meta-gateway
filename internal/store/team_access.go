@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/lan/meta-gateway/internal/domain"
 )
@@ -14,14 +15,17 @@ func (s *DownstreamKeyStore) ResolveTeamAccess(key *domain.DownstreamKey) (*doma
 	if key.UserID == 0 {
 		return nil, nil
 	}
+	if err := expireTeamCodeGrants(s.db, key.UserID, time.Now()); err != nil {
+		return nil, errors.New("team account quota unavailable")
+	}
 	var canRoute int
 	var canConfigure int
 	var preferencesJSON string
 	a := &domain.TeamAccess{UserID: key.UserID, MemberIDs: make(map[int64]bool)}
-	err := s.db.QueryRow(`SELECT u.rpm,u.allow_routing,u.allow_request_preferences,u.preferences_json,u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost
+	err := s.db.QueryRow(`SELECT u.max_concurrent,u.rpm,u.allow_routing,u.allow_request_preferences,u.preferences_json,u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost
 		FROM team_users u JOIN team_settings s ON s.id=1
 		WHERE u.id=? AND u.status='active' AND s.mode='team'`, key.UserID).
-		Scan(&a.RPM, &canRoute, &canConfigure, &preferencesJSON, &a.QuotaTotalTokens, &a.QuotaUsedTokens, &a.QuotaTotalCost, &a.QuotaUsedCost)
+		Scan(&a.MaxConcurrent, &a.RPM, &canRoute, &canConfigure, &preferencesJSON, &a.QuotaTotalTokens, &a.QuotaUsedTokens, &a.QuotaTotalCost, &a.QuotaUsedCost)
 	if err != nil {
 		return nil, errors.New("team access unavailable")
 	}

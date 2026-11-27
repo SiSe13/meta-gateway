@@ -7,19 +7,21 @@
 鉴权：`Authorization: Bearer <session_token>`，由 `POST /admin/session` 换取。`/admin/session` 本身与少数公开入口除外。
 除特别说明外，请求与响应都是 JSON；请求体上限由 `MAX_ADMIN_BODY_BYTES` 约束。
 
-共 **259** 条注册、**207** 个路径、Delete、Get、Patch、Post、Put 方法。
+共 **267** 条注册、**215** 个路径、Delete、Get、Patch、Post、Put 方法。
 
 ## /admin/(root) · 1 条
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
-| `Get` | `/admin/` | — |
+| `Get` | `/admin/` | handleLanding |
 
-## /admin/admin · 1 条
+## /admin/admin · 3 条
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
 | `Post` | `/admin/admin/session` | login |
+| `Post` | `/admin/admin/setup` | setupAdmin |
+| `Get` | `/admin/admin/setup/status` | setupStatus |
 
 ## /admin/admin-ui · 1 条
 
@@ -62,12 +64,13 @@
 | --- | --- | --- |
 | `Get` | `/admin/availability` | availability |
 
-## /admin/backups · 2 条
+## /admin/backups · 3 条
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
 | `Get` | `/admin/backups` | list |
 | `Post` | `/admin/backups` | create |
+| `Get` | `/admin/backups/{name}/download` | download |
 
 ## /admin/balance-history · 1 条
 
@@ -177,12 +180,13 @@
 | `Get` | `/admin/display-settings` | displaySettings |
 | `Put` | `/admin/display-settings` | saveDisplaySettings |
 
-## /admin/downstream-keys · 6 条
+## /admin/downstream-keys · 7 条
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
 | `Get` | `/admin/downstream-keys` | listDownstreamKeys |
 | `Post` | `/admin/downstream-keys` | createDownstreamKey |
+| `Get` | `/admin/downstream-keys/activity` | listDownstreamKeyActivity |
 | `Delete` | `/admin/downstream-keys/{id}` | deleteDownstreamKey |
 | `Put` | `/admin/downstream-keys/{id}` | updateDownstreamKey |
 | `Post` | `/admin/downstream-keys/{id}/reveal` | revealDownstreamKeyToken |
@@ -246,7 +250,7 @@
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
-| `Get` | `/admin/landing` | handleLanding |
+| `Get` | `/admin/landing` | — |
 
 ## /admin/metrics · 1 条
 
@@ -432,6 +436,12 @@
 | --- | --- | --- |
 | `Post` | `/admin/reset` | factoryReset |
 
+## /admin/robots.txt · 1 条
+
+| 方法 | 路径 | handler |
+| --- | --- | --- |
+| `Get` | `/admin/robots.txt` | handleRobots |
+
 ## /admin/route-groups · 1 条
 
 | 方法 | 路径 | handler |
@@ -514,6 +524,12 @@
 | --- | --- | --- |
 | `Get` | `/admin/site-type` | detectSiteType |
 
+## /admin/sitemap.xml · 1 条
+
+| 方法 | 路径 | handler |
+| --- | --- | --- |
+| `Get` | `/admin/sitemap.xml` | handleSitemap |
+
 ## /admin/sites · 8 条
 
 | 方法 | 路径 | handler |
@@ -533,7 +549,7 @@
 | --- | --- | --- |
 | `Get` | `/admin/sticky` | stickyStats |
 
-## /admin/team · 27 条
+## /admin/team · 29 条
 
 | 方法 | 路径 | handler |
 | --- | --- | --- |
@@ -542,6 +558,7 @@
 | `Get` | `/admin/team/codes` | listCodes |
 | `Post` | `/admin/team/codes` | createCodes |
 | `Delete` | `/admin/team/codes/{id}` | revokeCode |
+| `Post` | `/admin/team/codes/{id}/reveal` | revealCode |
 | `Get` | `/admin/team/invitations` | listInvites |
 | `Post` | `/admin/team/invitations` | createInvite |
 | `Delete` | `/admin/team/invitations/{id}` | revokeInvite |
@@ -558,6 +575,7 @@
 | `Post` | `/admin/team/users/bulk` | bulkUsers |
 | `Post` | `/admin/team/users/import` | importUsers |
 | `Patch` | `/admin/team/users/{id}` | updateUser |
+| `Post` | `/admin/team/users/{id}/concurrency` | adjustUserConcurrency |
 | `Get` | `/admin/team/users/{id}/events` | userEvents |
 | `Get` | `/admin/team/users/{id}/identities` | userIdentities |
 | `Delete` | `/admin/team/users/{id}/identities/{identityID}` | deleteIdentity |

@@ -3,7 +3,9 @@ import {
   Button as HeroButton,
   Card,
   Checkbox as HeroCheckbox,
+  Input as HeroInput,
   Modal as HeroModal,
+  TextArea as HeroTextArea,
   Switch as HeroSwitch,
   Tabs as HeroTabs,
   useOverlayState,
@@ -63,20 +65,20 @@ export function Button({
   disabled,
   ...props
 }: Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "value"> & {
-  variant?: "primary" | "secondary" | "danger" | "quiet";
+  variant?: "primary" | "secondary" | "danger" | "quiet" | "link";
   icon?: ReactNode;
   loading?: boolean;
   ref?: React.Ref<HTMLButtonElement>;
   value?: string;
 }) {
-  const { onClick, value, title, ref: forwardedRef, ...buttonProps } = props;
+  const { onClick, value, title, ref: forwardedRef, form, ...buttonProps } = props;
   const buttonRef = useButtonTitleRef(title, forwardedRef);
   const heroVariant =
     variant === "secondary"
       ? "secondary"
       : variant === "danger"
         ? "danger"
-        : variant === "quiet"
+        : variant === "quiet" || variant === "link"
           ? "ghost"
           : "primary";
   return (
@@ -87,8 +89,15 @@ export function Button({
       isPending={loading}
       className={["button", `button-${variant}`, className].filter(Boolean).join(" ")}
       value={value}
+      form={form}
       {...(buttonProps as React.ComponentProps<typeof HeroButton>)}
-      onPress={(event) => onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
+      onClick={(event) => {
+        onClick?.(event as React.MouseEvent<HTMLButtonElement>);
+        if (type === "submit" && form) {
+          const ownerForm = document.getElementById(form);
+          if (ownerForm instanceof HTMLFormElement) ownerForm.requestSubmit();
+        }
+      }}
       ref={buttonRef}
     >
       {loading ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : icon}
@@ -122,7 +131,7 @@ export function IconButton({
       aria-label={label}
       value={value}
       {...(buttonProps as React.ComponentProps<typeof HeroButton>)}
-      onPress={(event) => onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)}
+      onClick={onClick as React.ComponentProps<typeof HeroButton>["onClick"]}
       ref={buttonRef}
     >
       {children}
@@ -130,20 +139,40 @@ export function IconButton({
   );
 }
 
+/** 使用 HeroUI 输入框承接项目内的文本、数字、密码等输入。 */
+export function TextInput(props: React.ComponentProps<typeof HeroInput>) {
+  return <HeroInput {...props} />;
+}
+
+/** 使用 HeroUI 文本域承接多行文本编辑。 */
+export function TextAreaControl(props: React.ComponentProps<typeof HeroTextArea>) {
+  return <HeroTextArea {...props} />;
+}
+
 /** 用统一的可搜索 UI 下拉框承接表单里原先的原生 select。 */
 export function SelectControl({
   value,
+  defaultValue,
   onChange,
   children,
   disabled,
+  name,
+  className,
+  placeholder,
   "aria-label": ariaLabel,
 }: {
-  value: string | number;
+  value?: string | number;
+  defaultValue?: string | number;
   onChange: React.ChangeEventHandler<HTMLSelectElement>;
   children: ReactNode;
   disabled?: boolean;
+  name?: string;
+  className?: string;
+  placeholder?: string;
   "aria-label"?: string;
 }) {
+  const [uncontrolledValue, setUncontrolledValue] = useState(String(defaultValue ?? ""));
+  const selectedValue = String(value ?? uncontrolledValue);
   const options = Children.toArray(children)
     .filter(isValidElement)
     .map((child) => {
@@ -151,15 +180,21 @@ export function SelectControl({
       return { value: String(props.value ?? ""), label: String(props.children ?? "") };
     });
   return (
-    <SearchableSelect
-      ariaLabel={ariaLabel}
-      value={String(value)}
-      disabled={disabled}
-      options={options}
-      onChange={(next) =>
-        onChange({ target: { value: next } } as React.ChangeEvent<HTMLSelectElement>)
-      }
-    />
+    <>
+      <SearchableSelect
+        ariaLabel={ariaLabel}
+        className={className}
+        placeholder={placeholder}
+        value={selectedValue}
+        disabled={disabled}
+        options={options}
+        onChange={(next) => {
+          if (value === undefined) setUncontrolledValue(next);
+          onChange({ target: { value: next } } as React.ChangeEvent<HTMLSelectElement>);
+        }}
+      />
+      {name ? <input type="hidden" name={name} value={selectedValue} disabled={disabled} /> : null}
+    </>
   );
 }
 
@@ -168,29 +203,39 @@ export function CheckboxControl({
   checked,
   onChange,
   disabled,
+  name,
+  value = "on",
+  className,
   "aria-label": ariaLabel,
 }: {
   checked: boolean;
   onChange: React.ChangeEventHandler<HTMLInputElement>;
   disabled?: boolean;
+  name?: string;
+  value?: string;
+  className?: string;
   "aria-label"?: string;
 }) {
   return (
-    <HeroCheckbox
-      aria-label={ariaLabel}
-      isSelected={checked}
-      isDisabled={disabled}
-      onChange={(selected) =>
-        onChange({ target: { checked: selected } } as React.ChangeEvent<HTMLInputElement>)
-      }
-    >
-      <HeroCheckbox.Content>
-        <HeroCheckbox.Control>
-          <HeroCheckbox.Indicator />
-        </HeroCheckbox.Control>
-        {ariaLabel ? <span className="sr-only">{ariaLabel}</span> : null}
-      </HeroCheckbox.Content>
-    </HeroCheckbox>
+    <>
+      <HeroCheckbox
+        aria-label={ariaLabel}
+        isSelected={checked}
+        isDisabled={disabled}
+        className={className}
+        onChange={(selected) =>
+          onChange({ target: { checked: selected } } as React.ChangeEvent<HTMLInputElement>)
+        }
+      >
+        <HeroCheckbox.Content>
+          <HeroCheckbox.Control>
+            <HeroCheckbox.Indicator />
+          </HeroCheckbox.Control>
+          {ariaLabel ? <span className="sr-only">{ariaLabel}</span> : null}
+        </HeroCheckbox.Content>
+      </HeroCheckbox>
+      {name && checked ? <input type="hidden" name={name} value={value} /> : null}
+    </>
   );
 }
 
@@ -397,7 +442,7 @@ export function Dialog({
   busy = false,
   preventBackdropDismiss = false,
 }: {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   onClose: () => void;
   actions?: ReactNode;
@@ -657,6 +702,7 @@ export function Field({
   label,
   children,
   hint,
+  labelAction,
   error,
   required,
   className,
@@ -664,12 +710,14 @@ export function Field({
   label: string;
   children: ReactNode;
   hint?: string;
+  labelAction?: ReactNode;
   /** Shown under the control when the value fails validation. Announced. */
   error?: string;
   required?: boolean;
   className?: string;
 }) {
   const errorId = useId();
+  const controlId = useId();
   // Every hint rides in the (i) beside the label. A paragraph under the control
   // pushed the form down and competed with the thing it explained, and splitting
   // hints into "short enough to show" and "long enough to hide" made two fields
@@ -682,27 +730,44 @@ export function Field({
   const describedChild =
     isValidElement<Record<string, unknown>>(children) && children.type !== "label"
       ? cloneElement(children, {
+          ...(labelAction ? { id: controlId } : {}),
           "aria-describedby": described || undefined,
           "aria-invalid": error ? true : undefined,
           "aria-required": required ? true : undefined,
         })
       : children;
+  const labelContent = (
+    <span className="field-label">
+      <span>{label}</span>
+      {required ? (
+        <span className="field-required" aria-hidden="true">
+          *
+        </span>
+      ) : null}
+      {hint ? <InfoTip label={hint} /> : null}
+    </span>
+  );
+
   return (
     <div className={["field", error ? "is-invalid" : null, className].filter(Boolean).join(" ")}>
       {/* The label wraps the control so clicking its name still focuses the field.
-          The hint is the (i) in this row, not a paragraph below it. */}
-      <label className="field-label-wrap">
-        <span className="field-label">
-          <span>{label}</span>
-          {required ? (
-            <span className="field-required" aria-hidden="true">
-              *
-            </span>
-          ) : null}
-          {hint ? <InfoTip label={hint} /> : null}
-        </span>
-        {describedChild}
-      </label>
+          The hint is the (i) beside the label, not a paragraph below it. */}
+      {labelAction ? (
+        <>
+          <div className="field-label-row">
+            <label className="field-label-wrap" htmlFor={controlId}>
+              {labelContent}
+            </label>
+            <span className="field-label-action">{labelAction}</span>
+          </div>
+          <div className="field-control-wrap">{describedChild}</div>
+        </>
+      ) : (
+        <label className="field-label-wrap">
+          {labelContent}
+          {describedChild}
+        </label>
+      )}
       {error ? (
         <span className="field-error" id={errorId} role="alert">
           {error}

@@ -1,21 +1,20 @@
 import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loading, ErrorState } from "../components/ui";
+import { Button, Dialog, Field, Loading, ErrorState, TextInput } from "../components/ui";
 import { useI18n } from "../i18n";
 import { useToast } from "../toast";
 import { accountRequest } from "../team/transport";
 import { teamText, teamError } from "../team/text";
-import type { Account, Plan, UserKey } from "../team/types";
-import { ConnectDialog } from "../member/ConnectDialog";
+import type { Account, Plan } from "../team/types";
 import { ModelsWorkspace } from "../member/ModelsWorkspace";
 
 /**
  * The member's model page, inside the console.
  *
  * The page body is the member app's own (`ModelsWorkspace`): the catalogue they
- * may call, their arrangement editor and the connect hand-off. What this
+ * may call and their arrangement editor. What this
  * wrapper adds is the data the workspace expects its host to have fetched —
- * account, plans, authorized models, keys — because in the member shell that
+ * account and plans — because in the member shell that
  * host was `UserApp`, and the console is not going to grow a second copy of the
  * member shell to satisfy a prop list.
  *
@@ -37,12 +36,8 @@ export function MemberModelsPage() {
     }
   });
   const [busy, setBusy] = useState(false);
-  const [connecting, setConnecting] = useState<{
-    key: UserKey;
-    token?: string;
-    model?: string;
-  } | null>(null);
-
+  const [newPlanOpen, setNewPlanOpen] = useState(false);
+  const [newPlanName, setNewPlanName] = useState("");
   const account = useQuery({
     queryKey: ["me", "account"],
     queryFn: ({ signal }) => accountRequest<Account>("/me", { signal }),
@@ -54,17 +49,6 @@ export function MemberModelsPage() {
     queryFn: ({ signal }) => accountRequest<Plan[]>("/me/plans", { signal }),
     enabled: Boolean(userID) && canRoute,
   });
-  const models = useQuery({
-    queryKey: ["user", userID, "models"],
-    queryFn: ({ signal }) => accountRequest<string[]>("/me/models", { signal }),
-    enabled: Boolean(userID),
-  });
-  const keys = useQuery({
-    queryKey: ["user", userID, "keys"],
-    queryFn: ({ signal }) => accountRequest<UserKey[]>("/me/keys", { signal }),
-    enabled: Boolean(userID),
-  });
-
   const selectPlan = useCallback((id: number) => {
     setPlanId(id);
     try {
@@ -74,8 +58,8 @@ export function MemberModelsPage() {
     }
   }, []);
   const createPlan = useCallback(async () => {
-    const name = window.prompt(t("planName"));
-    if (!name?.trim()) return;
+    const name = newPlanName.trim();
+    if (!name || busy) return;
     setBusy(true);
     try {
       const created = await accountRequest<Plan>("/me/plans", {
@@ -84,18 +68,18 @@ export function MemberModelsPage() {
       });
       await qc.invalidateQueries({ queryKey: ["user", userID, "plans"] });
       if (created?.id) selectPlan(created.id);
+      setNewPlanName("");
+      setNewPlanOpen(false);
     } catch (error) {
       push({ message: teamError(error, locale), tone: "error" });
     } finally {
       setBusy(false);
     }
-  }, [qc, selectPlan, t, userID, push, locale]);
+  }, [busy, locale, newPlanName, qc, selectPlan, userID, push]);
 
   if (account.isPending) return <Loading />;
   if (!account.data)
     return <ErrorState error={account.error} retry={() => void account.refetch()} />;
-  const branding = account.data.branding;
-  const base = branding.api_base_url || `${location.origin}/v1`;
   return (
     <>
       <ModelsWorkspace
@@ -105,30 +89,46 @@ export function MemberModelsPage() {
         plans={plans.data ?? []}
         planId={planId}
         onPlanChange={selectPlan}
-        onCreatePlan={() => void createPlan()}
-        onConnect={(model) => {
-          // Connect needs a live token; the first enabled one is the obvious
-          // choice, and a member with none is told to make one on the keys page.
-          const enabled = keys.data?.find((key) => key.enabled);
-          if (enabled) setConnecting({ key: enabled, model });
-          else push({ message: t("noKeysYet"), tone: "info" });
+        onCreatePlan={() => {
+          setNewPlanName("");
+          setNewPlanOpen(true);
         }}
       />
-      {connecting ? (
-        <ConnectDialog
-          apiKey={connecting.key}
-          token={connecting.token}
-          initialModel={connecting.model}
-          base={base}
-          brandName={branding.name || "Meta Gateway"}
-          models={models.data ?? []}
-          t={t}
-          onClose={() => setConnecting(null)}
-          onCopy={(value, message) => {
-            void navigator.clipboard.writeText(value);
-            push({ message: message || t("copied") });
-          }}
-        />
+      {newPlanOpen ? (
+        <Dialog
+          title={t("newPlan")}
+          busy={busy}
+          onClose={() => setNewPlanOpen(false)}
+          actions={
+            <>
+              <Button variant="secondary" onClick={() => setNewPlanOpen(false)}>
+                {t("close")}
+              </Button>
+              <Button
+                disabled={!newPlanName.trim()}
+                loading={busy}
+                onClick={() => void createPlan()}
+              >
+                {t("create")}
+              </Button>
+            </>
+          }
+        >
+          <Field label={t("planName")}>
+            <TextInput
+              autoFocus
+              maxLength={80}
+              value={newPlanName}
+              onChange={(event) => setNewPlanName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void createPlan();
+                }
+              }}
+            />
+          </Field>
+        </Dialog>
       ) : null}
       {busy ? <Loading /> : null}
     </>

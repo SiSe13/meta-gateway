@@ -27,7 +27,7 @@ import { HookSection } from "./store/HookSection";
 import { PluginConfigForm } from "./plugins/PluginConfigForm";
 import { useGatewayModels } from "./plugins/useGatewayModels";
 import { Drawer } from "../components/Drawer";
-import { Button, Dialog, ErrorState, Page, StatusBadge } from "../components/ui";
+import { Button, Dialog, ErrorState, Page, StatusBadge, TextInput } from "../components/ui";
 
 // Only invalidate always-safe keys here. Gated add-on queries (checkin-logs,
 // webdav-*) are owned by their panels with enabled: moduleOn — invalidating them
@@ -231,14 +231,14 @@ function StoreExtensions() {
               <p>{t("plugins.addHint")}</p>
             </header>
             <div className="plugin-add-row">
-              <input
+              <TextInput
                 className="mono"
                 value={addUrl}
                 onChange={(e) => setAddUrl(e.target.value)}
                 placeholder="http://127.0.0.1:9100"
                 spellCheck={false}
               />
-              <input
+              <TextInput
                 type="password"
                 value={addKey}
                 onChange={(e) => setAddKey(e.target.value)}
@@ -268,28 +268,28 @@ function StoreExtensions() {
               <div className="plugin-add-advanced">
                 <p className="muted">{t("plugins.advancedHint")}</p>
                 <div className="plugin-add-row">
-                  <input
+                  <TextInput
                     className="mono"
                     value={addId}
                     onChange={(e) => setAddId(e.target.value)}
                     placeholder={t("plugins.idPlaceholder")}
                     spellCheck={false}
                   />
-                  <input
+                  <TextInput
                     value={addName}
                     onChange={(e) => setAddName(e.target.value)}
                     placeholder={t("plugins.namePlaceholder")}
                   />
                 </div>
                 <div className="plugin-add-row">
-                  <input
+                  <TextInput
                     className="mono"
                     value={addPage}
                     onChange={(e) => setAddPage(e.target.value)}
                     placeholder={t("plugins.pagePlaceholder")}
                     spellCheck={false}
                   />
-                  <input
+                  <TextInput
                     className="mono"
                     value={addHealth}
                     onChange={(e) => setAddHealth(e.target.value)}
@@ -298,7 +298,7 @@ function StoreExtensions() {
                   />
                 </div>
                 <div className="plugin-add-row">
-                  <input
+                  <TextInput
                     className="mono"
                     value={addPrefix}
                     onChange={(e) => setAddPrefix(e.target.value)}
@@ -647,7 +647,7 @@ function EditPluginDialog({
       <div className="form-stack">
         <label className="field">
           <span>{t("plugins.urlLabel")}</span>
-          <input
+          <TextInput
             className="mono"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -657,12 +657,12 @@ function EditPluginDialog({
         </label>
         <label className="field">
           <span>{t("plugins.keyPlaceholder")}</span>
-          <input type="password" value={key} onChange={(e) => setKey(e.target.value)} />
+          <TextInput type="password" value={key} onChange={(e) => setKey(e.target.value)} />
         </label>
         <div className="form-row">
           <label className="field">
             <span>{t("plugins.pageLabel")}</span>
-            <input
+            <TextInput
               className="mono"
               value={page}
               onChange={(e) => setPage(e.target.value)}
@@ -672,7 +672,7 @@ function EditPluginDialog({
           </label>
           <label className="field">
             <span>{t("plugins.healthLabel")}</span>
-            <input
+            <TextInput
               className="mono"
               value={health}
               onChange={(e) => setHealth(e.target.value)}
@@ -683,7 +683,7 @@ function EditPluginDialog({
         </div>
         <label className="field">
           <span>{t("plugins.prefixLabel")}</span>
-          <input
+          <TextInput
             className="mono"
             value={prefix}
             onChange={(e) => setPrefix(e.target.value)}
@@ -770,15 +770,15 @@ function CreateChannelDialog({
       <div className="form-stack">
         <label className="field">
           <span>{t("plugins.channelName")}</span>
-          <input value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} />
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} spellCheck={false} />
         </label>
         <label className="field">
           <span>{t("plugins.channelBase")}</span>
-          <input className="mono" value={baseUrl} readOnly spellCheck={false} />
+          <TextInput className="mono" value={baseUrl} readOnly spellCheck={false} />
         </label>
         <label className="field">
           <span>{t("common.secret")}</span>
-          <input
+          <TextInput
             type="password"
             autoComplete="new-password"
             required

@@ -1,5 +1,6 @@
 import type { Route, RouteMember, RouteOverview, RoutingCandidate } from "../../api/types";
 import { mappingRealName } from "../../lib/alias";
+import { formatGroupName } from "../../lib/format";
 
 export function primaryMember(
   members: RoutingCandidate[],
@@ -100,7 +101,7 @@ export function upstreamChoices(
   // picker has nothing left to say about it.
   return separate(
     separate(choices, (choice) => `#${choice.channelId}`),
-    (choice) => choice.group,
+    (choice) => formatGroupName(choice.group, t),
   );
 }
 

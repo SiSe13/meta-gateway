@@ -3,7 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Copy, Eraser, Pencil, RefreshCw, Send, Square, Trash2 } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import { Empty, ErrorState, Field, Panel, formatDate } from "../../components/ui";
+import {
+  Empty,
+  ErrorState,
+  Field,
+  Panel,
+  formatDate,
+  TextInput,
+  TextAreaControl,
+  SelectControl,
+  CheckboxControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { parseSseJson, splitSseFrames } from "../../lib/sse";
 import { upstreamMessage } from "../../lib/upstreamError";
@@ -493,7 +503,7 @@ export default function Playground({
             upstreams.length > 1 ? t("playground.upstreamHint") : t("playground.upstreamHintOne")
           }
         >
-          <select
+          <SelectControl
             aria-label={t(runner.pickLabelKey)}
             value={memberId}
             onChange={(event) => setMemberId(Number(event.target.value) || 0)}
@@ -504,7 +514,7 @@ export default function Playground({
                 {upstream.label}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </Field>
       </div>
 
@@ -513,7 +523,7 @@ export default function Playground({
         <p className="panel-hint">{t("playground.paramsHint")}</p>
         <div className="meta-form">
           <Field label={t("playground.system")}>
-            <textarea
+            <TextAreaControl
               rows={2}
               value={system}
               placeholder={t("playground.systemPlaceholder")}
@@ -521,7 +531,7 @@ export default function Playground({
             />
           </Field>
           <Field label={t("playground.maxTokens")} hint={t("playground.maxTokensHint")}>
-            <input
+            <TextInput
               type="number"
               min={1}
               value={maxTokens}
@@ -530,14 +540,13 @@ export default function Playground({
           </Field>
           <Field label={t("playground.temperature")}>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={temperatureOn}
                 onChange={(event) => setTemperatureOn(event.target.checked)}
               />
               <span>{t("playground.useParam")}</span>
             </label>
-            <input
+            <TextInput
               type="number"
               step="0.1"
               min={0}
@@ -549,14 +558,13 @@ export default function Playground({
           </Field>
           <Field label={t("playground.topP")}>
             <label className="check marginless">
-              <input
-                type="checkbox"
+              <CheckboxControl
                 checked={topPOn}
                 onChange={(event) => setTopPOn(event.target.checked)}
               />
               <span>{t("playground.useParam")}</span>
             </label>
-            <input
+            <TextInput
               type="number"
               step="0.05"
               min={0}
@@ -568,9 +576,8 @@ export default function Playground({
           </Field>
           <Field label={t("playground.stream")} hint={t("playground.streamHint")}>
             <label className="check marginless">
-              <input
+              <CheckboxControl
                 className="switch"
-                type="checkbox"
                 checked={stream}
                 onChange={(event) => setStream(event.target.checked)}
               />
@@ -626,7 +633,7 @@ export default function Playground({
       </div>
 
       <div className="pg-composer">
-        <textarea
+        <TextAreaControl
           rows={3}
           value={draft}
           placeholder={t("playground.promptPlaceholder")}
@@ -704,7 +711,7 @@ function TurnView({
 
       {editing ? (
         <div className="pg-editor">
-          <textarea
+          <TextAreaControl
             rows={4}
             value={draft}
             aria-label={t("playground.edit")}

@@ -369,6 +369,8 @@ func NewWithDependencies(cfg *config.Config, db *store.DB, enc *crypto.Encrypter
 	// Shared /v1/models cache: recomputed on expiry or admin route/channel writes.
 	modelsCache := newModelsCache(5 * time.Second)
 	adminHandler := NewAdminHandler(db, enc, selector, stickyStore, outboundClient, modelsCache)
+	adminHandler.SetKeyInFlightProvider(proxyService.KeyInFlight)
+	teamHandler.SetKeyInFlightProvider(proxyService.KeyInFlight)
 	adminHandler.SetGCService(gcService)
 	// Global outbound proxy (runtime setting proxy_url, hot-swappable): the
 	// transport's proxy hook resolves per-request channel overrides first.

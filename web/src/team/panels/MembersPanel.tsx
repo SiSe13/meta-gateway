@@ -1,20 +1,30 @@
 import { useEffect, useId, useState } from "react";
-import { Button as HeroButton } from "@heroui/react";
+import { Button as HeroButton, SearchField } from "@heroui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileUp, Search, UserRoundPlus } from "lucide-react";
 import { TeamField as Field } from "../ui";
-import { ActionMenu } from "../../components/ActionMenu";
-import { Drawer } from "../../components/Drawer";
-import { ModelDirectoryToolbar } from "../../components/ModelDirectoryToolbar";
-import { QuotaMeters } from "../QuotaMeters";
+import { formatCost } from "../../lib/format";
 import {
   Button,
+  CheckboxControl,
+  ConfirmDialog,
   DataTable,
+  Dialog,
   ErrorState,
   Loading,
-  PageActions,
+  SelectControl,
   StatusBadge,
+  formatDate,
+  TextInput,
 } from "../../components/ui";
-import { ImportMembersDialog, NewMemberDialog, QuotaDialog } from "../MemberForms";
+import { useConfirm } from "../../components/ConfirmProvider";
+import {
+  BulkQuotaDialog,
+  ConcurrencyDialog,
+  ImportMembersDialog,
+  NewMemberDialog,
+  QuotaDialog,
+} from "../MemberForms";
 import { teamError } from "../text";
 import { useTeamMutation } from "../useTeamMutation";
 import { useUsers } from "../UsersContext";
@@ -30,6 +40,7 @@ import type { BulkMemberAction, OAuthBinding, Policy, TeamUser, UserKey } from "
  */
 export function MembersPanel() {
   const { request, locale, t, owner, settings } = useUsers();
+  const confirm = useConfirm();
   const enabled = settings.mode === "team";
   const qc = useQueryClient();
   const refresh = () => void qc.invalidateQueries({ queryKey: ["team"] });
@@ -40,6 +51,11 @@ export function MembersPanel() {
   const [newMember, setNewMember] = useState(false);
   const [importing, setImporting] = useState(false);
   const [quotaFor, setQuotaFor] = useState<TeamUser | null>(null);
+  const [concurrencyTarget, setConcurrencyTarget] = useState<
+    { kind: "user"; user: TeamUser } | { kind: "bulk" } | null
+  >(null);
+  const [bulkQuotaOpen, setBulkQuotaOpen] = useState(false);
+  const [revokeFor, setRevokeFor] = useState<TeamUser | null>(null);
   const [bulkPolicies, setBulkPolicies] = useState<number[]>([]);
   const [copyMessage, setCopyMessage] = useState("");
 
@@ -91,10 +107,13 @@ export function MembersPanel() {
   );
   const queryError = users.error || policies.error;
   const policyNames = (ids: number[]) =>
-    ids.map((id) => policies.data?.find((p) => p.id === id)?.name ?? `#${id}`).join("、");
+    ids.map((id) => ({
+      id,
+      name: policies.data?.find((policy) => policy.id === id)?.name ?? `#${id}`,
+    }));
 
   return (
-    <div>
+    <section className="team-user-roster">
       {Boolean(error || queryError) && (
         <div role="alert" className="team-error">
           {teamError(error || queryError, locale)}
@@ -124,17 +143,41 @@ export function MembersPanel() {
       {/* The roster stays mounted: the drawer edits one member beside the list
           they were found in, instead of replacing the page they were on. */}
       <>
-        <PageActions>
-          <Button variant="secondary" disabled={!enabled} onClick={() => setImporting(true)}>
-            {t("importMembers")}
-          </Button>
-          <Button disabled={!enabled} onClick={() => setNewMember(true)}>
-            ＋ {t("newMember")}
-          </Button>
-        </PageActions>
-        <div className="team-toolbar">
-          <ModelDirectoryToolbar value={search} onChange={setSearch} label={t("search")} />
-        </div>
+        <header className="team-roster-header">
+          <div className="team-roster-controls">
+            <SearchField
+              className="team-roster-search"
+              value={search}
+              onChange={setSearch}
+              aria-label={t("search")}
+            >
+              <SearchField.Group>
+                <SearchField.SearchIcon>
+                  <Search size={16} aria-hidden="true" />
+                </SearchField.SearchIcon>
+                <SearchField.Input placeholder={t("search")} />
+                <SearchField.ClearButton aria-label={t("clearSearch")} />
+              </SearchField.Group>
+            </SearchField>
+            <Button
+              variant="secondary"
+              className="team-roster-action team-roster-action--import"
+              icon={<FileUp size={16} aria-hidden="true" />}
+              disabled={!enabled}
+              onClick={() => setImporting(true)}
+            >
+              {t("importMembers")}
+            </Button>
+            <Button
+              className="team-roster-action team-roster-action--new"
+              icon={<UserRoundPlus size={16} aria-hidden="true" />}
+              disabled={!enabled}
+              onClick={() => setNewMember(true)}
+            >
+              {t("newMember")}
+            </Button>
+          </div>
+        </header>
         {checked.size > 0 && (
           <BulkBar
             count={checked.size}
@@ -144,6 +187,8 @@ export function MembersPanel() {
             policyIDs={bulkPolicies}
             onPolicyIDs={setBulkPolicies}
             onRun={bulk}
+            onQuota={() => setBulkQuotaOpen(true)}
+            onConcurrency={() => setConcurrencyTarget({ kind: "bulk" })}
             onClear={() => setChecked(new Set())}
           />
         )}
@@ -152,9 +197,8 @@ export function MembersPanel() {
         ) : (
           <DataTable
             headers={[
-              <input
+              <CheckboxControl
                 key="all"
-                type="checkbox"
                 aria-label={t("selectAll")}
                 checked={visibleUsers.length > 0 && visibleUsers.every((u) => checked.has(u.id))}
                 onChange={(e) =>
@@ -169,82 +213,129 @@ export function MembersPanel() {
               t("role"),
               t("authorizationGroups"),
               t("status"),
-              t("quota"),
+              t("budgetColumn"),
+              t("maxConcurrent"),
+              t("activityTime"),
               t("keyCount"),
-              "",
+              t("rowActions"),
             ]}
             empty={visibleUsers.length === 0}
           >
-            {visibleUsers.map((u) => (
-              <tr key={u.id} className={checked.has(u.id) ? "is-selected" : undefined}>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={t("selectMember", { name: u.name })}
-                    disabled={u.role === "owner"}
-                    checked={checked.has(u.id)}
-                    onChange={(e) => {
-                      const next = new Set(checked);
-                      if (e.target.checked) next.add(u.id);
-                      else next.delete(u.id);
-                      setChecked(next);
-                    }}
-                  />
-                </td>
-                <td>
-                  {/* The name is what an operator says out loud; the login is
+            {visibleUsers.map((u) => {
+              const groups = policyNames(u.policy_ids);
+              return (
+                <tr key={u.id} className={checked.has(u.id) ? "is-selected" : undefined}>
+                  <td>
+                    <CheckboxControl
+                      aria-label={t("selectMember", { name: u.name })}
+                      disabled={u.role === "owner"}
+                      checked={checked.has(u.id)}
+                      onChange={(e) => {
+                        const next = new Set(checked);
+                        if (e.target.checked) next.add(u.id);
+                        else next.delete(u.id);
+                        setChecked(next);
+                      }}
+                    />
+                  </td>
+                  <td>
+                    {/* The name is what an operator says out loud; the login is
                         how the account actually signs in. Both belong here. */}
-                  <span className="member-ident">
-                    <span className="member-avatar" aria-hidden="true">
-                      {(u.name || u.username || "?").trim().slice(0, 1).toUpperCase()}
+                    <span className="member-ident">
+                      <span className="member-avatar" aria-hidden="true">
+                        {(u.name || u.username || "?").trim().slice(0, 1).toUpperCase()}
+                      </span>
+                      <span className="member-ident-text">
+                        <strong>{u.name}</strong>
+                        <small>{u.username}</small>
+                      </span>
                     </span>
-                    <span className="member-ident-text">
-                      <strong>{u.name}</strong>
-                      <small>{u.username}</small>
+                  </td>
+                  <td>
+                    <span className={`badge badge-role-${u.role}`}>{t(u.role)}</span>
+                  </td>
+                  <td>
+                    <span className="team-user-policies">
+                      {groups.length ? (
+                        groups.map((policy) => (
+                          <span className="team-user-policy" key={policy.id}>
+                            {policy.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="team-user-policy-empty">—</span>
+                      )}
                     </span>
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge badge-role-${u.role}`}>{t(u.role)}</span>
-                </td>
-                <td>{policyNames(u.policy_ids)}</td>
-                <td>
-                  <StatusBadge value={u.status} />
-                </td>
-                <td>
-                  <QuotaCell user={u} owner={owner} onEdit={() => setQuotaFor(u)} />
-                </td>
-                <td>{u.key_count}</td>
-                <td className="row-actions">
-                  <ActionMenu
-                    compact
-                    label={t("moreActions")}
-                    items={[
-                      { key: "details", label: t("details"), onSelect: () => setSelected(u) },
-                      ...(owner
-                        ? [
-                            {
-                              key: "quota",
-                              label: t("editQuota"),
-                              onSelect: () => setQuotaFor(u),
-                            },
-                            {
-                              key: "revoke",
-                              group: t("dangerZone"),
-                              label: t("revokeSessions"),
-                              danger: true,
-                              onSelect: () => {
-                                if (confirm(t("revokeSessions")))
-                                  void run(`/admin/team/users/${u.id}/revoke-sessions`, "POST", {});
-                              },
-                            },
-                          ]
-                        : []),
-                    ]}
-                  />
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td>
+                    <StatusBadge value={u.status} />
+                  </td>
+                  <td>
+                    <QuotaCell user={u} owner={owner} onEdit={() => setQuotaFor(u)} />
+                  </td>
+                  <td>
+                    <span className="team-concurrency-limit">{u.max_concurrent}</span>
+                  </td>
+                  <td>
+                    <span className="member-activity-times">
+                      {u.last_login_at ? (
+                        <span>
+                          <small>{t("lastLogin")}</small>
+                          <time>{formatDate(u.last_login_at)}</time>
+                        </span>
+                      ) : null}
+                      {u.last_model_call_at ? (
+                        <span>
+                          <small>{t("lastModelCall")}</small>
+                          <time>{formatDate(u.last_model_call_at)}</time>
+                        </span>
+                      ) : null}
+                      {!u.last_login_at && !u.last_model_call_at ? <time>—</time> : null}
+                    </span>
+                  </td>
+                  <td>{u.key_count}</td>
+                  <td className="row-actions team-member-actions">
+                    <div className="team-member-action-group">
+                      <Button
+                        variant="quiet"
+                        className="team-member-action team-member-action--edit"
+                        onClick={() => setSelected(u)}
+                      >
+                        {t("edit")}
+                      </Button>
+                      {owner ? (
+                        <>
+                          <Button
+                            variant="quiet"
+                            className="team-member-action team-member-action--quota"
+                            onClick={() => setQuotaFor(u)}
+                          >
+                            {t("editQuota")}
+                          </Button>
+                          <Button
+                            variant="quiet"
+                            className="team-member-action team-member-action--concurrency"
+                            onClick={() => setConcurrencyTarget({ kind: "user", user: u })}
+                          >
+                            {t("concurrencyAction")}
+                          </Button>
+                          {u.role !== "owner" ? (
+                            <Button
+                              variant="quiet"
+                              className="team-member-action team-member-action--revoke"
+                              disabled={busy}
+                              onClick={() => setRevokeFor(u)}
+                            >
+                              {t("revokeSessions")}
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </DataTable>
         )}
       </>
@@ -263,10 +354,7 @@ export function MembersPanel() {
           onSave={(body) =>
             void run(`/admin/team/users/${selected.id}`, "PATCH", body, () => setSelected(null))
           }
-          onRevoke={() => {
-            if (confirm(t("revokeSessions")))
-              void run(`/admin/team/users/${selected.id}/revoke-sessions`, "POST", {});
-          }}
+          onRevoke={() => setRevokeFor(selected)}
           onRecovery={() =>
             void run<{ path: string }>(
               `/admin/team/users/${selected.id}/recovery`,
@@ -276,8 +364,15 @@ export function MembersPanel() {
             )
           }
           onUnlink={(bindingID) => {
-            if (confirm(t("oauthUnlinkWarning")))
-              void run(`/admin/team/users/${selected.id}/identities/${bindingID}`, "DELETE");
+            void confirm({
+              title: t("oauthUnlinkTitle"),
+              message: t("oauthUnlinkWarning"),
+              confirmLabel: t("unlink"),
+              danger: true,
+            }).then((accepted) => {
+              if (accepted)
+                void run(`/admin/team/users/${selected.id}/identities/${bindingID}`, "DELETE");
+            });
           }}
         />
       ) : null}
@@ -312,7 +407,61 @@ export function MembersPanel() {
           onSaved={refresh}
         />
       )}
-    </div>
+      {bulkQuotaOpen && owner ? (
+        <BulkQuotaDialog
+          request={request}
+          ids={[...checked]}
+          count={checked.size}
+          locale={locale}
+          t={t}
+          onClose={() => setBulkQuotaOpen(false)}
+          onSaved={() => {
+            refresh();
+            setChecked(new Set());
+            setBulkPolicies([]);
+          }}
+        />
+      ) : null}
+      {concurrencyTarget && owner ? (
+        <ConcurrencyDialog
+          request={request}
+          target={
+            concurrencyTarget.kind === "bulk"
+              ? { kind: "bulk", ids: [...checked], count: checked.size }
+              : concurrencyTarget
+          }
+          locale={locale}
+          t={t}
+          onClose={() => setConcurrencyTarget(null)}
+          onSaved={() => {
+            refresh();
+            if (concurrencyTarget.kind === "bulk") {
+              setChecked(new Set());
+              setBulkPolicies([]);
+            }
+          }}
+        />
+      ) : null}
+      {revokeFor && (
+        <ConfirmDialog
+          title={t("revokeSessionsConfirmTitle")}
+          message={t("revokeSessionsConfirmMessage", { name: revokeFor.name })}
+          confirmLabel={t("revokeSessions")}
+          className="team-revoke-sessions-dialog"
+          pending={busy}
+          error={error}
+          onClose={() => setRevokeFor(null)}
+          onConfirm={() =>
+            void run<{ ok: boolean }>(
+              `/admin/team/users/${revokeFor.id}/revoke-sessions`,
+              "POST",
+              {},
+              () => setRevokeFor(null),
+            )
+          }
+        />
+      )}
+    </section>
   );
 }
 
@@ -329,14 +478,38 @@ function QuotaCell({
   owner: boolean;
   onEdit: () => void;
 }) {
+  const { t } = useUsers();
+  const costTotal = user.quota_total_cost;
+  const costRemaining = Math.max(0, costTotal - user.quota_used_cost);
+  const tokenTotal = user.quota_total_tokens;
+  const tokenRemaining = Math.max(0, tokenTotal - user.quota_used_tokens);
+  const bothUnlimited = costTotal <= 0 && tokenTotal <= 0;
+  const content = bothUnlimited ? (
+    <span className="quota-unlimited">{t("unlimited")}</span>
+  ) : (
+    <span className="team-quota-summary">
+      <span className="team-quota-line team-quota-line--cost">
+        <span>{t("quotaMoneyLabel")}</span>
+        <strong>{costTotal > 0 ? formatCost(costTotal) : t("unlimited")}</strong>
+        <small>
+          {t("creditRemaining")}: {costTotal > 0 ? formatCost(costRemaining) : t("unlimited")}
+        </small>
+      </span>
+      <span className="team-quota-line team-quota-line--tokens">
+        <span>{t("quotaTokensLabel")}</span>
+        <strong>{tokenTotal > 0 ? tokenTotal.toLocaleString() : t("unlimited")}</strong>
+        <small>
+          {t("creditRemaining")}:{" "}
+          {tokenTotal > 0 ? tokenRemaining.toLocaleString() : t("unlimited")}
+        </small>
+      </span>
+    </span>
+  );
+  if (!owner) return content;
   return (
-    <QuotaMeters
-      usedTokens={user.quota_used_tokens}
-      totalTokens={user.quota_total_tokens}
-      usedCost={user.quota_used_cost}
-      totalCost={user.quota_total_cost}
-      onEdit={owner ? onEdit : undefined}
-    />
+    <Button className="team-quota-edit" type="button" onClick={onEdit}>
+      {content}
+    </Button>
   );
 }
 
@@ -348,6 +521,8 @@ function BulkBar({
   policyIDs,
   onPolicyIDs,
   onRun,
+  onQuota,
+  onConcurrency,
   onClear,
 }: {
   count: number;
@@ -357,33 +532,61 @@ function BulkBar({
   policyIDs: number[];
   onPolicyIDs: (value: number[]) => void;
   onRun: (action: BulkMemberAction, policyIDs?: number[]) => void;
+  onQuota: () => void;
+  onConcurrency: () => void;
   onClear: () => void;
 }) {
   const { t } = useUsers();
+  const confirm = useConfirm();
   return (
     <div className="team-bulkbar" role="region" aria-label={t("bulkActions")}>
-      <strong>{t("bulkSelected", { n: count })}</strong>
+      <strong className="team-bulkbar-count">{t("bulkSelected", { n: count })}</strong>
       <div className="team-actions">
         {owner ? (
           <>
-            <select
-              className="team-search"
-              aria-label={t("authorizationGroups")}
-              multiple
-              value={policyIDs.map(String)}
-              onChange={(e) =>
-                onPolicyIDs(Array.from(e.target.selectedOptions, (option) => Number(option.value)))
-              }
-            >
-              {policies.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
             <HeroButton
               variant="outline"
-              className="team-button"
+              className="team-button team-bulk-action"
+              type="button"
+              isDisabled={busy}
+              onPress={onQuota}
+            >
+              {t("bulkQuota")}
+            </HeroButton>
+            <HeroButton
+              variant="outline"
+              className="team-button team-bulk-action"
+              type="button"
+              isDisabled={busy}
+              onPress={onConcurrency}
+            >
+              {t("adjustConcurrency")}
+            </HeroButton>
+            <div
+              className="team-bulk-policy-picker"
+              role="group"
+              aria-label={t("authorizationGroups")}
+            >
+              {policies.map((p) => (
+                <div className="team-bulk-policy" key={p.id}>
+                  <CheckboxControl
+                    aria-label={p.name}
+                    checked={policyIDs.includes(p.id)}
+                    onChange={(event) =>
+                      onPolicyIDs(
+                        event.target.checked
+                          ? [...policyIDs, p.id]
+                          : policyIDs.filter((id) => id !== p.id),
+                      )
+                    }
+                  />
+                  <span>{p.name}</span>
+                </div>
+              ))}
+            </div>
+            <HeroButton
+              variant="outline"
+              className="team-button team-bulk-apply"
               type="button"
               isDisabled={busy || !policyIDs.length}
               onPress={() => onRun("policy", policyIDs)}
@@ -392,7 +595,7 @@ function BulkBar({
             </HeroButton>
             <HeroButton
               variant="outline"
-              className="team-button"
+              className="team-button team-bulk-action"
               type="button"
               isDisabled={busy}
               onPress={() => onRun("pause")}
@@ -401,7 +604,7 @@ function BulkBar({
             </HeroButton>
             <HeroButton
               variant="outline"
-              className="team-button"
+              className="team-button team-bulk-action"
               type="button"
               isDisabled={busy}
               onPress={() => onRun("resume")}
@@ -409,21 +612,19 @@ function BulkBar({
               {t("resume")}
             </HeroButton>
             <HeroButton
-              variant="outline"
-              className="team-button"
-              type="button"
-              isDisabled={busy}
-              onPress={() => onRun("revoke_sessions")}
-            >
-              {t("revokeSessions")}
-            </HeroButton>
-            <HeroButton
               variant="danger-soft"
-              className="team-button danger"
+              className="team-button danger team-bulk-delete"
               type="button"
               isDisabled={busy}
               onPress={() => {
-                if (confirm(t("bulkDeleteWarning", { n: count }))) onRun("delete");
+                void confirm({
+                  title: t("bulkDeleteTitle"),
+                  message: t("bulkDeleteWarning", { n: count }),
+                  confirmLabel: t("delete"),
+                  danger: true,
+                }).then((accepted) => {
+                  if (accepted) onRun("delete");
+                });
               }}
             >
               {t("delete")}
@@ -432,7 +633,7 @@ function BulkBar({
         ) : (
           <HeroButton
             variant="outline"
-            className="team-button"
+            className="team-button team-bulk-action"
             type="button"
             isDisabled={busy}
             onPress={() => onRun("revoke_sessions")}
@@ -440,7 +641,12 @@ function BulkBar({
             {t("revokeSessions")}
           </HeroButton>
         )}
-        <HeroButton variant="ghost" className="team-button quiet" type="button" onPress={onClear}>
+        <HeroButton
+          variant="ghost"
+          className="team-button quiet team-bulk-clear"
+          type="button"
+          onPress={onClear}
+        >
           {t("clearSelection")}
         </HeroButton>
       </div>
@@ -458,13 +664,7 @@ function BulkBar({
  * reported that quotas could not be changed from user management at all.
  */
 /**
- * One member's whole record, opened beside the roster rather than instead of it.
- *
- * This used to replace the list: click a row and the page became a form with a
- * "← members" link, so the operator lost the list they were working from (and on
- * a phone the identity of the page they were on). A right-hand Drawer is how
- * every other entity in this console is edited, and it keeps the roster — and the
- * search that found the row — in view.
+ * One member's whole record, edited in a centered dialog with a fixed action bar.
  */
 function MemberDetail({
   user,
@@ -501,41 +701,71 @@ function MemberDetail({
   const [quotaTokens, setQuotaTokens] = useState(String(user.quota_total_tokens));
   const [quotaCost, setQuotaCost] = useState(String(user.quota_total_cost));
   const [resetUsed, setResetUsed] = useState(false);
-  // The save button lives in the drawer's footer, outside the form element, so
-  // the two have to be tied together explicitly.
+  const [status, setStatus] = useState(user.status);
+  const [role, setRole] = useState(user.role);
+  const [allowRouting, setAllowRouting] = useState(user.allow_routing);
+  const [allowRequestPreferences, setAllowRequestPreferences] = useState(
+    user.allow_request_preferences,
+  );
+  // 保存操作放在弹框底部，使用表单 ID 关联到表单。
   const formID = useId();
   return (
-    <Drawer
-      title={user.name}
+    <Dialog
+      title={
+        <span className="member-edit-heading">
+          <strong>{user.name}</strong>
+          <span className="member-edit-heading__meta">{t(user.role)}</span>
+          <StatusBadge value={user.status} />
+        </span>
+      }
       busy={busy}
       onClose={onBack}
-      footer={
-        <>
-          {user.role !== "owner" && (
-            <Button variant="secondary" disabled={busy} onClick={onRevoke}>
-              {t("revokeSessions")}
+      className="member-edit-dialog"
+      actions={
+        <div className="member-edit-dialog-actions">
+          <div className="member-edit-dialog-actions__utility">
+            {user.role !== "owner" && (
+              <Button
+                variant="secondary"
+                className="member-edit-utility-button member-edit-utility-button--danger"
+                disabled={busy}
+                onClick={onRevoke}
+              >
+                {t("revokeSessions")}
+              </Button>
+            )}
+            {owner && (
+              <Button
+                variant="secondary"
+                className="member-edit-utility-button member-edit-utility-button--recovery"
+                disabled={busy}
+                onClick={onRecovery}
+              >
+                {t("recovery")}
+              </Button>
+            )}
+          </div>
+          <div className="member-edit-dialog-actions__primary">
+            <Button variant="secondary" disabled={busy} onClick={onBack}>
+              {t("cancel")}
             </Button>
-          )}
-          {owner && (
-            <Button variant="secondary" disabled={busy} onClick={onRecovery}>
-              {t("recovery")}
+            <Button
+              type="button"
+              loading={busy}
+              onClick={() => {
+                const form = document.getElementById(formID);
+                if (form instanceof HTMLFormElement) form.requestSubmit();
+              }}
+            >
+              {t("save")}
             </Button>
-          )}
-          <span className="flex-spacer" />
-          <Button variant="quiet" disabled={busy} onClick={onBack}>
-            {t("cancel")}
-          </Button>
-          <Button type="submit" form={formID} loading={busy}>
-            {t("save")}
-          </Button>
-        </>
+          </div>
+        </div>
       }
     >
-      <p className="drawer-subtitle">
-        {user.username} · {t(user.role)} · <StatusBadge value={user.status} />
-      </p>
       <form
         id={formID}
+        className="member-edit-form"
         onSubmit={(e) => {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
@@ -545,13 +775,14 @@ function MemberDetail({
             ...(owner
               ? {
                   max_keys: Number(f.get("max_keys")),
+                  max_concurrent: Number(f.get("max_concurrent")),
                   rpm: Number(f.get("rpm")),
-                  allow_routing: f.has("allow_routing"),
-                  allow_request_preferences: f.has("allow_request_preferences"),
+                  allow_routing: allowRouting,
+                  allow_request_preferences: allowRequestPreferences,
                 }
               : {}),
-            status: f.get("status"),
-            ...(owner && user.role !== "owner" ? { role: f.get("role") } : {}),
+            status: status,
+            ...(owner && user.role !== "owner" ? { role: role } : {}),
             ...(owner
               ? {
                   quota_total_tokens: Number(quotaTokens || 0),
@@ -562,17 +793,17 @@ function MemberDetail({
           });
         }}
       >
-        <div className="meta-form">
+        <div className="meta-form member-edit-grid">
           <Field label={t("name")}>
-            <input name="name" defaultValue={user.name} required maxLength={80} />
+            <TextInput name="name" defaultValue={user.name} required maxLength={80} />
           </Field>
           {owner && (
             <fieldset className="team-policy-choices">
               <legend>{t("authorizationGroups")}</legend>
               {policies.map((policy) => (
-                <label className="check marginless" key={policy.id}>
-                  <input
-                    type="checkbox"
+                <div className="check marginless" key={policy.id}>
+                  <CheckboxControl
+                    aria-label={policy.name}
                     checked={policyIDs.includes(policy.id)}
                     disabled={policyIDs.length === 1 && policyIDs.includes(policy.id)}
                     onChange={(event) =>
@@ -584,32 +815,43 @@ function MemberDetail({
                     }
                   />
                   <span>{policy.name}</span>
-                </label>
+                </div>
               ))}
             </fieldset>
           )}
           <Field label={t("status")}>
-            <select name="status" defaultValue={user.status} disabled={user.role === "owner"}>
+            <SelectControl
+              name="status"
+              value={status}
+              disabled={user.role === "owner"}
+              onChange={(event) => setStatus(event.target.value as TeamUser["status"])}
+              aria-label={t("status")}
+            >
               <option value="active">{t("active")}</option>
               <option value="paused">{t("paused")}</option>
-            </select>
+            </SelectControl>
             {user.role === "owner" && <input type="hidden" name="status" value="active" />}
           </Field>
           {owner && user.role !== "owner" && (
             <Field label={t("role")}>
-              <select name="role" defaultValue={user.role}>
+              <SelectControl
+                name="role"
+                value={role}
+                onChange={(event) => setRole(event.target.value as TeamUser["role"])}
+                aria-label={t("role")}
+              >
                 <option value="member">{t("member")}</option>
                 <option value="admin">{t("admin")}</option>
-              </select>
+              </SelectControl>
             </Field>
           )}
         </div>
         {owner && (
-          <section className="drawer-section">
+          <section className="drawer-section member-edit-section">
             <h3>{t("accountLimits")}</h3>
-            <div className="meta-form">
+            <div className="meta-form member-edit-limit-grid">
               <Field label={t("maxKeys")}>
-                <input
+                <TextInput
                   name="max_keys"
                   type="number"
                   min={1}
@@ -618,8 +860,19 @@ function MemberDetail({
                   required
                 />
               </Field>
+              <Field label={t("maxConcurrent")}>
+                <TextInput
+                  name="max_concurrent"
+                  aria-label={t("maxConcurrent")}
+                  type="number"
+                  min={1}
+                  max={10000}
+                  defaultValue={user.max_concurrent}
+                  required
+                />
+              </Field>
               <Field label={t("rpm")}>
-                <input
+                <TextInput
                   name="rpm"
                   type="number"
                   min={1}
@@ -629,27 +882,33 @@ function MemberDetail({
                 />
               </Field>
             </div>
-            <label className="check marginless">
-              <input type="checkbox" name="allow_routing" defaultChecked={user.allow_routing} />
-              <span>{t("allowPersonalRouting")}</span>
-            </label>
-            <label className="check marginless">
-              <input
-                type="checkbox"
-                name="allow_request_preferences"
-                defaultChecked={user.allow_request_preferences}
-              />
-              <span>{t("allowRequestControls")}</span>
-            </label>
+            <div className="member-edit-features">
+              <div className="check marginless">
+                <CheckboxControl
+                  name="allow_routing"
+                  checked={allowRouting}
+                  onChange={(event) => setAllowRouting(event.target.checked)}
+                />
+                <span>{t("allowPersonalRouting")}</span>
+              </div>
+              <div className="check marginless">
+                <CheckboxControl
+                  name="allow_request_preferences"
+                  checked={allowRequestPreferences}
+                  onChange={(event) => setAllowRequestPreferences(event.target.checked)}
+                />
+                <span>{t("allowRequestControls")}</span>
+              </div>
+            </div>
           </section>
         )}
         {owner && (
-          <section className="drawer-section">
+          <section className="drawer-section member-edit-section member-edit-section--quota">
             <h3>{t("credit")}</h3>
             <p className="panel-hint">{t("creditHint")}</p>
-            <div className="meta-form">
+            <div className="meta-form member-edit-quota-grid">
               <Field label={t("quotaTotal")} hint={t("quotaHint")}>
-                <input
+                <TextInput
                   type="number"
                   min={0}
                   value={quotaTokens}
@@ -657,7 +916,7 @@ function MemberDetail({
                 />
               </Field>
               <Field label={t("quotaCostTotal")} hint={t("quotaCostHint")}>
-                <input
+                <TextInput
                   type="number"
                   min={0}
                   step="0.01"
@@ -666,21 +925,20 @@ function MemberDetail({
                 />
               </Field>
             </div>
-            <label className="check marginless">
-              <input
-                type="checkbox"
+            <div className="check marginless">
+              <CheckboxControl
                 checked={resetUsed}
                 onChange={(e) => setResetUsed(e.target.checked)}
               />
               <span>{t("quotaResetLabel")}</span>
-            </label>
+            </div>
             <p className="panel-hint">
               {user.role === "owner" ? t("protectedOwner") : t("userChangeHint")}
             </p>
           </section>
         )}
       </form>
-      <section className="drawer-section">
+      <section className="drawer-section member-edit-section">
         <h3>{t("keys")}</h3>
         {keysPending ? (
           <Loading />
@@ -702,7 +960,7 @@ function MemberDetail({
           </DataTable>
         )}
       </section>
-      <section className="drawer-section">
+      <section className="drawer-section member-edit-section">
         <h3>{t("oauthBindings")}</h3>
         <p className="panel-hint">{t("oauthBindingsHint")}</p>
         {bindings && bindings.length > 0 ? (
@@ -727,6 +985,6 @@ function MemberDetail({
           <p className="panel-hint">{t("oauthNoBindings")}</p>
         )}
       </section>
-    </Drawer>
+    </Dialog>
   );
 }

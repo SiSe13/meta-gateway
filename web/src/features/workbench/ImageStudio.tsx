@@ -3,7 +3,16 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import { Empty, ErrorState, Field, Panel, formatDate } from "../../components/ui";
+import {
+  Empty,
+  ErrorState,
+  Field,
+  Panel,
+  formatDate,
+  TextInput,
+  TextAreaControl,
+  SelectControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
 import { upstreamMessage } from "../../lib/upstreamError";
 import type { ImageBody, WorkbenchRunner } from "./runner";
@@ -337,7 +346,7 @@ export default function ImageStudio({
                   : t("workbench.image.upstreamHintOne")
               }
             >
-              <select
+              <SelectControl
                 aria-label={t("workbench.image.upstream")}
                 value={memberId}
                 onChange={(event) => {
@@ -352,10 +361,10 @@ export default function ImageStudio({
                     {upstream.label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("workbench.image.mode")}>
-              <select
+              <SelectControl
                 aria-label={t("workbench.image.mode")}
                 value={mode}
                 onChange={(event) => {
@@ -371,11 +380,11 @@ export default function ImageStudio({
                 <option value="edit" disabled={!canEdit}>
                   {t("workbench.image.modeEdit")}
                 </option>
-              </select>
+              </SelectControl>
             </Field>
             <Field label={t("workbench.image.size")}>
               {sizeOptions.length > 0 ? (
-                <select
+                <SelectControl
                   aria-label={t("workbench.image.size")}
                   value={size}
                   onChange={(event) => setSize(event.target.value)}
@@ -386,9 +395,9 @@ export default function ImageStudio({
                       {option}
                     </option>
                   ))}
-                </select>
+                </SelectControl>
               ) : (
-                <input
+                <TextInput
                   aria-label={t("workbench.image.size")}
                   value={size}
                   placeholder="1024x1024"
@@ -398,7 +407,7 @@ export default function ImageStudio({
             </Field>
           </div>
           <Field label={t("workbench.image.prompt")}>
-            <textarea
+            <TextAreaControl
               aria-label={t("workbench.image.prompt")}
               rows={4}
               value={prompt}

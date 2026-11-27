@@ -1,7 +1,25 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, expect, it } from "vitest";
-import { formatLatency, formatUnitPrice, setCurrency, useCurrency } from "./format";
+import {
+  formatGroupName,
+  formatLatency,
+  formatUnitPrice,
+  setCurrency,
+  useCurrency,
+} from "./format";
+import { translate } from "../i18n";
 beforeEach(() => setCurrency({ symbol: "$", rate: 1 }));
+
+it("localizes built-in default groups while preserving custom group names", () => {
+  const t = (key: string) => translate("zh-CN", key);
+  for (const value of [undefined, null, "", " ", "default", " default "]) {
+    expect(formatGroupName(value, t)).toBe("默认");
+  }
+  for (const value of ["vip", "默认", "my-default", "Default"]) {
+    expect(formatGroupName(value, t)).toBe(value);
+  }
+  expect(formatGroupName("default", (key) => translate("en", key))).toBe("default");
+});
 it("preserves nonzero tiny prices and large fractional prices", () => {
   expect(formatUnitPrice(0.0000001)).toBe("$1e-7");
   expect(formatUnitPrice(1234.56789)).toBe("$1,234.56789");

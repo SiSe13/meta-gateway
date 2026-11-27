@@ -137,6 +137,7 @@ describe("proxy log filters", () => {
       { target: { value: " quota " } },
     );
     fireEvent.click(screen.getByRole("button", { name: "Exact filters" }));
+    expect(document.querySelector(".log-filter-bar")).toHaveClass("is-expanded");
     fireEvent.change(screen.getByRole("textbox", { name: "Model" }), {
       target: { value: " gpt-image-2 " },
     });
@@ -509,16 +510,20 @@ describe("log page reading order", () => {
     vi.unstubAllGlobals();
   });
 
-  // "How many rows, how many of them failed" is the question the page opens
-  // with, so the readouts sit above every panel rather than between two.
-  it("opens with the readout strip, above the distribution", async () => {
+  // The range controls belong with the distribution, while export belongs
+  // with the filters that determine which rows are downloaded.
+  it("keeps the distribution above the log list and export with the filters", async () => {
     const { container } = renderLogs();
     await screen.findByText("fast-model");
-    const strip = container.querySelector(".logs-overview");
     const panel = container.querySelector(".latency-panel");
-    expect(strip).not.toBeNull();
+    const list = container.querySelector(".logs-split .list-shell");
     expect(panel).not.toBeNull();
-    expect(strip!.compareDocumentPosition(panel!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(list).not.toBeNull();
+    expect(panel!.compareDocumentPosition(list!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector(".logs-overview")).not.toBeInTheDocument();
+    expect(container.querySelector(".log-filter-bar")).toContainElement(
+      screen.getByRole("button", { name: "Export CSV" }),
+    );
   });
 
   // The distribution used to be a collapsed strip under the table, which made
@@ -672,9 +677,9 @@ describe("logs refresh", () => {
     await screen.findByText("fast-model");
     expect(requests.at(-1)?.get("until")).toBe("2026-10-09T12:00:00.000Z");
 
-    // Five minutes later the operator presses 刷新: the window must end NOW.
+    // Five minutes later the operator re-anchors the range: it must end NOW.
     vi.setSystemTime(new Date("2026-10-09T12:05:00.000Z"));
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-anchor to now" }));
     await waitFor(() => expect(requests.at(-1)?.get("until")).toBe("2026-10-09T12:05:00.000Z"));
     // ...and it is still the same 24-hour span, not a window that slid halfway.
     expect(requests.at(-1)?.get("since")).toBe("2026-10-08T12:05:00.000Z");
@@ -689,7 +694,7 @@ describe("logs refresh", () => {
     await screen.findByText("fast-model");
     const before = requests.length;
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: "Re-anchor to now" }));
     await waitFor(() => expect(requests.length).toBeGreaterThan(before));
     // Same window, forced fetch: a fixed range must not drift just because the
     // operator asked to see it again.
@@ -753,35 +758,37 @@ describe("log empty-state entry points", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps the operator's connections and token actions", async () => {
+  it("shows a plain hint without an empty-state card or action buttons", async () => {
     localStorage.setItem("meta-gateway.admin-token", "test-token");
     renderLogs("/logs", []);
-    await screen.findByText("No proxy traffic yet");
-    expect(screen.getByRole("link", { name: "Go to connections" })).toHaveAttribute(
-      "href",
-      "/channels",
+    expect(
+      await screen.findByText("Send a /v1 request and its records will appear here."),
+    ).toHaveClass("logs-empty-hint");
+    for (const label of ["Shown", "Failed in view", "Failure rate", "Average latency"]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: "Re-anchor to now" })).toBeInTheDocument();
+    expect(document.querySelector(".logs-overview")).not.toBeInTheDocument();
+    expect(document.querySelector(".log-filter-bar")).toContainElement(
+      screen.getByRole("button", { name: "Export CSV" }),
     );
-    expect(screen.getByRole("link", { name: "Create a token" })).toHaveAttribute(
-      "href",
-      "/keys?create=1",
-    );
+    expect(document.querySelector(".empty-hero")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Go to connections" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create a token" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open workbench" })).not.toBeInTheDocument();
   });
 
-  it("offers a member a token and the workbench, not a staff-only connection page", async () => {
+  it("shows the same plain hint for a member", async () => {
     // A team cookie session, no deployment token: SessionProvider restores the
     // member role from /me and Logs binds the member source.
     localStorage.setItem("meta-gateway.team-console", "1");
     renderMemberLogs();
-    await screen.findByText("No proxy traffic yet");
-    expect(screen.getByRole("link", { name: "Create a token" })).toHaveAttribute(
-      "href",
-      "/keys?create=1",
-    );
-    expect(screen.getByRole("link", { name: "Open workbench" })).toHaveAttribute(
-      "href",
-      "/workbench",
-    );
+    expect(
+      await screen.findByText("Send a /v1 request and its records will appear here."),
+    ).toHaveClass("logs-empty-hint");
+    expect(document.querySelector(".empty-hero")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Create a token" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open workbench" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Go to connections" })).not.toBeInTheDocument();
   });
 

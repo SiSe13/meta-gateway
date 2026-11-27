@@ -19,7 +19,7 @@ import type {
   Site,
   ThirdPartySync,
 } from "../../api/types";
-import { relativeTime } from "../../lib/format";
+import { formatGroupName, relativeTime } from "../../lib/format";
 import { AvailabilityIndicator } from "../../components/AvailabilityIndicator";
 import { Button, ConfirmDialog, Dialog, Empty, ErrorState, InfoTip } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
@@ -588,7 +588,7 @@ export function SiteObservationWorkspace({
                   aria-current={site.site_id === selected?.site_id ? "true" : undefined}
                   onPress={() => setSelectedId(site.site_id)}
                 >
-                  <strong>{site.site_name}</strong>
+                  <span className="observation-site-name">{site.site_name}</span>
                   <span>
                     {t("observation.count", {
                       count: items.filter((item) => item.site_id === site.site_id).length,
@@ -889,7 +889,7 @@ function ObservationRow({
         ) : null}
         <div>
           <code title={item.raw_model}>{item.raw_model}</code>
-          {item.group_name ? <small>{item.group_name}</small> : null}
+          {item.group_name ? <small>{formatGroupName(item.group_name, t)}</small> : null}
           {item.weak_evidence ? <small>{t("modelsPage.siteProbe.weakEvidence")}</small> : null}
           {/* Routing state stayed in the panel after the route column became the
               availability one: it is what tells the operator whether this name

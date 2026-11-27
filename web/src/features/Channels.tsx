@@ -17,7 +17,7 @@ import type { ActionMenuItem } from "../components/ActionMenu";
 import { ThemeDetails } from "../themes/ThemeDetails";
 import { ResultStrip } from "../components/ResultStrip";
 import { TelemetryStrip } from "../components/TelemetryStrip";
-import { Button, Page } from "../components/ui";
+import { Button, Page, CheckboxControl } from "../components/ui";
 import { useAdminMutation } from "../hooks/useAdminMutation";
 import { useAutomationMaster } from "../hooks/useAutomationMaster";
 import { useClientPagination } from "../hooks/useClientPagination";
@@ -682,8 +682,7 @@ export function Channels() {
     });
   };
   const bulkHeader = (
-    <input
-      type="checkbox"
+    <CheckboxControl
       aria-label={t("channels.bulkSelectPage")}
       checked={pageAllSelected}
       onChange={selectAllPage}

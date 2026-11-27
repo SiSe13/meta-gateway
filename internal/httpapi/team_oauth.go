@@ -335,7 +335,7 @@ func (h *TeamHandler) oauthCallback(w http.ResponseWriter, r *http.Request) {
 		fail("oauth_account_failed")
 		return
 	}
-	if _, err := h.startSession(w, r, user); err != nil {
+	if _, err := h.startSession(w, r, user, "oauth:"+providerID); err != nil {
 		log.Printf("team: oauth %s session failed: %v", providerID, err)
 		fail("oauth_session_failed")
 		return

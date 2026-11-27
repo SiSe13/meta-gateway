@@ -142,6 +142,30 @@ func (s *Service) ForwardWithMeta(ctx context.Context, req Request) (finalResult
 	if rejected := normalizeAndAuthorize(&req); rejected != nil {
 		return rejected, nil
 	}
+	keyInFlight := req.DownstreamKeyID > 0
+	if keyInFlight {
+		s.acquireKey(req.DownstreamKeyID)
+		defer func() {
+			if keyInFlight {
+				s.releaseKey(req.DownstreamKeyID)
+			}
+		}()
+	}
+	userGateHeld := false
+	var userGateGen uint64
+	if req.TeamAccess != nil && req.TeamAccess.UserID > 0 && s.userGate != nil {
+		gen, err := s.userGate.Acquire(ctx, req.TeamAccess.UserID, req.TeamAccess.MaxConcurrent)
+		if err != nil {
+			return &relay.Result{Err: err}, nil
+		}
+		userGateGen = gen
+		userGateHeld = true
+		defer func() {
+			if userGateHeld {
+				s.userGate.Release(req.TeamAccess.UserID, userGateGen)
+			}
+		}()
+	}
 	// Failover state for one relay request: channels retired entirely
 	// (channel-wide failure), individual alias variants retired (the upstream
 	// name failed while its channel siblings may be healthy), and the two-layer
@@ -842,6 +866,20 @@ func (s *Service) ForwardWithMeta(ctx context.Context, req Request) (finalResult
 				// body wrapper, which fires exactly once via sync.Once.
 				result.Body = &gateBoundBody{ReadCloser: body, release: func() { s.gate.Release(candidate.Channel.ID, gateGen) }}
 				gateHeld = false
+			}
+			if userGateHeld && result.Body != nil {
+				body := result.Body
+				result.Body = &gateBoundBody{ReadCloser: body, release: func() {
+					s.userGate.Release(req.TeamAccess.UserID, userGateGen)
+				}}
+				userGateHeld = false
+			}
+			if keyInFlight && result.Body != nil {
+				body := result.Body
+				result.Body = &gateBoundBody{ReadCloser: body, release: func() {
+					s.releaseKey(req.DownstreamKeyID)
+				}}
+				keyInFlight = false
 			}
 			if req.UpstreamURLActual != "" {
 				// Echo the endpoint that served the request. Without it a client

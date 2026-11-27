@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button as HeroButton } from "@heroui/react";
-import { Button, Field } from "../components/ui";
+import { Button, Field, TextInput } from "../components/ui";
 import { useI18n } from "../i18n";
 import { accountRequest } from "../team/transport";
 import { teamError, type TeamText } from "../team/text";
@@ -81,17 +81,23 @@ export function AcceptFlow({
       <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, display: "contents" }}>
         {!recovery && (
           <Field label={t("username")} hint={t("userHint")}>
-            <input name="username" required minLength={3} maxLength={64} autoComplete="username" />
+            <TextInput
+              name="username"
+              required
+              minLength={3}
+              maxLength={64}
+              autoComplete="username"
+            />
           </Field>
         )}
         {signingUp && (
           <Field label={t("name")}>
-            <input name="name" required maxLength={80} autoComplete="name" />
+            <TextInput name="name" required maxLength={80} autoComplete="name" />
           </Field>
         )}
         {redeeming && (
           <Field label={t("code")} hint={t("codeHint")}>
-            <input
+            <TextInput
               name="code"
               required
               maxLength={64}
@@ -101,7 +107,7 @@ export function AcceptFlow({
           </Field>
         )}
         <Field label={t("password")} hint={signingUp || recovery ? t("passwordHint") : undefined}>
-          <input
+          <TextInput
             name="password"
             type="password"
             required

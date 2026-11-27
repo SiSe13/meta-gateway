@@ -28,6 +28,7 @@ export function ConsoleShell({
   showAdminAccount = false,
   showMemberAccount = false,
   onOpenAdminAccount = () => {},
+  onOpenPasswordDialog = () => {},
   appearanceHiddenNav = [],
   version,
   theme,
@@ -46,6 +47,7 @@ export function ConsoleShell({
   showAdminAccount?: boolean;
   showMemberAccount?: boolean;
   onOpenAdminAccount?: () => void;
+  onOpenPasswordDialog?: () => void;
   appearanceHiddenNav?: string[];
   version: string;
   theme: "light" | "dark";
@@ -77,7 +79,7 @@ export function ConsoleShell({
     new URLSearchParams(location.search).get("view") === "observations";
 
   // 桌面端在顶栏切换工作区，移动端在抽屉顶部提供同一组入口。
-  const mobileTopNavigation = (
+  const mobileTopNavigation = topNavigation.length ? (
     <nav className="console-mobile-top-nav" aria-label={t("app.topNav.ariaLabel")}>
       {topNavigation.map((item) => (
         <HeroButton
@@ -92,7 +94,7 @@ export function ConsoleShell({
         </HeroButton>
       ))}
     </nav>
-  );
+  ) : null;
 
   // 渲染按当前顶栏工作区筛选后的侧栏入口。
   const navigation = (mobile = false) => (
@@ -147,6 +149,7 @@ export function ConsoleShell({
         showAdminAccount={showAdminAccount}
         showMemberAccount={showMemberAccount}
         onOpenAdminAccount={onOpenAdminAccount}
+        onOpenPasswordDialog={onOpenPasswordDialog}
         appearanceHiddenNav={appearanceHiddenNav}
         sections={sections}
         version={version}
@@ -166,14 +169,13 @@ export function ConsoleShell({
           {children}
         </div>
         <footer className="console-page-foot">
-          <span>Meta Gateway</span>
           <span>{t("shell.footer")}</span>
           <span className="console-foot-dot" />
         </footer>
       </div>
       {mobileOpen ? (
         <Drawer
-          title="Meta Gateway"
+          title="Balbo AI"
           onClose={() => setMobileOpen(false)}
           side="left"
           width={300}

@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import { SearchableSelect, type SelectOption } from "../../components/SearchableSelect";
 import { Button, Dialog, ErrorState, Field } from "../../components/ui";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import { useSession } from "../../session";
 
 export function CreateKeyDialog({
@@ -40,7 +41,7 @@ export function CreateKeyDialog({
   }, [channelId, groupsQuery.data]);
   const groupOptions: SelectOption[] = (groupsQuery.data?.groups ?? []).map((value) => ({
     value,
-    label: value,
+    label: formatGroupName(value, t),
     group: "token-groups",
   }));
   const groupsLoadFailed = Boolean(groupsQuery.isError);

@@ -161,3 +161,29 @@ it("stays quiet once the deployment has an owner account", async () => {
   mount(<OperatorUpgradePrompt />);
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 });
+
+it("shows the current password before the new password without the account hint", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            required: false,
+            username: "boss",
+            has_owner: true,
+            token_login: false,
+            totp_login: false,
+            mode: "personal",
+          }),
+        ),
+    ),
+  );
+  mount(<OperatorClaimPanel />);
+
+  const currentPassword = await screen.findByLabelText<HTMLInputElement>("Current password");
+  const newPassword = screen.getByLabelText<HTMLInputElement>("New password");
+  const inputs = Array.from(currentPassword.form!.querySelectorAll("input"));
+  expect(inputs.indexOf(currentPassword)).toBeLessThan(inputs.indexOf(newPassword));
+  expect(screen.queryByText(/Change the administrator's username or password here/)).toBeNull();
+});

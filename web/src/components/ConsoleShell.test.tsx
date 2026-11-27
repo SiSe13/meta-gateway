@@ -47,7 +47,7 @@ it("closes mobile navigation after choosing a destination", () => {
     screen.queryByText("Workspace", { selector: ".console-breadcrumb span" }),
   ).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Open navigation" }));
-  const drawer = screen.getByRole("dialog", { name: "Meta Gateway" });
+  const drawer = screen.getByRole("dialog", { name: "Balbo AI" });
   fireEvent.click(within(drawer).getByRole("link", { name: "Connections" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByTestId("destination")).toHaveTextContent("/channels");
@@ -164,7 +164,7 @@ it("marks only the exact team board as active", () => {
   expect(container.querySelector('a[href="/users/policies"]')).toHaveClass("active");
 });
 
-it("opens the administrator account as a dialog action", () => {
+it("opens the password change dialog from the administrator menu", () => {
   const openAccount = vi.fn();
   render(
     <I18nProvider>
@@ -186,35 +186,34 @@ it("opens the administrator account as a dialog action", () => {
     </I18nProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "Administrator account" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Change password" }));
   expect(openAccount).toHaveBeenCalledOnce();
 });
 
-it("takes a team account to its own settings page", () => {
-  function CurrentLocation() {
-    return <output data-testid="destination">{useLocation().pathname}</output>;
-  }
+it("opens the password flow from the team account menu", () => {
+  const openPassword = vi.fn();
   render(
     <I18nProvider>
-      <MemoryRouter initialEntries={["/models"]}>
+      <MemoryRouter>
         <ConsoleShell
           appearance="metapi"
           sections={[]}
           showMemberAccount
+          onOpenPasswordDialog={openPassword}
           version="dev"
           theme="light"
           onThemeChange={vi.fn()}
           onDisconnect={vi.fn()}
           health={{ total: 0, healthy: 0, loading: false }}
         >
-          <CurrentLocation />
+          {null}
         </ConsoleShell>
       </MemoryRouter>
     </I18nProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Account menu" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: "My account" }));
-  expect(screen.getByTestId("destination")).toHaveTextContent("/account");
+  fireEvent.click(screen.getByRole("menuitem", { name: "Change password" }));
+  expect(openPassword).toHaveBeenCalledOnce();
 });
 
 it("keeps page header actions bound to the current selection", () => {

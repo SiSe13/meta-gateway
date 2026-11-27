@@ -63,6 +63,16 @@ func TestTeamAccessUnionsAssignedAuthorizationGroups(t *testing.T) {
 	if access.RPM != 23 || !access.AllowRouting || !access.AllowRequestPreferences {
 		t.Fatalf("account-level controls were not loaded from the user: %+v", access)
 	}
+	if access.MaxConcurrent != 5 {
+		t.Fatalf("default max concurrent = %d, want 5", access.MaxConcurrent)
+	}
+	if _, err := db.Exec(`UPDATE team_users SET max_concurrent=8 WHERE id=7`); err != nil {
+		t.Fatal(err)
+	}
+	access, err = db.DownstreamKey.ResolveTeamAccess(key)
+	if err != nil || access.MaxConcurrent != 8 {
+		t.Fatalf("updated max concurrent was not loaded: access=%+v err=%v", access, err)
+	}
 }
 
 // teamKeyRiding creates a team key for user 7 bound to planID (0 = unbound).

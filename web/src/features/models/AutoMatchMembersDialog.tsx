@@ -6,6 +6,7 @@ import { api } from "../../api/client";
 import { Button, CheckboxControl, Dialog, Empty, ErrorState } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import { useSession } from "../../session";
 import { useToast } from "../../toast";
 import { MatchScopeFieldset, matchSourceLabel } from "./MatchScopeFieldset";
@@ -90,7 +91,7 @@ export function AutoMatchMembersDialog({
       toast.push({
         tone: added > 0 ? "success" : "info",
         message: t(skipped > 0 ? "modelsPage.autoMatch.doneSkipped" : "modelsPage.autoMatch.done", {
-          group: group || t("routing.groupDefault"),
+          group: formatGroupName(group, t),
           added,
           skipped,
         }),
@@ -126,7 +127,7 @@ export function AutoMatchMembersDialog({
       <p className="panel-hint">{t("modelsPage.autoMatch.desc")}</p>
       <p className="ops-panel-context">
         {t("modelsPage.autoMatch.group", {
-          name: group || t("routing.groupDefault"),
+          name: formatGroupName(group, t),
         })}
       </p>
       <MatchScopeFieldset

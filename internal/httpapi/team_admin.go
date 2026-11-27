@@ -123,8 +123,8 @@ func (h *TeamHandler) policy(id int64) (TeamPolicy, error) {
 func (h *TeamHandler) userAccess(userID int64) (*domain.TeamAccess, error) {
 	var rpm, allowRouting, allowPreferences int
 	a := &domain.TeamAccess{UserID: userID, MemberIDs: make(map[int64]bool)}
-	if err := h.db.QueryRow(`SELECT rpm,allow_routing,allow_request_preferences FROM team_users WHERE id=?`, userID).
-		Scan(&rpm, &allowRouting, &allowPreferences); err != nil {
+	if err := h.db.QueryRow(`SELECT max_concurrent,rpm,allow_routing,allow_request_preferences FROM team_users WHERE id=?`, userID).
+		Scan(&a.MaxConcurrent, &rpm, &allowRouting, &allowPreferences); err != nil {
 		return nil, err
 	}
 	a.RPM, a.AllowRouting, a.AllowRequestPreferences = rpm, allowRouting != 0, allowPreferences != 0
@@ -253,7 +253,7 @@ func (h *TeamHandler) deletePolicy(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	res, err := h.db.Exec(`DELETE FROM team_policies WHERE id=? AND id<>1 AND NOT EXISTS(SELECT 1 FROM team_user_policies WHERE policy_id=?) AND NOT EXISTS(SELECT 1 FROM team_invites WHERE policy_id=?)`, id, id, id)
+	res, err := h.db.Exec(`DELETE FROM team_policies WHERE id=? AND id<>1 AND NOT EXISTS(SELECT 1 FROM team_user_policies WHERE policy_id=?) AND NOT EXISTS(SELECT 1 FROM team_invites WHERE policy_id=?) AND NOT EXISTS(SELECT 1 FROM team_invite_policies WHERE policy_id=?)`, id, id, id, id)
 	if err != nil {
 		teamFail(w, 409, "policy_in_use")
 		return
@@ -305,21 +305,69 @@ func (h *TeamHandler) managedUser(w http.ResponseWriter, r *http.Request) (*Team
 	}
 	return u, true
 }
+
+// adjustUserConcurrency 为单个成员增加并发额度，并记录可选的到期时间。
+func (h *TeamHandler) adjustUserConcurrency(w http.ResponseWriter, r *http.Request) {
+	if !teamOwner(w, r) {
+		return
+	}
+	u, ok := h.managedUser(w, r)
+	if !ok {
+		return
+	}
+	var req struct {
+		Amount            int `json:"amount"`
+		GrantValidityDays int `json:"grant_validity_days"`
+	}
+	if !teamRead(w, r, &req) {
+		return
+	}
+	if req.Amount < 1 || req.Amount > teamCodeMaxConcurrent || req.GrantValidityDays < 0 || req.GrantValidityDays > teamCodeMaxGrantValidityDays {
+		teamFail(w, 400, "invalid_request")
+		return
+	}
+	tx, err := h.db.Begin()
+	if err != nil {
+		teamFail(w, 500, "save_failed")
+		return
+	}
+	defer tx.Rollback()
+	expiresAt := int64(0)
+	if req.GrantValidityDays > 0 {
+		expiresAt = time.Now().Add(time.Duration(req.GrantValidityDays) * 24 * time.Hour).Unix()
+	}
+	if err := grantUserConcurrency(tx, u.ID, req.Amount, expiresAt); err != nil {
+		if errors.Is(err, errTeamConcurrencyLimit) {
+			teamFail(w, 400, "concurrency_limit_exceeded")
+		} else {
+			teamFail(w, 500, "save_failed")
+		}
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		teamFail(w, 500, "save_failed")
+		return
+	}
+	h.audit(r, "team.user.concurrency", u.ID)
+	teamJSON(w, 200, map[string]any{"ok": true})
+}
+
 func (h *TeamHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 	u, ok := h.managedUser(w, r)
 	if !ok {
 		return
 	}
 	var req struct {
-		Name     *string `json:"name"`
-		Status   *string `json:"status"`
-		PolicyID *int64   `json:"policy_id"`
-		PolicyIDs *[]int64 `json:"policy_ids"`
-		MaxKeys   *int    `json:"max_keys"`
-		RPM       *int    `json:"rpm"`
-		AllowRouting *bool `json:"allow_routing"`
-		AllowRequestPreferences *bool `json:"allow_request_preferences"`
-		Role     *string `json:"role"`
+		Name                    *string  `json:"name"`
+		Status                  *string  `json:"status"`
+		PolicyID                *int64   `json:"policy_id"`
+		PolicyIDs               *[]int64 `json:"policy_ids"`
+		MaxKeys                 *int     `json:"max_keys"`
+		MaxConcurrent           *int     `json:"max_concurrent"`
+		RPM                     *int     `json:"rpm"`
+		AllowRouting            *bool    `json:"allow_routing"`
+		AllowRequestPreferences *bool    `json:"allow_request_preferences"`
+		Role                    *string  `json:"role"`
 		// The account credit pool. quota_reset zeroes the spend counters in the
 		// same write, which is what "top this person up" means in practice.
 		QuotaTotal *int64   `json:"quota_total_tokens"`
@@ -403,6 +451,13 @@ func (h *TeamHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		u.MaxKeys = *req.MaxKeys
 	}
+	if req.MaxConcurrent != nil {
+		if *req.MaxConcurrent < 1 || *req.MaxConcurrent > teamCodeMaxConcurrent {
+			teamFail(w, 400, "invalid_request")
+			return
+		}
+		u.MaxConcurrent = *req.MaxConcurrent
+	}
 	if req.RPM != nil {
 		if *req.RPM < 1 || *req.RPM > 100000 {
 			teamFail(w, 400, "invalid_request")
@@ -420,7 +475,7 @@ func (h *TeamHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 		u.PolicyIDs = policyIDs
 		u.PolicyID = policyIDs[0]
 	}
-	if (groupsChanged || req.MaxKeys != nil || req.RPM != nil || req.AllowRouting != nil || req.AllowRequestPreferences != nil) && !teamOwner(w, r) {
+	if (groupsChanged || req.MaxKeys != nil || req.MaxConcurrent != nil || req.RPM != nil || req.AllowRouting != nil || req.AllowRequestPreferences != nil) && !teamOwner(w, r) {
 		return
 	}
 	// A quota reset rides along with the rest of the update, so "raise the cap
@@ -431,8 +486,8 @@ func (h *TeamHandler) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	set := `name=?,status=?,role=?,policy_id=?,max_keys=?,rpm=?,allow_routing=?,allow_request_preferences=?,quota_total_tokens=?,quota_total_cost=?,session_version=session_version+1`
-	args := []any{u.Name, u.Status, u.Role, u.PolicyID, u.MaxKeys, u.RPM, u.AllowRouting, u.AllowRequestPreferences, u.QuotaTotalTokens, u.QuotaTotalCost}
+	set := `name=?,status=?,role=?,policy_id=?,max_keys=?,max_concurrent=?,rpm=?,allow_routing=?,allow_request_preferences=?,quota_total_tokens=?,quota_total_cost=?,session_version=session_version+1`
+	args := []any{u.Name, u.Status, u.Role, u.PolicyID, u.MaxKeys, u.MaxConcurrent, u.RPM, u.AllowRouting, u.AllowRequestPreferences, u.QuotaTotalTokens, u.QuotaTotalCost}
 	if resetUsed {
 		set += `,quota_used_tokens=0,quota_used_cost=0`
 	}
@@ -569,7 +624,7 @@ func (h *TeamHandler) revokeInvite(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	query := `UPDATE team_invites SET revoked=1 WHERE id=?`
+	query := `UPDATE team_invites SET revoked=1,token_enc='' WHERE id=?`
 	if p := teamActor(r); p != nil && p.User != nil && p.User.Role == "admin" {
 		query += ` AND role='member' AND kind='invite'`
 	}

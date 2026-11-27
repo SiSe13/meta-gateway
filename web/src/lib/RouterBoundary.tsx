@@ -6,6 +6,7 @@ import {
   type Location,
 } from "react-router-dom";
 import { useI18n } from "../i18n";
+import { useConfirm } from "../components/ConfirmProvider";
 import { leavesDirtyZone } from "./unsavedChanges";
 
 /** A move is held back only when it would leave the page the operator is on. */
@@ -44,11 +45,14 @@ export function UnsavedChangesBoundary({ children }: { children: ReactNode }) {
 
 function GuardedNavigation({ children }: { children: ReactNode }) {
   const { t } = useI18n();
+  const confirm = useConfirm();
   const blocker = useBlocker(shouldBlockLeave);
   // One prompt per held-back move. The effect also runs for unrelated
   // re-renders and, under StrictMode, twice for one mount; asking again would
   // put a second dialog in front of the same navigation.
   const asked = useRef<Location | null>(null);
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
 
   useEffect(() => {
     if (blocker.state !== "blocked") {
@@ -57,9 +61,17 @@ function GuardedNavigation({ children }: { children: ReactNode }) {
     }
     if (asked.current === blocker.location) return;
     asked.current = blocker.location;
-    if (window.confirm(t("common.unsavedConfirm"))) blocker.proceed();
-    else blocker.reset();
-  }, [blocker, t]);
+    void confirm({
+      title: t("common.unsavedTitle"),
+      message: t("common.unsavedConfirm"),
+    }).then((accepted) => {
+      if (asked.current !== blocker.location) return;
+      const current = blockerRef.current;
+      if (current.state !== "blocked") return;
+      if (accepted) current.proceed();
+      else current.reset();
+    });
+  }, [blocker.location, blocker.state, confirm, t]);
 
   return <>{children}</>;
 }

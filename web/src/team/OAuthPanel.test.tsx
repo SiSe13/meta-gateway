@@ -1,8 +1,9 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createContext, useContext, useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Link, Route, Routes, createMemoryRouter, RouterProvider } from "react-router-dom";
 import { I18nProvider } from "../i18n";
+import { ConfirmProvider } from "../components/ConfirmProvider";
 import { UnsavedChangesBoundary } from "../lib/RouterBoundary";
 import { OAuthPanel } from "./OAuthPanel";
 import { teamText } from "./text";
@@ -89,9 +90,11 @@ function Board({ request }: { request: TeamRequest }) {
   );
   return (
     <I18nProvider>
-      <RequestContext.Provider value={request}>
-        <RouterProvider router={router} />
-      </RequestContext.Provider>
+      <ConfirmProvider>
+        <RequestContext.Provider value={request}>
+          <RouterProvider router={router} />
+        </RequestContext.Provider>
+      </ConfirmProvider>
     </I18nProvider>
   );
 }
@@ -114,44 +117,71 @@ function BoardRoutes() {
 }
 
 it("keeps a half-typed provider field when the operator leaves the board", async () => {
-  const confirm = vi.fn(() => false);
-  vi.stubGlobal("confirm", confirm);
   render(<Board request={stub().request} />);
 
   fireEvent.change(await screen.findByLabelText("Client ID"), { target: { value: "gh-client" } });
   fireEvent.click(screen.getByRole("link", { name: "members" }));
 
-  expect(confirm).toHaveBeenCalledTimes(1);
+  const dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(screen.getByLabelText("Client ID")).toHaveValue("gh-client");
   expect(screen.queryByTestId("page")).not.toBeInTheDocument();
 });
 
-it("leaves without a prompt once the board is saved", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
+it("shows first-sign-in settings and each provider in the requested card layout with setup guides", async () => {
+  const linuxdo = provider({
+    id: "linuxdo",
+    label: "Linux.do",
+    callback_url: "https://gateway/console/auth/oauth/linuxdo/callback",
+    default_authorize_url: "https://connect.linux.do/oauth2/authorize",
+    default_token_url: "https://connect.linux.do/oauth2/token",
+    default_userinfo_url: "https://connect.linux.do/api/user",
+    default_scopes: "read",
+  });
+  render(
+    <Board request={stub({ settings: document_({ providers: [provider(), linuxdo] }) }).request} />,
+  );
+
+  const registration = await screen.findByRole("region", { name: "Registration settings" });
+  const github = screen.getByRole("region", { name: "GitHub" });
+  const linux = screen.getByRole("region", { name: "Linux.do" });
+
+  expect(registration).toHaveClass("team-oauth-card-registration");
+  expect(github).toHaveClass("team-oauth-card-github");
+  expect(linux).toHaveClass("team-oauth-card");
+  expect(
+    screen.getByText(/does not control whether the registration page or entry is shown/),
+  ).toBeInTheDocument();
+  expect(screen.getByLabelText("Authorization group for new accounts")).toBeEnabled();
+  expect(screen.getByText("GitHub setup guide")).toBeInTheDocument();
+  expect(screen.getByText("Linux.do setup guide")).toBeInTheDocument();
+  expect(screen.getByText(/Authorization callback URL/)).toBeInTheDocument();
+  expect(screen.getByText(/callback \/ Redirect URI/)).toBeInTheDocument();
+});
+
+it("automatically saves edits before leaving the board", async () => {
   render(<Board request={stub().request} />);
 
   fireEvent.change(await screen.findByLabelText("Client ID"), { target: { value: "gh-client" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
-  await screen.findByText("Saved");
+  expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Third-party sign-in" })).not.toBeInTheDocument();
+  await screen.findByText("Changes saved automatically");
 
   fireEvent.click(screen.getByRole("link", { name: "members" }));
-  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog", { name: "Unsaved changes" })).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getByTestId("page")).toHaveTextContent("members"));
 });
 
 it("keeps the draft and the guard when a save fails", async () => {
-  const confirm = vi.fn(() => false);
-  vi.stubGlobal("confirm", confirm);
   render(<Board request={stub({ failSave: true }).request} />);
 
   fireEvent.change(await screen.findByLabelText("Client ID"), { target: { value: "gh-client" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await screen.findByRole("alert");
 
   expect(screen.getByLabelText("Client ID")).toHaveValue("gh-client");
   fireEvent.click(screen.getByRole("link", { name: "members" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  const dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
   expect(screen.getByLabelText("Client ID")).toHaveValue("gh-client");
 });
 

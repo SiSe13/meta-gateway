@@ -48,10 +48,13 @@ export interface TeamUser {
   policy_id: number;
   policy_ids: number[];
   max_keys: number;
+  max_concurrent: number;
   rpm: number;
   allow_routing: boolean;
   allow_request_preferences: boolean;
   created_at: string;
+  last_login_at?: string;
+  last_model_call_at?: string;
   key_count: number;
   /** The account's own credit pool; 0 means unlimited. */
   quota_total_tokens: number;
@@ -123,15 +126,17 @@ export interface UserKey {
   last_used_at?: string;
   used_tokens?: number;
   cost?: number;
+  current_concurrent?: number;
+  authorization_groups?: string[];
 }
 /**
  * One row of the code board. `invite` signs someone up (possibly many times),
- * `credit` tops up an existing account. The plaintext code is never listed:
- * the table only stores its hash.
+ * `credit` tops up an existing account. The list exposes only whether a code
+ * can be explicitly revealed; the plaintext is fetched from a separate action.
  */
 export interface TeamCode {
   id: number;
-  kind: "invite" | "credit";
+  kind: "invite" | "credit" | "concurrency";
   label: string;
   note: string;
   policy_id: number;
@@ -142,11 +147,14 @@ export interface TeamCode {
   quota_tokens: number;
   /** Money face value, in the ledger's unit. A voucher may carry either. */
   quota_cost: number;
+  quota_concurrent: number;
+  grant_validity_days?: number;
   revoked: boolean;
   created_at: string;
   prefix: string;
+  revealable: boolean;
 }
-/** A freshly minted code: the only moment the plaintext exists. */
+/** A freshly minted code returned once in the create response. */
 export interface MintedCode {
   id: number;
   code: string;
@@ -189,7 +197,8 @@ export interface ImportOutcome {
   created: ImportedMember[];
   failed: ImportFailure[];
 }
-export type BulkMemberAction = "pause" | "resume" | "policy" | "revoke_sessions" | "delete";
+export type BulkMemberAction =
+  "pause" | "resume" | "policy" | "quota" | "revoke_sessions" | "delete";
 export interface Account {
   user: TeamUser;
   policies: Policy[];

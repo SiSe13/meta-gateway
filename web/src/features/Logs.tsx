@@ -1,4 +1,4 @@
-import { RefreshCw, MessagesSquare, SlidersHorizontal, Timer, Download } from "lucide-react";
+import { MessagesSquare, SlidersHorizontal, Timer, Download } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Input as HeroInput, Switch as HeroSwitch } from "@heroui/react";
 import { Fragment, useMemo, useEffect, useState, type ReactNode } from "react";
@@ -11,7 +11,6 @@ import { SearchableSelect, type SelectOption } from "../components/SearchableSel
 import { ListShell } from "../components/ListShell";
 import { PaginationBar } from "../components/PaginationBar";
 import { EntityState } from "../components/EntityState";
-import { TelemetryStrip } from "../components/TelemetryStrip";
 import { TimeRangePicker, useUrlTimeRange } from "../components/TimeRangePicker";
 import { categorizeError } from "../errorCatalog";
 import {
@@ -670,16 +669,7 @@ function LogDetails({ log }: { log: ProxyLog }) {
   );
 }
 
-export function LogsView({
-  source,
-  caps,
-  member = false,
-}: {
-  source: LogsSource;
-  caps: LogsCapabilities;
-  /** A member sees their own requests: their entry points, not the gateway's. */
-  member?: boolean;
-}) {
+export function LogsView({ source, caps }: { source: LogsSource; caps: LogsCapabilities }) {
   const { t } = useI18n();
   const [params, setParams] = useSearchParams();
   const channelId = caps.upstream ? positiveId(params.get("channel_id")) : undefined;
@@ -817,7 +807,6 @@ export function LogsView({
   const visibleRows = slowOnly ? rows.filter((log) => log.latency_ms >= 5000) : rows;
   const pagination = useClientPagination(visibleRows, 20);
   const pageRows = pagination.pageItems;
-  const failedCount = visibleRows.filter((log) => log.status >= 400).length;
 
   // Friendly, translatable label for a raw backend error category.
   const errorLabel = (raw?: string): string => {
@@ -923,92 +912,7 @@ export function LogsView({
 
   return (
     <>
-      {/* 读数条先行：这一页现在有多少条、错了几条，是打开页面第一个问题。 */}
-      <div className="logs-overview">
-        <TelemetryStrip
-          items={[
-            {
-              label: t("logsPage.stat.shown"),
-              value: logs.isPending ? "—" : visibleRows.length,
-              tone: "primary",
-            },
-            {
-              label: t("logsPage.stat.failed"),
-              value: logs.isPending ? "—" : failedCount,
-              tone: "danger",
-            },
-            {
-              label: t("logsPage.stat.failRate"),
-              value:
-                logs.isPending || visibleRows.length === 0
-                  ? "—"
-                  : `${Math.round((failedCount / visibleRows.length) * 100)}%`,
-              tone:
-                visibleRows.length === 0 || failedCount / Math.max(1, visibleRows.length) < 0.05
-                  ? "success"
-                  : "warning",
-            },
-            // The two figures a member actually reconciles: what this page of
-            // requests cost, and how long it took. Both are computed over the
-            // rows on screen and labelled as such — a range total would be a
-            // different number, and the strip must not imply it has one.
-            ...(caps.pricing
-              ? [
-                  {
-                    label: t("logsPage.stat.cost"),
-                    value: logs.isPending
-                      ? "—"
-                      : formatCost(visibleRows.reduce((sum, row) => sum + (row.cost ?? 0), 0)),
-                    tone: "info" as const,
-                  },
-                ]
-              : []),
-            {
-              label: t("logsPage.stat.avgLatency"),
-              value:
-                logs.isPending || visibleRows.length === 0
-                  ? "—"
-                  : `${Math.round(
-                      visibleRows.reduce((sum, row) => sum + (row.latency_ms ?? 0), 0) /
-                        visibleRows.length,
-                    )} ms`,
-              tone: "primary",
-            },
-          ]}
-        />
-        <div className="logs-overview-actions">
-          <Button
-            variant="secondary"
-            icon={<Download size={15} />}
-            disabled={visibleRows.length === 0}
-            onClick={exportCSV}
-          >
-            {t("logsPage.export")}
-          </Button>
-          <Button
-            variant="secondary"
-            icon={<RefreshCw size={16} className={logs.isFetching ? "spin" : ""} />}
-            onClick={() => {
-              // Re-anchor a rolling window first: "刷新" means "show me the
-              // latest", and refetching with the window as of the last minute
-              // tick would leave a request made a second ago outside it — the
-              // button would look dead exactly when the operator just sent
-              // something. Re-anchoring moves the query keys, so the fetch
-              // follows; only a window that CANNOT move (a custom range, or "all
-              // time") needs the forced fetch.
-              range.refresh();
-              if (!range.rolling) {
-                void logs.refetch();
-                if (source.latencyHistogram) void histogram.refetch();
-              }
-            }}
-          >
-            {t("common.refresh")}
-          </Button>
-        </div>
-      </div>
-
-      {/* 延迟分布 — 一等公民面板，紧跟读数条（原为页面底部的折叠条）。 */}
+      {/* 延迟分布与时间区间控件放在一起。 */}
       <Panel className="latency-panel">
         <div className="panel-header latency-panel-header">
           <div className="cockpit-panel-title">
@@ -1030,8 +934,12 @@ export function LogsView({
             range={range}
             compact
             onRefresh={() => {
-              void logs.refetch();
-              if (source.latencyHistogram) void histogram.refetch();
+              // The picker already re-anchors rolling ranges. Fixed ranges
+              // keep their bounds, so explicitly refetch their data instead.
+              if (!range.rolling) {
+                void logs.refetch();
+                if (source.latencyHistogram) void histogram.refetch();
+              }
             }}
           />
         </div>
@@ -1040,7 +948,7 @@ export function LogsView({
         ) : histogram.isError ? (
           <ErrorState error={histogram.error} retry={() => void histogram.refetch()} />
         ) : !histogramData || histogramData.total === 0 ? (
-          <p className="dashboard-empty">{t("logsPage.histogramEmpty")}</p>
+          <p className="dashboard-empty logs-histogram-empty">{t("logsPage.histogramEmpty")}</p>
         ) : (
           <>
             <div
@@ -1120,7 +1028,7 @@ export function LogsView({
       <div className="logs-split">
         <Panel className="ops-list-panel">
           <form
-            className="filter-bar log-filter-bar"
+            className={`filter-bar log-filter-bar${showExactFilters ? " is-expanded" : ""}`}
             onSubmit={(event) => {
               event.preventDefault();
               setFilter({
@@ -1227,6 +1135,15 @@ export function LogsView({
                 />
               </div>
             </div>
+            <Button
+              className="log-export-action"
+              variant="secondary"
+              icon={<Download size={15} />}
+              disabled={visibleRows.length === 0}
+              onClick={exportCSV}
+            >
+              {t("logsPage.export")}
+            </Button>
           </form>
 
           <EntityState
@@ -1249,32 +1166,7 @@ export function LogsView({
                   }
                 />
               ) : (
-                <EmptyHero
-                  kicker={t("logsPage.emptyKicker")}
-                  title={t("logsPage.emptyTitle")}
-                  body={t("logsPage.empty")}
-                  actions={
-                    member ? (
-                      <>
-                        <Link className="button button-primary" to="/keys?create=1">
-                          {t("logsPage.ctaMemberToken")}
-                        </Link>
-                        <Link className="button button-secondary" to="/workbench">
-                          {t("logsPage.ctaWorkbench")}
-                        </Link>
-                      </>
-                    ) : (
-                      <>
-                        <Link className="button button-primary" to="/channels">
-                          {t("logsPage.ctaChannels")}
-                        </Link>
-                        <Link className="button button-secondary" to="/keys?create=1">
-                          {t("logsPage.ctaKeys")}
-                        </Link>
-                      </>
-                    )
-                  }
-                />
+                <p className="logs-empty-hint">{t("logsPage.empty")}</p>
               )
             }
             retry={() => logs.refetch()}
@@ -1574,16 +1466,15 @@ export function Logs() {
     <Page
       title={t("logsPage.title")}
       description={t(member ? "logsPage.memberDescription" : "logsPage.hubDescription")}
-      className={member ? "" : "logs-page"}
+      hideHeading={member}
+      className="logs-page"
     >
       <div className="ops-canvas">
-        <Tabs className="logs-main-tabs" items={tabItems} active={active} onChange={changeTab} />
+        {member ? null : (
+          <Tabs className="logs-main-tabs" items={tabItems} active={active} onChange={changeTab} />
+        )}
         {active === "proxy" ? (
-          <LogsView
-            source={source}
-            caps={member ? MEMBER_LOG_CAPS : ADMIN_LOG_CAPS}
-            member={member}
-          />
+          <LogsView source={source} caps={member ? MEMBER_LOG_CAPS : ADMIN_LOG_CAPS} />
         ) : null}
         {active === "live" ? <LiveTracePanel /> : null}
         {active === "discovery" ? <DiscoveryPanel /> : null}

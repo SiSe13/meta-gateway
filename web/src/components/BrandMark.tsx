@@ -6,7 +6,7 @@ export function BrandMark({ size = 24, className }: { size?: number; className?:
       width={size}
       height={size}
       src={`${import.meta.env.BASE_URL}favicon.ico`}
-      alt="Meta Gateway"
+      alt="Balbo AI"
       decoding="async"
       draggable={false}
     />

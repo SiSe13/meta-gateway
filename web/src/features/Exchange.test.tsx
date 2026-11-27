@@ -5,6 +5,7 @@ import { StrictMode } from "react";
 import { Route, Routes, RouterProvider, createMemoryRouter } from "react-router-dom";
 import type { WebDAVSettings, WebDAVStatus } from "../api/types";
 import { I18nProvider } from "../i18n";
+import { ConfirmProvider } from "../components/ConfirmProvider";
 import { UnsavedChangesBoundary } from "../lib/RouterBoundary";
 import { SessionProvider } from "../session";
 import { ToastProvider } from "../toast";
@@ -122,9 +123,11 @@ function mount(options: { initialEntries?: string[] } = {}) {
       <QueryClientProvider client={client}>
         <I18nProvider>
           <ToastProvider>
-            <SessionProvider>
-              <RouterProvider router={router} />
-            </SessionProvider>
+            <ConfirmProvider>
+              <SessionProvider>
+                <RouterProvider router={router} />
+              </SessionProvider>
+            </ConfirmProvider>
           </ToastProvider>
         </I18nProvider>
       </QueryClientProvider>
@@ -251,12 +254,10 @@ describe("exchange task workspace", () => {
     await screen.findByText("Saved.");
     expect(downloadUrlField()).toHaveValue("https://typed.example/dav/");
 
-    const confirm = vi.fn(() => true);
-    vi.stubGlobal("confirm", confirm);
     await act(async () => {
       await router.navigate("/other");
     });
-    expect(confirm).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Unsaved changes" })).not.toBeInTheDocument();
     expect(await screen.findByTestId("other")).toBeInTheDocument();
   });
 
@@ -266,13 +267,12 @@ describe("exchange task workspace", () => {
     await waitFor(() => expect(field).toHaveValue("https://stored.example/dav/"));
     fireEvent.change(field, { target: { value: "https://typed.example/dav/" } });
 
-    const confirm = vi.fn(() => false);
-    vi.stubGlobal("confirm", confirm);
     await act(async () => {
       await router.navigate("/other");
     });
 
-    expect(confirm).toHaveBeenCalledTimes(1);
+    const dialog = await screen.findByRole("dialog", { name: "Unsaved changes" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByTestId("other")).not.toBeInTheDocument();
     expect(downloadUrlField()).toHaveValue("https://typed.example/dav/");
   });

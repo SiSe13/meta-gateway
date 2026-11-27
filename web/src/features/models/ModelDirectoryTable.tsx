@@ -1,7 +1,7 @@
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { StatusBadge } from "../../components/ui";
 import { useI18n } from "../../i18n";
-import { formatTokens } from "../../lib/format";
+import { formatGroupName, formatTokens } from "../../lib/format";
 
 /**
  * The model directory table, shared by the console's Models page and the
@@ -124,7 +124,9 @@ export function ModelDirectoryTable({
                   {row.name}
                 </strong>
                 {row.provider}
-                {row.group ? <span className="model-meta-badge is-group">{row.group}</span> : null}
+                {row.group ? (
+                  <span className="model-meta-badge is-group">{formatGroupName(row.group, t)}</span>
+                ) : null}
                 {row.badges}
                 <span className="model-meta-badges">
                   {row.contextWindow && row.contextWindow > 0 ? (

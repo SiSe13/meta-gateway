@@ -14,6 +14,7 @@ const user: TeamUser = {
   policy_id: 1,
   policy_ids: [1],
   max_keys: 5,
+  max_concurrent: 5,
   rpm: 60,
   allow_routing: false,
   allow_request_preferences: false,

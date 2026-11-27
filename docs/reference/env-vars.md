@@ -13,8 +13,8 @@
 | --- | --- | --- | --- |
 | `ADMIN_RATE_BURST` | 整数 | 50 | — |
 | `ADMIN_RATE_PER_MINUTE` | 整数 | 300 | — |
-| `ADMIN_TOKEN` | 字符串 | — | AdminToken仅保留给旧部署登录迁移兼容使用。 |
-| `ADMIN_TOKENS` | 字符串 | — | 旧部署额外接受的轮换口令（逗号分隔）。 |
+| `ADMIN_TOKEN` | 字符串 | — | — |
+| `ADMIN_TOKENS` | 字符串 | — | — |
 | `ADMIN_TOKEN_LOGIN` | 字符串 | "" | AdminTokenLogin re-opens the ADMIN_TOKEN-as-password login after the deployment has claimed an owner account. Empty (the default) means the token only works while no owner credential exists, which is what makes the first-run claim close the upgrade path by itself; "break-glass" is the documented recovery hatch for a deployment whose owner forgot the password. |
 | `ADMIN_USERNAME` | 字符串 | admin | — |
 | `ALERT_CONFIG_JSON` | 字符串 | "" | AlertConfigJSON is the multi-channel alert matrix config (bark/serverchan/ telegram/smtp + cooldown + daily summary flag), JSON-encoded. |

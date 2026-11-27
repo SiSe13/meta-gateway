@@ -1,3 +1,4 @@
+import { CheckboxControl } from "./ui";
 import { Check, ChevronDown } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -127,7 +128,7 @@ export function ScopePicker({
                 role="option"
                 aria-selected={checked}
               >
-                <input type="checkbox" checked={checked} onChange={() => toggle(scope)} />
+                <CheckboxControl checked={checked} onChange={() => toggle(scope)} />
                 <span className="scope-picker-main">
                   <strong className="mono">{scope}</strong>
                   <small>{t(`keys.scope.${scope}`)}</small>

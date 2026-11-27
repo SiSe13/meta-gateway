@@ -138,7 +138,7 @@ func TestGateBodyBoundRelease(t *testing.T) {
 	})
 	result, _ := service.ForwardWithMeta(context.Background(), Request{
 		Model: "model", Method: http.MethodPost, OpenAIPath: "chat/completions",
-		Body: body, ContentType: "application/json",
+		Body: body, ContentType: "application/json", DownstreamKeyID: 42,
 	})
 	if result == nil || result.Err != nil {
 		t.Fatalf("result = %+v", result)
@@ -146,11 +146,17 @@ func TestGateBodyBoundRelease(t *testing.T) {
 	if service.gate.InFlight(channel.ID) != 1 {
 		t.Fatalf("slot released before body close: in-flight = %d, want 1 (stream lifetime held)", service.gate.InFlight(channel.ID))
 	}
+	if service.KeyInFlight(42) != 1 {
+		t.Fatalf("key concurrency = %d, want 1 while response body is open", service.KeyInFlight(42))
+	}
 	if err := result.Body.Close(); err != nil {
 		t.Fatal(err)
 	}
 	if service.gate.InFlight(channel.ID) != 0 {
 		t.Fatalf("slot not released after body close: in-flight = %d", service.gate.InFlight(channel.ID))
+	}
+	if service.KeyInFlight(42) != 0 {
+		t.Fatalf("key concurrency not released after body close: %d", service.KeyInFlight(42))
 	}
 	// Idempotent: closing again must not double-release.
 	if err := result.Body.Close(); err != nil {

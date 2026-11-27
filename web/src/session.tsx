@@ -41,6 +41,7 @@ export function isStaff(role: ConsoleRole | null): boolean {
 export type AccountSession = { role: ConsoleRole; csrf: string; remember?: boolean };
 
 interface SessionValue {
+  sessionReady: boolean;
   role: ConsoleRole | null;
   token: string | null;
   client: ApiClient | null;
@@ -67,6 +68,18 @@ function initialToken() {
   }
 }
 
+/** 判断当前标签页是否需要先从团队 Cookie 中恢复会话。 */
+function hasTeamConsoleHint() {
+  try {
+    return (
+      sessionStorage.getItem("meta-gateway.team-console") === "1" ||
+      localStorage.getItem("meta-gateway.team-console") === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function storeToken(token: string | null, remember: boolean) {
   try {
     if (token && remember) localStorage.setItem(SESSION_KEY, token);
@@ -81,6 +94,10 @@ function storeToken(token: string | null, remember: boolean) {
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(initialToken);
+  // Cookie 会话只能通过 /me 异步确认；确认前不能把空 token 当作已登出。
+  const [sessionReady, setSessionReady] = useState(
+    () => Boolean(initialToken()) || !hasTeamConsoleHint(),
+  );
   const [role, setRole] = useState<ConsoleRole | null>(null);
   // Bumped when a member signs in through the console: the effect below already
   // knows how to adopt a team session, it just needs a reason to run again.
@@ -101,17 +118,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTeamCSRF(account.csrf);
       setRole(account.role);
       setToken(COOKIE_SESSION);
-    } else setTeamAttempt((value) => value + 1);
+      setSessionReady(true);
+    } else {
+      setSessionReady(false);
+      setTeamAttempt((value) => value + 1);
+    }
   }, []);
   useEffect(() => {
     if (token || requiresLogin) return;
-    try {
-      if (
-        sessionStorage.getItem("meta-gateway.team-console") !== "1" &&
-        localStorage.getItem("meta-gateway.team-console") !== "1"
-      )
-        return;
-    } catch {
+    if (!hasTeamConsoleHint()) {
+      setSessionReady(true);
       return;
     }
     let active = true;
@@ -124,11 +140,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (role !== "owner" && role !== "admin" && role !== "member") {
           localStorage.removeItem("meta-gateway.team-console");
           sessionStorage.removeItem("meta-gateway.team-console");
+          setSessionReady(true);
           return;
         }
         setTeamCSRF(a.csrf);
         setRole(role);
         setToken(COOKIE_SESSION);
+        setSessionReady(true);
       })
       .catch((error) => {
         if (!active) return;
@@ -142,6 +160,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         } catch {
           /* optional metadata */
         }
+        setSessionReady(true);
       });
     return () => {
       active = false;
@@ -152,6 +171,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     storeToken(trimmed, remember);
     setRole(null);
     setToken(trimmed);
+    setSessionReady(true);
   }, []);
   const disconnect = useCallback(() => {
     if (role) notifyAccountChange();
@@ -166,6 +186,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setTeamCSRF("");
     setToken(null);
     setRole(null);
+    setSessionReady(true);
   }, [role]);
   // Expiry is a local reset, not another logout request. Avoid recursively
   // sending requests with an expired cookie. GatewayApp clears query data.
@@ -182,6 +203,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTeamCSRF("");
       setRole(null);
       setToken(null);
+      setSessionReady(true);
     };
     window.addEventListener("meta-team-expired", expire);
     return () => window.removeEventListener("meta-team-expired", expire);
@@ -194,6 +216,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // A while the browser now sends account B's cookie. Never trust the hint
       // as authentication, nor send logout (it would revoke the other tab).
       setRequiresLogin(true);
+      setSessionReady(true);
       setTeamCSRF("");
       setRole(null);
       setToken(null);
@@ -209,6 +232,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [role]);
   const value = useMemo(
     () => ({
+      sessionReady,
       role,
       token,
       client: token ? new ApiClient(token, disconnect, role ? "cookie" : "bearer") : null,
@@ -216,7 +240,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       connectMember,
       disconnect,
     }),
-    [role, token, connect, connectMember, disconnect],
+    [sessionReady, role, token, connect, connectMember, disconnect],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

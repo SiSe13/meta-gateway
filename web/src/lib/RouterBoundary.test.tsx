@@ -14,6 +14,7 @@ import {
   RouterProvider,
 } from "react-router-dom";
 import { AppearanceProvider, useAppearance } from "../appearance";
+import { ConfirmProvider } from "../components/ConfirmProvider";
 import { I18nProvider } from "../i18n";
 import { UnsavedChangesBoundary } from "./RouterBoundary";
 import { useUnsavedChanges } from "./unsavedChanges";
@@ -63,10 +64,10 @@ function Editor({ dirty }: { dirty: boolean }) {
       </button>
       <button
         type="button"
-        onClick={() => {
+        onClick={async () => {
           // Mirrors the settings page: the caller guards a same-pathname move
           // itself, then navigates.
-          if (guard()) void navigate("?tab=guarded", { replace: true });
+          if (await guard()) void navigate("?tab=guarded", { replace: true });
         }}
       >
         own-guard
@@ -159,7 +160,9 @@ function mount(
     <StrictMode>
       <I18nProvider>
         <AppearanceProvider>
-          <RouterProvider router={router} />
+          <ConfirmProvider>
+            <RouterProvider router={router} />
+          </ConfirmProvider>
         </AppearanceProvider>
       </I18nProvider>
     </StrictMode>,
@@ -168,47 +171,36 @@ function mount(
 }
 
 it("asks once on an in-app link and leaves when the operator accepts", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(true)));
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
   await waitFor(() => expect(screen.getByTestId("page")).toHaveTextContent("other"));
 });
 
-it("keeps the page and the draft when the operator chooses to stay", () => {
-  const confirm = vi.fn(() => false);
-  vi.stubGlobal("confirm", confirm);
+it("keeps the page and the draft when the operator chooses to stay", async () => {
   mount(guarded(routes(true)));
   fireEvent.change(screen.getByLabelText("draft"), { target: { value: "half typed" } });
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
   // Neither the URL nor the mounted form moved.
   expect(screen.getByTestId("location")).toHaveTextContent("/editor");
   expect(screen.getByLabelText("draft")).toHaveValue("half typed");
 });
 
 it("does not prompt when nothing is unsaved", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(false)));
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByTestId("page")).toHaveTextContent("other"));
 });
 
-it("guards a programmatic navigate() the same way", () => {
-  const confirm = vi.fn(() => false);
-  vi.stubGlobal("confirm", confirm);
+it("guards a programmatic navigate() the same way", async () => {
   mount(guarded(routes(true)));
   fireEvent.click(screen.getByRole("button", { name: "programmatic" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
   expect(screen.getByTestId("location")).toHaveTextContent("/editor");
 });
 
 it("holds back both Back and Forward, and lets an accepted POP through", async () => {
-  const confirm = vi.fn(() => false);
-  vi.stubGlobal("confirm", confirm);
   // /editor sits in the middle, so both directions leave it.
   const router = mount(guarded(routes(true)), {
     initialEntries: ["/other", "/editor", "/third"],
@@ -218,25 +210,27 @@ it("holds back both Back and Forward, and lets an accepted POP through", async (
   await act(async () => {
     await router.navigate(-1);
   });
-  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
   expect(screen.getByTestId("location")).toHaveTextContent("/editor");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Unsaved changes" })).toBeNull());
 
   await act(async () => {
     await router.navigate(1);
   });
-  expect(confirm).toHaveBeenCalledTimes(2);
+  expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
   expect(screen.getByTestId("location")).toHaveTextContent("/editor");
 
-  confirm.mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Unsaved changes" })).toBeNull());
   await act(async () => {
     await router.navigate(1);
   });
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
   await waitFor(() => expect(screen.getByTestId("page")).toHaveTextContent("third"));
 });
 
-it("asks once when two surfaces hold unsaved edits", () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
+it("asks once when two surfaces hold unsaved edits", async () => {
   mount(
     guarded(
       <Routes>
@@ -246,58 +240,44 @@ it("asks once when two surfaces hold unsaved edits", () => {
     ),
   );
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
 });
 
 it("does not treat a same-pathname query change as leaving", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(true)));
   fireEvent.click(screen.getByRole("link", { name: "same-page" }));
-  expect(confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("?tab=other"));
 });
 
 it("lets a page's own guard run without the boundary asking again", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(true)));
   fireEvent.click(screen.getByRole("button", { name: "own-guard" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("?tab=guarded"));
 });
 
 it("does not prompt on a theme switch, which is not a navigation", () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(true, <ThemeToggle />)));
   fireEvent.click(screen.getByRole("button", { name: "theme" }));
-  expect(confirm).not.toHaveBeenCalled();
   expect(screen.getByTestId("location")).toHaveTextContent("/editor");
 });
 
 it("drops a registration when its surface unmounts", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(<Toggle />));
   fireEvent.click(screen.getByRole("button", { name: "hide" }));
   fireEvent.click(screen.getByRole("link", { name: "leave" }));
-  expect(confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByTestId("page")).toHaveTextContent("other"));
 });
 
 it("measures the leave against the basename-stripped pathname, as /console does", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   mount(guarded(routes(true)), { initialEntries: ["/console/editor"], basename: "/console" });
   // A same-page move still carries the basename on its target; it must not be
   // mistaken for a leave.
   fireEvent.click(screen.getByRole("link", { name: "same-page" }));
-  expect(confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("?tab=other"));
 
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
+  expect(await screen.findByRole("dialog", { name: "Unsaved changes" })).toBeInTheDocument();
 });
 
 it("still resolves relative links under the splat root, as App's nested routes do", async () => {
@@ -331,8 +311,6 @@ it("still resolves relative links under the splat root, as App's nested routes d
 });
 
 it("degrades to no router guard in a declarative router", async () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
   // Only main.tsx installs the boundary, and only under RouterProvider. In a
   // declarative router it must not throw — it just cannot hold a move back.
   render(
@@ -346,6 +324,5 @@ it("degrades to no router guard in a declarative router", async () => {
     </I18nProvider>,
   );
   fireEvent.click(screen.getByRole("link", { name: "go" }));
-  expect(confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/other"));
 });

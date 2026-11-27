@@ -9,6 +9,7 @@ import { ChannelKeysDialog } from "../ChannelKeys";
 import type { CreateConnectionInput } from "./helpers";
 import type { PickableCredential } from "./channelCredentials";
 import { useToast } from "../../toast";
+import { formatGroupName } from "../../lib/format";
 
 /** The toast context these dialogs push through. */
 type ToastContextValue = ReturnType<typeof useToast>;
@@ -270,7 +271,7 @@ function ChannelAuxDialogs({
             createKeyLocked.current = true;
             const input = {
               id: createKeyChannel.id,
-              name: `gateway-${group || "default"}`,
+              name: `gateway-${formatGroupName(group, t)}`,
               group,
             };
             mutations.createUpstreamKey.mutate(input, {

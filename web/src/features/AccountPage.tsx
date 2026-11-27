@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorState, Loading } from "../components/ui";
-import { useAppearance, type ColorScheme } from "../appearance";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
 import { accountRequest } from "../team/transport";
@@ -12,41 +10,13 @@ import { SettingsPage } from "../member/SettingsPage";
 /**
  * The console's account page: the member app's settings, at a console path.
  *
- * The page itself is the member app's own component — request controls, display
- * preferences, password and sessions — and this wrapper only supplies what the
- * console has that the member shell used to: the account it already fetched,
- * the appearance settings, and the console's own sign-out.
- *
- * Density is the one piece with no console counterpart: it was the member
- * shell's state, stored under its own key and applied as `data-density` on the
- * document. It is kept exactly as it was, so the value a member set before this
- * page moved still applies.
+ * The console's personal information page. Password changes live in the
+ * profile menu, while appearance remains in the global appearance panel.
  */
-const DENSITY_KEY = "meta-gateway.team.density";
-
 export function AccountPage() {
   const { locale, t: consoleT } = useI18n();
   const t = teamText(locale);
   const { disconnect, role } = useSession();
-  const { scheme, setScheme } = useAppearance();
-  const [density, setDensity] = useState(() => {
-    try {
-      return localStorage.getItem(DENSITY_KEY) ?? "comfortable";
-    } catch {
-      return "comfortable";
-    }
-  });
-  useEffect(() => {
-    document.documentElement.dataset.density = density;
-  }, [density]);
-  const applyDensity = useCallback((value: string) => {
-    setDensity(value);
-    try {
-      localStorage.setItem(DENSITY_KEY, value);
-    } catch {
-      /* optional preference */
-    }
-  }, []);
 
   const account = useQuery({
     queryKey: ["me", "account"],
@@ -68,15 +38,5 @@ export function AccountPage() {
     return <ErrorState error={account.error} retry={() => void account.refetch()} />;
   }
   if (!account.data) return null;
-  return (
-    <SettingsPage
-      account={account.data}
-      scheme={scheme}
-      onScheme={(value) => setScheme(value as ColorScheme)}
-      density={density}
-      onDensity={applyDensity}
-      t={t}
-      onDisconnected={disconnect}
-    />
-  );
+  return <SettingsPage account={account.data} t={t} onDisconnected={disconnect} />;
 }

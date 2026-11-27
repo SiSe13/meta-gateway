@@ -1,3 +1,4 @@
+import { CheckboxControl } from "../components/ui";
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useModules } from "../hooks/useModules";
@@ -57,8 +58,7 @@ export function PluginHost() {
       <div className="plugin-page-bar">
         <strong>{pluginName}</strong>
         <label className="plugin-nav-switch">
-          <input
-            type="checkbox"
+          <CheckboxControl
             checked={!navHidden}
             onChange={(event) => setPluginNavHidden(id, !event.target.checked)}
           />

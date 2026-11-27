@@ -313,6 +313,11 @@
   border-color: color-mix(in srgb, var(--line) 80%, transparent);
 }
 .site-observation-workspace .observation-site {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  height: auto;
   min-height: 62px;
   margin: 3px 0;
   padding: 11px 12px;
@@ -324,6 +329,18 @@
     background-color var(--dur-fast),
     border-color var(--dur-fast),
     box-shadow var(--dur-fast);
+}
+.site-observation-workspace .observation-site > .observation-site-name {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .site-observation-workspace .observation-site:hover {
   transform: translateY(-1px);

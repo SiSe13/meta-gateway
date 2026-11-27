@@ -53,8 +53,8 @@ export function BillingRuleDialog({ onClose, ...target }: Target & { onClose: ()
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const guard = useUnsavedChanges(dirty);
-  const close = () => {
-    if (!busy && guard()) onClose();
+  const close = async () => {
+    if (!busy && (await guard())) onClose();
   };
   return (
     <Dialog title={t("billing.title", { name: target.model })} onClose={close} busy={busy}>
@@ -609,8 +609,8 @@ function BillingEditor({
           <Button
             variant="quiet"
             disabled={save.isPending}
-            onClick={() => {
-              if (!guardLeave()) return;
+            onClick={async () => {
+              if (!(await guardLeave())) return;
               setDraft(initial);
               setBaseline(JSON.stringify(initial));
               setRevision(view.revision);

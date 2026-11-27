@@ -29,6 +29,7 @@ import (
 
 const teamCookie = "mg_team_session"
 const teamCSRFCookie = "mg_team_csrf"
+const teamDeviceCookie = "mg_team_device"
 
 type TeamBranding struct {
 	Name             string `json:"name"`
@@ -45,19 +46,22 @@ type TeamSettings struct {
 	Branding TeamBranding `json:"branding"`
 }
 type TeamUser struct {
-	ID        int64  `json:"id"`
-	Username  string `json:"username"`
-	Name      string `json:"name"`
-	Role      string `json:"role"`
-	Status    string `json:"status"`
+	ID                      int64   `json:"id"`
+	Username                string  `json:"username"`
+	Name                    string  `json:"name"`
+	Role                    string  `json:"role"`
+	Status                  string  `json:"status"`
 	PolicyID                int64   `json:"policy_id"`
+	MaxConcurrent           int     `json:"max_concurrent"`
 	PolicyIDs               []int64 `json:"policy_ids"`
 	MaxKeys                 int     `json:"max_keys"`
 	RPM                     int     `json:"rpm"`
 	AllowRouting            bool    `json:"allow_routing"`
-	AllowRequestPreferences bool `json:"allow_request_preferences"`
-	CreatedAt string `json:"created_at"`
-	KeyCount  int    `json:"key_count"`
+	AllowRequestPreferences bool    `json:"allow_request_preferences"`
+	CreatedAt               string  `json:"created_at"`
+	LastLoginAt             string  `json:"last_login_at"`
+	LastModelCallAt         string  `json:"last_model_call_at"`
+	KeyCount                int     `json:"key_count"`
 	// The account's own credit pool, granted by the owner or topped up with a
 	// credit code. 0 = unlimited, like the per-key quota. Tokens and money are
 	// two independent budgets and both are enforced.
@@ -69,12 +73,12 @@ type TeamUser struct {
 	PasswordHash     string  `json:"-"`
 }
 type TeamPolicy struct {
-	ID                      int64    `json:"id"`
-	Name                    string   `json:"name"`
-	Models                  []string `json:"models"`
-	MemberIDs               []int64  `json:"member_ids"`
-	AllModels               bool     `json:"all_models"`
-	UserCount               int      `json:"user_count"`
+	ID        int64    `json:"id"`
+	Name      string   `json:"name"`
+	Models    []string `json:"models"`
+	MemberIDs []int64  `json:"member_ids"`
+	AllModels bool     `json:"all_models"`
+	UserCount int      `json:"user_count"`
 }
 type teamPrincipal struct {
 	User        *TeamUser
@@ -110,7 +114,9 @@ type TeamHandler struct {
 	loginLimiter       *ratelimit.Limiter
 	globalLoginLimiter *ratelimit.Limiter
 	userLimiter        *groupRateLimiter
-	requestDefaults    func() TeamRequestDefaults
+	// keyInFlight 返回令牌当前正在处理的请求数。
+	keyInFlight     func(int64) int
+	requestDefaults func() TeamRequestDefaults
 	// outboundProxy reports the operator's outbound proxy. Empty means direct.
 	outboundProxy func() string
 	// deploymentAdmin reports the configured deployment administrator — the
@@ -122,6 +128,11 @@ type TeamHandler struct {
 	// (i.e. no owner account has been claimed yet). It drives the sign-in page's
 	// upgrade entry; see sessionHandler.tokenLoginAllowed.
 	tokenLoginOpen func() bool
+}
+
+// SetKeyInFlightProvider 设置个人令牌并发数的数据源。
+func (h *TeamHandler) SetKeyInFlightProvider(provider func(int64) int) {
+	h.keyInFlight = provider
 }
 
 func NewTeamHandler(db *store.DB, enc *crypto.Encrypter) *TeamHandler {
@@ -221,16 +232,18 @@ const teamUserSelect = `SELECT u.id,u.username,u.name,u.role,u.status,u.policy_i
 	u.quota_total_tokens,u.quota_used_tokens,u.quota_total_cost,u.quota_used_cost,
 	(SELECT count(*) FROM downstream_keys k WHERE k.user_id=u.id AND k.team_deleted_at=''),
 	u.max_keys,u.rpm,u.allow_routing,u.allow_request_preferences,
+	u.max_concurrent,
 	COALESCE((SELECT json_group_array(policy_id) FROM (
 		SELECT policy_id FROM team_user_policies WHERE user_id=u.id ORDER BY policy_id
-	)),'[]') FROM team_users u`
+	)),'[]'),u.last_login_at,
+	COALESCE((SELECT MAX(created_at) FROM usage_records WHERE user_id=u.id),'') FROM team_users u`
 
 func scanTeamUser(row interface{ Scan(...any) error }) (*TeamUser, error) {
 	u := &TeamUser{}
 	var policyIDs string
 	err := row.Scan(&u.ID, &u.Username, &u.Name, &u.Role, &u.Status, &u.PolicyID, &u.CreatedAt, &u.Version, &u.PasswordHash,
 		&u.QuotaTotalTokens, &u.QuotaUsedTokens, &u.QuotaTotalCost, &u.QuotaUsedCost, &u.KeyCount,
-		&u.MaxKeys, &u.RPM, &u.AllowRouting, &u.AllowRequestPreferences, &policyIDs)
+		&u.MaxKeys, &u.RPM, &u.AllowRouting, &u.AllowRequestPreferences, &u.MaxConcurrent, &policyIDs, &u.LastLoginAt, &u.LastModelCallAt)
 	if err == nil {
 		err = json.Unmarshal([]byte(policyIDs), &u.PolicyIDs)
 	}
@@ -240,6 +253,9 @@ func scanTeamUser(row interface{ Scan(...any) error }) (*TeamUser, error) {
 	return u, err
 }
 func (h *TeamHandler) user(id int64) (*TeamUser, error) {
+	if err := h.db.ExpireTeamCodeGrants(id, time.Now()); err != nil {
+		return nil, err
+	}
 	return scanTeamUser(h.db.QueryRow(teamUserSelect+` WHERE u.id=?`, id))
 }
 func (h *TeamHandler) session(r *http.Request) (*teamPrincipal, error) {
@@ -261,6 +277,8 @@ func (h *TeamHandler) session(r *http.Request) (*teamPrincipal, error) {
 	if err != nil || u.Status != "active" || u.Version != version {
 		return nil, errors.New("invalid session")
 	}
+	// 最近活动每分钟最多写入一次，保留准确度同时避免每个请求都触发数据库写入。
+	_, _ = h.db.Exec(`UPDATE team_sessions SET last_active_at=? WHERE token_hash=? AND last_active_at<?`, time.Now().Unix(), hash, time.Now().Unix()-60)
 	return &teamPrincipal{User: u, SessionHash: hash, CSRF: teamCSRF(c.Value)}, nil
 }
 func (h *TeamHandler) UserAuth(next http.Handler) http.Handler {
@@ -357,6 +375,7 @@ func (h *TeamHandler) RegisterAdmin(r chi.Router) {
 		r.Post("/team/users", h.createUser)
 		r.Post("/team/users/import", h.importUsers)
 		r.Post("/team/users/bulk", h.bulkUsers)
+		r.Post("/team/users/{id}/concurrency", h.adjustUserConcurrency)
 		r.Patch("/team/users/{id}", h.updateUser)
 		r.Get("/team/users/{id}/keys", h.adminUserKeys)
 		r.Get("/team/users/{id}/events", h.userEvents)
@@ -376,6 +395,7 @@ func (h *TeamHandler) RegisterAdmin(r chi.Router) {
 		// recovery links share one table, so one set of endpoints manages them.
 		r.Get("/team/codes", h.listCodes)
 		r.Post("/team/codes", h.createCodes)
+		r.Post("/team/codes/{id}/reveal", h.revealCode)
 		r.Delete("/team/codes/{id}", h.revokeCode)
 		// Kept for older consoles and their tests: the invitations endpoints are
 		// the single-use face of the same table.
@@ -392,6 +412,8 @@ func (h *TeamHandler) RegisterPublic(r chi.Router) {
 	// where it is needed. It exposes one bit — "the admin token still works as a
 	// password" — and the token itself is of course still required to use it.
 	r.Get("/auth/upgrade", h.authUpgrade)
+	// 兑换记录属于当前登录账号，个人模式下也应可查；这里只绕过团队模式门禁。
+	r.With(h.UserAuth).Get("/me/redemptions", h.myRedemptions)
 	r.Group(func(a chi.Router) {
 		a.Use(h.ModeGate)
 		a.Get("/auth/options", h.authOptions)
@@ -411,6 +433,7 @@ func (h *TeamHandler) RegisterPublic(r chi.Router) {
 		me.Post("/logout", h.logout)
 		me.Post("/password", h.changePassword)
 		me.Get("/sessions", h.sessions)
+		me.Delete("/sessions/others", h.logoutOtherSessions)
 		me.Delete("/sessions/{id}", h.deleteSession)
 		me.Get("/keys", h.myKeys)
 		me.Post("/keys", h.createKey)

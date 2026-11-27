@@ -1,7 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { I18nProvider } from "../i18n";
+import { ConfirmProvider } from "../components/ConfirmProvider";
 import { leavesDirtyZone, useUnsavedChanges } from "./unsavedChanges";
 
 beforeEach(() => {
@@ -22,7 +23,9 @@ function Harness({ dirty }: { dirty: boolean }) {
     <button
       type="button"
       onClick={() => {
-        allowed = guard();
+        void guard().then((result) => {
+          allowed = result;
+        });
       }}
     >
       leave
@@ -33,9 +36,11 @@ function Harness({ dirty }: { dirty: boolean }) {
 function mount(dirty: boolean) {
   return render(
     <I18nProvider>
-      <MemoryRouter initialEntries={["/settings"]}>
-        <Harness dirty={dirty} />
-      </MemoryRouter>
+      <ConfirmProvider>
+        <MemoryRouter initialEntries={["/settings"]}>
+          <Harness dirty={dirty} />
+        </MemoryRouter>
+      </ConfirmProvider>
     </I18nProvider>,
   );
 }
@@ -55,25 +60,21 @@ it("arms the browser prompt only while there are unsaved edits", () => {
   expect(unload().defaultPrevented).toBe(false);
 });
 
-it("asks before letting an in-app navigation discard the draft", () => {
-  const confirm = vi.fn(() => true);
-  vi.stubGlobal("confirm", confirm);
+it("asks before letting an in-app navigation discard the draft", async () => {
   mount(true);
   fireEvent.click(screen.getByRole("button", { name: "leave" }));
-  expect(confirm).toHaveBeenCalledTimes(1);
-  expect(allowed).toBe(true);
+  fireEvent.click(await screen.findByRole("button", { name: "Confirm" }));
+  await waitFor(() => expect(allowed).toBe(true));
 
-  confirm.mockReturnValue(false);
   fireEvent.click(screen.getByRole("button", { name: "leave" }));
-  expect(allowed).toBe(false);
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(allowed).toBe(false));
 
   // Clean state: no prompt at all, not a prompt that happens to be accepted.
   cleanup();
-  confirm.mockClear();
   mount(false);
   fireEvent.click(screen.getByRole("button", { name: "leave" }));
-  expect(confirm).not.toHaveBeenCalled();
-  expect(allowed).toBe(true);
+  await waitFor(() => expect(allowed).toBe(true));
 });
 
 it("registers a dirty surface against its pathname, and drops it on unmount", () => {

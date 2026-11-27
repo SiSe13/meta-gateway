@@ -2,7 +2,7 @@ import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { useI18n } from "../../i18n";
-import { Field, InfoTip } from "../../components/ui";
+import { Field, InfoTip, TextInput, TextAreaControl, SelectControl } from "../../components/ui";
 import {
   CLIENT_PATH_SUGGESTIONS,
   ENDPOINT_MAP_PRESETS,
@@ -115,7 +115,7 @@ export function EndpointMapEditor({
     className: string,
   ) => (
     <Field label={t(labelKey)} hint={t(hintKey)} className={error ? "is-invalid" : undefined}>
-      <textarea
+      <TextAreaControl
         className={`mono ${className}`}
         value={value[key]}
         onChange={(event) => onChange({ ...value, [key]: event.target.value })}
@@ -214,7 +214,7 @@ export function EndpointMapEditor({
         hint={t("channels.pathOverrideHint")}
         className={overrideIssue ? "is-invalid" : undefined}
       >
-        <input
+        <TextInput
           value={value.pathOverride}
           onChange={(event) => onChange({ ...value, pathOverride: event.target.value })}
           disabled={disabled}
@@ -279,7 +279,7 @@ export function EndpointMapEditor({
                     key={index}
                     className={`map-row${issueFor(pathIssues, index) ? " is-invalid" : ""}`}
                   >
-                    <input
+                    <TextInput
                       list="map-client-paths"
                       className="mono"
                       value={row.from}
@@ -297,7 +297,7 @@ export function EndpointMapEditor({
                     <span className="map-row-arrow" aria-hidden="true">
                       →
                     </span>
-                    <input
+                    <TextInput
                       className="mono"
                       value={row.to}
                       aria-label={t("channels.mapTo")}
@@ -415,7 +415,7 @@ function FieldMapSection({
               key={index}
               className={`map-row map-row-forward${issueFor(index) ? " is-invalid" : ""}`}
             >
-              <select
+              <SelectControl
                 className="map-row-mode"
                 value={row.mode}
                 aria-label={t("channels.mapRowMode")}
@@ -427,10 +427,10 @@ function FieldMapSection({
                     {t(FIELD_MODE_KEYS[mode])}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
 
               {row.mode === "keep" ? (
-                <input
+                <TextInput
                   className="mono map-row-grow"
                   value={row.keep}
                   aria-label={t("channels.mapKeep")}
@@ -441,7 +441,7 @@ function FieldMapSection({
               ) : (
                 <>
                   {row.mode === "copy" || row.mode === "move" ? (
-                    <input
+                    <TextInput
                       className="mono"
                       value={row.from}
                       aria-label={t("channels.mapFrom")}
@@ -452,7 +452,7 @@ function FieldMapSection({
                   ) : null}
 
                   {row.mode === "template" ? (
-                    <input
+                    <TextInput
                       className="mono map-row-grow"
                       value={row.template}
                       aria-label={t("channels.mapTemplate")}
@@ -464,7 +464,7 @@ function FieldMapSection({
 
                   {row.mode === "value" ? (
                     <>
-                      <select
+                      <SelectControl
                         className="map-row-mode"
                         value={row.valueType}
                         aria-label={t("channels.mapValueType")}
@@ -478,9 +478,9 @@ function FieldMapSection({
                             {t(VALUE_TYPE_KEYS[type])}
                           </option>
                         ))}
-                      </select>
+                      </SelectControl>
                       {row.valueType === "bool" ? (
-                        <select
+                        <SelectControl
                           className="map-row-mode"
                           value={row.valueText}
                           aria-label={t("channels.mapValue")}
@@ -489,9 +489,9 @@ function FieldMapSection({
                         >
                           <option value="true">true</option>
                           <option value="false">false</option>
-                        </select>
+                        </SelectControl>
                       ) : row.valueType === "null" ? null : (
-                        <input
+                        <TextInput
                           className="mono"
                           value={row.valueText}
                           aria-label={t("channels.mapValue")}
@@ -507,7 +507,7 @@ function FieldMapSection({
                   <span className="map-row-arrow" aria-hidden="true">
                     →
                   </span>
-                  <input
+                  <TextInput
                     className="mono"
                     value={row.to}
                     aria-label={t("channels.mapTo")}

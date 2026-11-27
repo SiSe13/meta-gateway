@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useI18n } from "../../i18n";
-import { formatCost, formatTokens, useCurrency } from "../../lib/format";
+import { formatCost, formatGroupName, formatTokens, useCurrency } from "../../lib/format";
 
 /**
  * One model, told completely, as a card in a responsive grid.
@@ -48,6 +48,8 @@ export type ModelCardHealth = {
   probed: number;
   /** Probe samples behind the ratio; 0 means "never probed", not "all good". */
   samples: number;
+  /** Successful probe samples, summed across all channels for this model. */
+  okSamples: number;
   /** 0..1, meaningful only when samples > 0. */
   availability: number;
   avgLatencyMs: number;
@@ -75,8 +77,6 @@ export type ModelCardProps = {
   stats?: ModelCardStats;
   /** Upstream probe state. Omitted when the host may not read it. */
   health?: ModelCardHealth;
-  selected?: boolean;
-  onSelect?: () => void;
   /** Shown top-right, e.g. the plan group or a status chip. */
   status?: ReactNode;
 };
@@ -98,8 +98,6 @@ export function ModelCard({
   metrics,
   stats,
   health,
-  selected,
-  onSelect,
   status,
 }: ModelCardProps) {
   const { t } = useI18n();
@@ -109,40 +107,13 @@ export function ModelCard({
   const healthTone =
     !health || health.samples === 0
       ? "unknown"
-      : health.availability >= 0.99
+      : health.availability >= 0.95
         ? "ok"
-        : health.availability >= 0.5
+        : health.availability >= 0.8
           ? "degraded"
           : "down";
-  const healthLabel =
-    healthTone === "unknown"
-      ? t("modelsPage.health.unprobed")
-      : healthTone === "ok"
-        ? t("modelsPage.health.up")
-        : healthTone === "degraded"
-          ? t("modelsPage.health.degraded")
-          : t("modelsPage.health.down");
   return (
-    <article
-      className={`model-card${selected ? " is-selected" : ""}${onSelect ? " is-clickable" : ""}`}
-      tabIndex={onSelect ? 0 : undefined}
-      aria-label={name}
-      /* The layout owns the detail dialog and looks for this marker on the
-         clicked element — the table rows carry it too, so cards and rows open
-         the same detail the same way. */
-      data-model-selectable={onSelect ? "true" : undefined}
-      onClick={onSelect}
-      onKeyDown={
-        onSelect
-          ? (event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onSelect();
-              }
-            }
-          : undefined
-      }
-    >
+    <article className="model-card" aria-label={name}>
       <header className="model-card-head">
         <div className="model-card-identity">
           <h3 className="mono" title={name}>
@@ -150,23 +121,11 @@ export function ModelCard({
           </h3>
           <div className="model-card-chips">
             {vendor ? <span className="model-card-chip is-vendor">{vendor}</span> : null}
-            {group ? <span className="model-card-chip">{group}</span> : null}
+            {group ? <span className="model-card-chip">{formatGroupName(group, t)}</span> : null}
             {arranged ? <span className="model-card-chip is-arranged">★</span> : null}
           </div>
         </div>
-        {status || health ? (
-          <div className="model-card-status">
-            {/* The state badge sits where the eye lands first (top right); the
-                evidence for it — the ratio and which upstreams are behind it —
-                stays on the card's own line. */}
-            {status ?? (
-              <span className={`model-health-badge is-${healthTone}`}>
-                <span className="model-health-dot" aria-hidden="true" />
-                {healthLabel}
-              </span>
-            )}
-          </div>
-        ) : null}
+        {status ? <div className="model-card-status">{status}</div> : null}
       </header>
 
       {facts ? <div className="model-card-facts">{facts}</div> : null}
@@ -213,27 +172,29 @@ export function ModelCard({
       ) : null}
 
       {health ? (
-        // The gateway's probes, not this account's calls: a member who has never
-        // called the model still gets a true answer for it, and one who has gets
-        // told which of the two numbers they are looking at.
-        <div className={`model-card-health is-${healthTone}`}>
-          {health.samples > 0 ? (
-            <span className="model-health-figure">
-              {Math.round(health.availability * 100)}%
-              {health.avgLatencyMs > 0 ? (
-                <span className="model-health-latency">{seconds(health.avgLatencyMs)}</span>
-              ) : null}
+        health.samples > 0 ? (
+          // 竖线按多渠道汇总后的成功比例着色，只表达总体比例，不伪装成时间走势。
+          <div className={`model-card-health is-${healthTone}`}>
+            <span
+              className="availability-bars"
+              aria-hidden="true"
+              title={t("modelsPage.health.aggregate", {
+                ok: health.okSamples,
+                total: health.samples,
+              })}
+            >
+              {Array.from({ length: 24 }, (_, index) => (
+                <span
+                  key={index}
+                  className={`availability-bar ${index < Math.round(health.availability * 24) ? "is-ok" : "is-failed"}`}
+                />
+              ))}
             </span>
-          ) : null}
-          {/* An unprobed model must not be summarised as "0/1 up": nothing has
-              been asked yet, so the only true line is how many upstreams there
-              are. */}
-          <span className="model-health-source">
-            {health.samples > 0
-              ? t("modelsPage.health.upstreams", { up: health.healthy, total: health.upstreams })
-              : t("modelsPage.health.upstreamCount", { total: health.upstreams })}
-          </span>
-        </div>
+            <strong className={`model-health-figure is-${healthTone}`}>
+              {(Math.floor(Math.max(0, Math.min(1, health.availability)) * 1000) / 10).toFixed(1)}%
+            </strong>
+          </div>
+        ) : null
       ) : null}
 
       {capabilities?.length ? (
@@ -255,6 +216,12 @@ export function ModelCard({
 }
 
 /** The grid the cards live in. One column on a phone, two on a tablet, three wider. */
-export function ModelCardGrid({ children }: { children: ReactNode }) {
-  return <div className="model-card-grid">{children}</div>;
+export function ModelCardGrid({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <div className={["model-card-grid", className].filter(Boolean).join(" ")}>{children}</div>;
 }

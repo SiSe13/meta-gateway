@@ -1,9 +1,9 @@
 import {
-  Ban,
   Check,
   ChevronDown,
   Copy,
   Eye,
+  Globe2,
   KeyRound,
   Pencil,
   Plus,
@@ -19,6 +19,7 @@ import {
   Calendar as HeroCalendar,
   DateField as HeroDateField,
   DatePicker as HeroDatePicker,
+  Dropdown,
   Input as HeroInput,
   Switch as HeroSwitch,
   TextArea as HeroTextArea,
@@ -33,16 +34,15 @@ import type {
   DownstreamKey,
   RouteOverview,
 } from "../api/types";
-import { ActionMenu, type ActionMenuItem } from "../components/ActionMenu";
-import { rowContextPoint, rowKeyboardContextPoint } from "../components/contextMenu";
+import type { ActionMenuItem } from "../components/ActionMenu";
 import { EmptyHero } from "../components/EmptyHero";
 import { ListShell } from "../components/ListShell";
 import { ModelPicker, type ModelOption } from "../components/ModelPicker";
 import { SearchableSelect } from "../components/SearchableSelect";
+import { registerOverlay } from "../components/overlayStack";
 import { ScopePicker } from "../components/ScopePicker";
 import { autoModelGroup, modelGroup, modelPatternMatches } from "./models/modelGroups";
 import { PaginationBar } from "../components/PaginationBar";
-import { QuotaBar, quotaPercent } from "../components/QuotaMeter";
 import { SecretRevealDialog } from "../components/SecretRevealDialog";
 import { EntityState } from "../components/EntityState";
 import { TelemetryStrip } from "../components/TelemetryStrip";
@@ -52,10 +52,9 @@ import { useI18n } from "../i18n";
 import { useSession } from "../session";
 import { useOperatingMode } from "../hooks/useOperatingMode";
 import { memberKeysSource } from "../member/MemberKeysSource";
-import { KeyCard } from "./keys/KeyCard";
 import { parseQuotaInput } from "./keys/quotaInput";
 import { mappingRealName } from "../lib/alias";
-import { formatCost as formatLedgerCost, useCurrency } from "../lib/format";
+import { formatCost as formatLedgerCost, formatGroupName, useCurrency } from "../lib/format";
 import {
   ADMIN_KEY_CAPS,
   MEMBER_KEY_CAPS,
@@ -73,6 +72,8 @@ import {
   Panel,
   StatusBadge,
   formatDate,
+  TextInput,
+  CheckboxControl,
 } from "../components/ui";
 
 /**
@@ -112,6 +113,86 @@ function EnabledSwitch({
   );
 }
 
+/** 在同一弹窗中查看或编辑单个令牌的模型白名单。 */
+function KeyModelRangeDialog({
+  models,
+  modelOptions,
+  canEdit,
+  pending,
+  error,
+  onClose,
+  onSave,
+}: {
+  models: string[];
+  modelOptions: ModelOption[];
+  canEdit: boolean;
+  pending: boolean;
+  error: unknown;
+  onClose: () => void;
+  onSave: (models: string[]) => void;
+}) {
+  const { t } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [selectedModels, setSelectedModels] = useState(models);
+
+  return (
+    <Dialog
+      title={t("keys.modelRangeDialogTitle")}
+      className="key-model-range-dialog"
+      onClose={onClose}
+      busy={pending}
+      actions={
+        <>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              if (editing) {
+                setSelectedModels(models);
+                setEditing(false);
+              } else {
+                onClose();
+              }
+            }}
+          >
+            {editing ? t("common.cancel") : t("common.close")}
+          </Button>
+          {editing ? (
+            <Button disabled={pending} onClick={() => onSave(selectedModels)}>
+              {t("common.save")}
+            </Button>
+          ) : canEdit ? (
+            <Button onClick={() => setEditing(true)}>{t("keys.modelRangeEdit")}</Button>
+          ) : null}
+        </>
+      }
+    >
+      {editing ? (
+        <div className="key-model-range-editor">
+          <Field label={t("keys.modelAllowlist")} hint={t("keys.modelAllowlistHint")}>
+            <ModelPicker
+              options={modelOptions}
+              selected={selectedModels}
+              onChange={setSelectedModels}
+              placeholder={t("modelPicker.search")}
+              emptyLabel={t("keys.modelPickerEmpty")}
+              flagMissing
+            />
+          </Field>
+          {error ? <ErrorState error={error} /> : null}
+        </div>
+      ) : (
+        <ul className="key-model-range-list">
+          {models.map((model) => (
+            <li key={model}>
+              <code>{model}</code>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Dialog>
+  );
+}
+
 // Redemption code manager: mint quota vouchers, copy them, void unused ones.
 function RedemptionDialog({ onClose }: { onClose: () => void }) {
   const { client } = useSession();
@@ -145,7 +226,7 @@ function RedemptionDialog({ onClose }: { onClose: () => void }) {
     >
       <div className="redemption-mint">
         <Field label={t("keys.redemptionCount")}>
-          <input
+          <TextInput
             type="number"
             min={1}
             max={100}
@@ -154,7 +235,7 @@ function RedemptionDialog({ onClose }: { onClose: () => void }) {
           />
         </Field>
         <Field label={t("keys.redemptionQuota")}>
-          <input
+          <TextInput
             type="number"
             min={1}
             value={quota}
@@ -227,12 +308,6 @@ function formatNumber(value?: number) {
   return new Intl.NumberFormat().format(value);
 }
 
-function formatQuota(used?: number, total?: number) {
-  const usedLabel = formatNumber(used ?? 0);
-  if (!total || total <= 0) return `${usedLabel} / ∞`;
-  return `${usedLabel} / ${formatNumber(total)}`;
-}
-
 function formatCost(value?: number) {
   if (value == null || !Number.isFinite(value)) return "—";
   return formatLedgerCost(value);
@@ -287,6 +362,12 @@ export function Keys() {
         ? memberKeysSource
         : {
             keys: (signal) => service.keys(signal),
+            ownerUsers: (signal) =>
+              client!.request<Array<{ id: number; name: string; username: string }>>(
+                "/admin/team/users",
+                { signal },
+              ),
+            keyActivity: (signal) => service.keyActivity(signal),
             discoveredModels: (signal) => service.discoveredModels(undefined, signal),
             usageSummary: (signal) => service.usageSummary(undefined, signal),
             routeOverviews: (signal) => service.routeOverviews(signal),
@@ -302,7 +383,7 @@ export function Keys() {
             revealKey: (id) => service.revealKey(id),
             rotateKey: (id) => service.rotateKey(id),
           },
-    [member, service],
+    [client, member, service],
   );
   return <KeysView source={source} caps={member ? MEMBER_KEY_CAPS : ADMIN_KEY_CAPS} team={team} />;
 }
@@ -345,6 +426,26 @@ export function KeysView({
     queryKey: ["keys", caps.upstream ? "admin" : "member"],
     queryFn: ({ signal }) => source.keys(signal),
   });
+  const keyActivity = useQuery({
+    queryKey: ["key-activity", caps.upstream ? "admin" : "member"],
+    queryFn: ({ signal }) => source.keyActivity!(signal),
+    enabled: caps.upstream && !!source.keyActivity,
+    refetchInterval: caps.upstream ? 2000 : false,
+  });
+  const ownerUsers = useQuery({
+    queryKey: ["key-owner-users"],
+    queryFn: ({ signal }) => source.ownerUsers!(signal),
+    enabled: showTeam && !!source.ownerUsers,
+    staleTime: 60_000,
+  });
+  const ownerById = useMemo(
+    () => new Map((ownerUsers.data ?? []).map((user) => [user.id, user])),
+    [ownerUsers.data],
+  );
+  const currentConcurrencyByKey = useMemo(
+    () => new Map((keyActivity.data ?? []).map((item) => [item.id, item.current_concurrent])),
+    [keyActivity.data],
+  );
   const discovered = useQuery({
     queryKey: ["discovered-models", caps.upstream ? "admin" : "member"],
     queryFn: ({ signal }) => source.discoveredModels(signal),
@@ -393,12 +494,17 @@ export function KeysView({
     return map;
   }, [metadata.data]);
   // The allow/deny filter compares the name a client sends, and clients can
-  // only send route names — so routes (with their channel bindings) are the
-  // candidate set. Discovery snapshots used to feed this list instead, which
-  // hid every renamed model: an alias is a route, and never appears in an
-  // upstream snapshot. Wildcard routes are expanded into the concrete names
-  // they answer for; a pattern with nothing to expand stays visible as-is.
+  // only send route names. A member's /me/models endpoint already returns the
+  // names authorized for that account; the admin side derives them from routes
+  // so aliases and wildcard expansions match the names clients can call.
   const modelOptions = useMemo<ModelOption[]>(() => {
+    if (!caps.upstream) {
+      return discoveredNames.map((name) => ({
+        name,
+        group: modelGroup(name, undefined, metaByModel.get(name)),
+      }));
+    }
+
     const out: ModelOption[] = [];
     for (const overview of modelRoutes.data ?? []) {
       const pattern = overview.route.model_pattern.trim();
@@ -431,7 +537,7 @@ export function KeysView({
       });
     }
     return out;
-  }, [discoveredNames, metaByModel, modelRoutes.data]);
+  }, [caps.upstream, discoveredNames, metaByModel, modelRoutes.data]);
   const modelGroupOptions = useMemo(() => {
     const groups = new Set<string>();
     for (const option of modelOptions) {
@@ -452,11 +558,12 @@ export function KeysView({
   const [add, setAdd] = useState(false);
   const [edit, setEdit] = useState<DownstreamKey | null>(null);
   const [redemption, setRedemption] = useState(false);
+  const [viewingModelRange, setViewingModelRange] = useState<{
+    key: DownstreamKey;
+    models: string[];
+  } | null>(null);
   const [created, setCreated] = useState<Pick<CreatedDownstreamKey, "id" | "token"> | null>(null);
   const [remove, setRemove] = useState<number | null>(null);
-  const [contextMenu, setContextMenu] = useState<{ id: number; top: number; left: number } | null>(
-    null,
-  );
   // Re-view a stored plaintext token (created after plaintext storage).
   const [viewing, setViewing] = useState<{ id: number; name: string } | null>(null);
   const [viewedToken, setViewedToken] = useState<string | null>(null);
@@ -493,7 +600,10 @@ export function KeysView({
     mutationFn: (v: { id: number; body: KeyUpdateInput }) => source.updateKey!(v.id, v.body),
     invalidateKeys: [["keys"], ["usage-summary"]],
     toastOnError: false,
-    onSuccess: () => setEdit(null),
+    onSuccess: () => {
+      setEdit(null);
+      setViewingModelRange(null);
+    },
   });
   const del = useAdminMutation({
     mutationFn: (id: number) => source.deleteKey!(id),
@@ -513,6 +623,12 @@ export function KeysView({
   // confirm in place. If the clipboard is unavailable the dialog opens instead,
   // which is the one path that still lets them see it.
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [apiAddressCopied, setApiAddressCopied] = useState(false);
+  const [apiAddressOpen, setApiAddressOpen] = useState(false);
+  const apiAddressRootRef = useRef<HTMLDivElement>(null);
+  const apiAddressPopoverRef = useRef<HTMLElement>(null);
+  const apiAddressTimer = useRef<number | null>(null);
+  const apiAddress = `${window.location.origin}/v1`;
   // The in-place "copied" confirmation is a timer, and a timer that outlives its
   // component is a leak: it fired into a torn-down tree, which showed up as a test
   // run reporting 526 passed and exit code 1. Cleared on unmount and on each copy.
@@ -520,9 +636,49 @@ export function KeysView({
   useEffect(
     () => () => {
       if (copyResetTimer.current !== null) window.clearTimeout(copyResetTimer.current);
+      if (apiAddressTimer.current !== null) window.clearTimeout(apiAddressTimer.current);
     },
     [],
   );
+  useEffect(() => {
+    const popover = apiAddressPopoverRef.current;
+    const root = apiAddressRootRef.current;
+    if (!apiAddressOpen || !popover || !root) return;
+    const close = () => setApiAddressOpen(false);
+    const unregister = registerOverlay(close, {
+      modal: false,
+      transient: true,
+      element: popover,
+    });
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && (popover.contains(target) || root.contains(target))) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    popover.addEventListener("keydown", onKeyDown);
+    return () => {
+      unregister();
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      popover.removeEventListener("keydown", onKeyDown);
+    };
+  }, [apiAddressOpen]);
+  const copyApiAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(apiAddress);
+      setApiAddressCopied(true);
+      if (apiAddressTimer.current !== null) window.clearTimeout(apiAddressTimer.current);
+      apiAddressTimer.current = window.setTimeout(() => {
+        apiAddressTimer.current = null;
+        setApiAddressCopied(false);
+      }, 1800);
+    } catch {
+      setApiAddressCopied(false);
+    }
+  };
   const copy = useAdminMutation({
     mutationFn: (key: { id: number; name: string }) => source.revealKey!(key.id),
     pendingIdOf: (key) => key.id,
@@ -608,15 +764,6 @@ export function KeysView({
     const actions: ActionMenuItem[] = [];
     // A capability that is off removes the item instead of disabling it: an
     // action a member can never perform should not appear at all.
-    if (caps.reveal && (key.has_token || key.id === rotatedToken?.id))
-      actions.push({
-        key: "view",
-        label: t("keys.view"),
-        group: t("actions.view"),
-        icon: <Eye size={14} />,
-        disabled: busy,
-        onSelect: () => viewKey(key),
-      });
     if (caps.edit) {
       actions.push({
         key: "edit",
@@ -628,18 +775,6 @@ export function KeysView({
           update.reset();
           setEdit(key);
         },
-      });
-    }
-    // Pausing a token is not the same as revoking it: the client keeps its
-    // credentials and starts working again the moment the switch goes back on.
-    if (caps.edit) {
-      actions.push({
-        key: key.enabled ? "disable" : "enable",
-        label: key.enabled ? t("common.disableAction") : t("common.enableAction"),
-        group: t("actions.manage"),
-        icon: key.enabled ? <Ban size={14} /> : <Check size={14} />,
-        disabled: busy,
-        onSelect: () => update.mutate({ id: key.id, body: { enabled: !key.enabled } }),
       });
     }
     if (caps.rotate) {
@@ -676,8 +811,6 @@ export function KeysView({
       disabledReason: action.disabled ? t("common.working") : undefined,
     }));
   };
-  const contextKey = contextMenu ? rows.find((key) => key.id === contextMenu.id) : undefined;
-
   return (
     <main className="page keys-page">
       <div className="ops-canvas">
@@ -735,6 +868,42 @@ export function KeysView({
               />
             </div>
             <div className="keys-toolbar-actions">
+              <div className="keys-api-address" ref={apiAddressRootRef}>
+                <Dropdown isOpen={apiAddressOpen} onOpenChange={setApiAddressOpen}>
+                  <Dropdown.Trigger
+                    className="button button--secondary keys-api-address-trigger"
+                    aria-label={t("keys.apiAddress")}
+                  >
+                    <Globe2 size={15} aria-hidden="true" />
+                    {t("keys.apiAddress")}
+                    <ChevronDown size={13} aria-hidden="true" />
+                  </Dropdown.Trigger>
+                  <Dropdown.Popover
+                    ref={apiAddressPopoverRef}
+                    className="keys-api-address-popover"
+                    placement="bottom end"
+                    isNonModal
+                  >
+                    <div className="keys-api-address-title">{t("keys.apiAddress")}</div>
+                    <Button
+                      className="keys-api-address-copy"
+                      type="button"
+                      aria-label={t("keys.copyAPIAddress")}
+                      onClick={() => void copyApiAddress()}
+                    >
+                      <span>
+                        <strong>{t("keys.defaultAPIAddress")}</strong>
+                        <code>{apiAddress}</code>
+                      </span>
+                      {apiAddressCopied ? (
+                        <Check size={16} aria-label={t("dashboard.copied")} />
+                      ) : (
+                        <Copy size={16} aria-hidden="true" />
+                      )}
+                    </Button>
+                  </Dropdown.Popover>
+                </Dropdown>
+              </div>
               {caps.create ? (
                 <Button icon={<Plus size={16} />} onClick={openCreate}>
                   {t("keys.create")}
@@ -792,105 +961,115 @@ export function KeysView({
                 />
               }
             >
-              {caps.cards ? (
-                // A person's own tokens: few, and each one read on its own. The
-                // same rows and the same actions feed both layouts, so the card
-                // and the table can never drift apart.
-                <div className="key-card-grid">
-                  {pageRows.map((k) => (
-                    <KeyCard
-                      key={k.id}
-                      name={k.name}
-                      id={k.id}
-                      hint={k.token_hint}
-                      usedTokens={k.quota_used_tokens ?? 0}
-                      cost={k.cost ?? 0}
-                      lastUsedAt={k.last_used_at}
-                      modelScope={k.model_allowlist}
-                      expiresAt={k.expires_at}
-                      allowedIPs={k.allowed_ips}
-                      busy={
-                        reveal.pendingId === k.id ||
-                        (update.isPending && update.variables?.id === k.id)
-                      }
-                      copied={copiedId === k.id}
-                      copyPending={copy.pendingId === k.id}
-                      onCopy={caps.reveal ? () => copyKey(k) : undefined}
-                      toggle={
-                        caps.edit ? (
-                          <EnabledSwitch
-                            on={k.enabled}
-                            name={k.name}
-                            pending={update.isPending && update.variables?.id === k.id}
-                            onToggle={() =>
-                              update.mutate({ id: k.id, body: { enabled: !k.enabled } })
-                            }
-                          />
-                        ) : (
-                          <StatusBadge value={k.enabled} />
-                        )
-                      }
-                      actions={keyActions(k)}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <DataTable
-                  headers={[
-                    t("common.name"),
-                    ...(caps.scopes ? [t("keys.accessCol")] : []),
-                    ...(caps.quotas ? [t("keys.quotaCol")] : []),
-                    ...(caps.pricing ? [t("keys.costCol")] : []),
-                    t("common.status"),
-                    t("common.created"),
-                    t("common.actions"),
-                  ]}
-                >
-                  {pageRows.map((k) => (
-                    <tr
-                      key={k.id}
-                      tabIndex={0}
-                      onContextMenu={(event) => {
-                        const point = rowContextPoint(event);
-                        if (point) setContextMenu({ id: k.id, ...point });
-                      }}
-                      onKeyDown={(event) => {
-                        const point = rowKeyboardContextPoint(event);
-                        if (point) setContextMenu({ id: k.id, ...point });
-                      }}
-                    >
+              <DataTable
+                headers={[
+                  t("common.name"),
+                  t("keys.secretCol"),
+                  ...(caps.quotas || caps.pricing ? [t("keys.usageCol")] : []),
+                  ...(caps.modelRange ? [t("keys.modelRangeCol")] : []),
+                  ...(caps.concurrency ? [t("keys.currentConcurrentCol")] : []),
+                  t("common.status"),
+                  ...(caps.advanced ? [t("keys.expiresAt")] : []),
+                  t("common.created"),
+                  t("common.actions"),
+                ]}
+              >
+                {pageRows.map((k) => {
+                  const allowedModels = (k.model_allowlist ?? "")
+                    .split(",")
+                    .map((model) => model.trim())
+                    .filter(Boolean);
+                  const owner = ownerById.get(k.user_id ?? 0);
+                  const ownerName =
+                    k.owner_name?.trim() ||
+                    owner?.name.trim() ||
+                    k.owner_username ||
+                    owner?.username ||
+                    t(ownerUsers.isPending ? "keys.userOwnerLoading" : "keys.userOwnerUnknown");
+                  const ownerUsername = k.owner_username || owner?.username;
+                  return (
+                    <tr key={k.id}>
                       <td>
                         <strong>{k.name}</strong>
-                        <small>#{k.id}</small>
                         {showTeam && k.user_id ? (
-                          <small>{t("keys.userOwner", { id: k.user_id })}</small>
+                          <small>
+                            {t("keys.userOwner", {
+                              name: ownerName,
+                              username:
+                                ownerUsername && ownerUsername !== ownerName
+                                  ? ` (@${ownerUsername})`
+                                  : "",
+                            })}
+                          </small>
                         ) : null}
                       </td>
-                      {caps.scopes ? <td>{k.scopes?.trim() || "relay"}</td> : null}
-                      {caps.quotas ? (
+                      <td className="key-secret-cell">
+                        {caps.reveal && (k.has_token || k.id === rotatedToken?.id) ? (
+                          <>
+                            <code>mg-••••••••</code>
+                            <IconButton
+                              className="is-bare"
+                              label={
+                                copiedId === k.id ? t("dashboard.copied") : t("keys.copyToken")
+                              }
+                              title={
+                                copiedId === k.id ? t("dashboard.copied") : t("keys.copyToken")
+                              }
+                              disabled={copy.pendingId === k.id}
+                              onClick={() => copyKey(k)}
+                            >
+                              {copiedId === k.id ? <Check size={14} /> : <Copy size={14} />}
+                            </IconButton>
+                          </>
+                        ) : (
+                          <span className="key-secret-unavailable">
+                            {caps.reveal ? t("keys.tokenUnavailable") : "—"}
+                          </span>
+                        )}
+                      </td>
+                      {caps.quotas || caps.pricing ? (
                         <td>
-                          <div className="quota-cell">
-                            <code>{formatQuota(k.quota_used_tokens, k.quota_total_tokens)}</code>
-                            {k.quota_total_tokens && k.quota_total_tokens > 0 ? (
-                              <QuotaBar
-                                percent={quotaPercent(
-                                  k.quota_used_tokens ?? 0,
-                                  k.quota_total_tokens,
-                                )}
-                              />
-                            ) : null}
-                            {/* The money budget appears only when it is set: an unlimited key
-                would otherwise grow a meaningless "0 / 0" line. */}
-                            {(k.quota_total_cost ?? 0) > 0 ? (
-                              <small>
-                                {formatCost(k.quota_used_cost ?? 0)} /{" "}
-                                {formatCost(k.quota_total_cost ?? 0)}
-                              </small>
-                            ) : null}
+                          <div className="key-usage-cell">
+                            <span>
+                              <strong>{t("keys.todayUsage")}</strong>
+                              {formatCost(k.today_cost)} · {formatNumber(k.today_tokens)} Token
+                            </span>
+                            <span>
+                              <strong>{t("keys.last30DaysUsage")}</strong>
+                              {formatCost(k.last_30_days_cost)} ·{" "}
+                              {formatNumber(k.last_30_days_tokens)} Token
+                            </span>
                           </div>
                         </td>
                       ) : null}
-                      {caps.pricing ? <td>{formatCost(k.cost)}</td> : null}
+                      {caps.modelRange ? (
+                        <td>
+                          {allowedModels.length === 0 ? (
+                            t("keys.modelRangeFollowAccount")
+                          ) : allowedModels.length <= 2 ? (
+                            allowedModels.join("、")
+                          ) : (
+                            <span className="key-model-range-summary">
+                              <span>
+                                {t("keys.modelRangeCount", { count: allowedModels.length })}
+                              </span>
+                              <Button
+                                className="button--ghost"
+                                onClick={() =>
+                                  setViewingModelRange({ key: k, models: allowedModels })
+                                }
+                              >
+                                {t("keys.modelRangeView")}
+                              </Button>
+                            </span>
+                          )}
+                        </td>
+                      ) : null}
+                      {caps.concurrency ? (
+                        <td className="key-current-concurrent">
+                          {currentConcurrencyByKey.get(k.id) ?? k.current_concurrent ?? 0}
+                        </td>
+                      ) : null}
                       <td>
                         {caps.edit ? (
                           <EnabledSwitch
@@ -905,48 +1084,72 @@ export function KeysView({
                           <StatusBadge value={k.enabled} />
                         )}
                       </td>
+                      {caps.advanced ? (
+                        <td>{k.expires_at ? formatDate(k.expires_at) : t("keys.neverExpires")}</td>
+                      ) : null}
                       <td>{formatDate(k.created_at)}</td>
                       <td className="actions key-row-actions">
                         {caps.reveal && (k.has_token || k.id === rotatedToken?.id) && (
                           <IconButton
                             className="is-bare"
                             label={t("keys.view")}
+                            title={t("keys.view")}
                             disabled={reveal.pendingId === k.id}
                             onClick={() => viewKey(k)}
                           >
                             <Eye size={14} />
                           </IconButton>
                         )}
-                        <ActionMenu
-                          compact
-                          label={t("common.moreActions")}
-                          title={k.name}
-                          items={keyActions(k)}
-                        />
+                        {keyActions(k).map((action) =>
+                          action.icon ? (
+                            <IconButton
+                              key={action.key}
+                              className={`is-bare${action.danger ? " key-row-action-danger" : ""}`}
+                              label={action.label}
+                              title={action.label}
+                              disabled={action.disabled}
+                              onClick={action.onSelect}
+                            >
+                              {action.icon}
+                            </IconButton>
+                          ) : (
+                            <Button
+                              key={action.key}
+                              className="button--ghost"
+                              disabled={action.disabled}
+                              onClick={action.onSelect}
+                            >
+                              {action.label}
+                            </Button>
+                          ),
+                        )}
                       </td>
                     </tr>
-                  ))}
-                </DataTable>
-              )}
+                  );
+                })}
+              </DataTable>
             </ListShell>
           </EntityState>
         </Panel>
       </div>
 
-      {contextMenu && contextKey ? (
-        <ActionMenu
-          key={contextKey.id}
-          label={t("common.moreActions")}
-          title={contextKey.name}
-          open
-          position={contextMenu}
-          onOpenChange={(open) => {
-            if (!open) setContextMenu(null);
-          }}
-          items={keyActions(contextKey)}
+      {caps.quotas && redemption && <RedemptionDialog onClose={() => setRedemption(false)} />}
+      {viewingModelRange ? (
+        <KeyModelRangeDialog
+          models={viewingModelRange.models}
+          modelOptions={modelOptions}
+          canEdit={caps.edit}
+          pending={update.isPending}
+          error={update.error}
+          onClose={() => setViewingModelRange(null)}
+          onSave={(models) =>
+            update.mutate({
+              id: viewingModelRange.key.id,
+              body: { model_allowlist: models.join(",") },
+            })
+          }
         />
       ) : null}
-      {caps.quotas && redemption && <RedemptionDialog onClose={() => setRedemption(false)} />}
       {add && (
         <KeyDialog
           mode="create"
@@ -967,7 +1170,9 @@ export function KeysView({
           initial={edit}
           pending={update.isPending}
           error={update.error}
-          onClose={() => setEdit(null)}
+          onClose={() => {
+            setEdit(null);
+          }}
           onSave={(v) =>
             update.mutate({
               id: edit.id,
@@ -1318,7 +1523,7 @@ function KeyDialog({
                     { value: "", label: t("keys.modelGroupPlaceholder") },
                     ...modelGroupOptions.map((group) => ({
                       value: group,
-                      label: `${group} (${modelsByGroup.get(group)?.size ?? 0})`,
+                      label: `${formatGroupName(group, t)} (${modelsByGroup.get(group)?.size ?? 0})`,
                     })),
                   ]}
                 />
@@ -1370,7 +1575,13 @@ function KeyDialog({
                   onChange={setTenantGroup}
                   options={[
                     { value: "", label: t("keys.groupDefault") },
-                    ...tenantGroupNames.map((name) => ({ value: name, label: name })),
+                    ...(tenantGroup && !tenantGroupNames.includes(tenantGroup)
+                      ? [{ value: tenantGroup, label: formatGroupName(tenantGroup, t) }]
+                      : []),
+                    ...tenantGroupNames.map((name) => ({
+                      value: name,
+                      label: formatGroupName(name, t),
+                    })),
                   ]}
                 />
               </Field>
@@ -1384,9 +1595,12 @@ function KeyDialog({
                 options={[
                   { value: "", label: t("keys.routeGroupNone") },
                   ...(routeGroup && !routeGroupNames.includes(routeGroup)
-                    ? [{ value: routeGroup, label: routeGroup }]
+                    ? [{ value: routeGroup, label: formatGroupName(routeGroup, t) }]
                     : []),
-                  ...routeGroupNames.map((name) => ({ value: name, label: name })),
+                  ...routeGroupNames.map((name) => ({
+                    value: name,
+                    label: formatGroupName(name, t),
+                  })),
                 ]}
               />
             </Field>
@@ -1442,8 +1656,7 @@ function KeyDialog({
             </div>
             {mode === "edit" ? (
               <label className="check is-spaced">
-                <input
-                  type="checkbox"
+                <CheckboxControl
                   checked={resetUsed}
                   disabled={pending}
                   onChange={(event) => setResetUsed(event.target.checked)}
@@ -1453,8 +1666,7 @@ function KeyDialog({
             ) : (
               <>
                 <label className="check is-spaced">
-                  <input
-                    type="checkbox"
+                  <CheckboxControl
                     checked={useCustomToken}
                     disabled={pending}
                     aria-label={t("keys.useCustomToken")}

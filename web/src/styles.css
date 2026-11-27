@@ -483,7 +483,7 @@ td.status-col {
 }
 .info-tip-bubble {
   position: fixed;
-  z-index: 1005;
+  z-index: calc(var(--z-index-overlay, 100000) + 10);
   width: min(320px, calc(100vw - 24px));
   padding: 9px 10px;
   border: 1px solid var(--line-strong);
@@ -1164,14 +1164,20 @@ td.row-actions {
 td.row-actions .action-menu {
   justify-content: flex-end;
 }
-td.key-row-actions {
-  min-width: 88px;
-  width: 88px;
+td.actions.key-row-actions {
+  min-width: 148px;
+  width: 148px;
   white-space: nowrap;
   text-align: right;
 }
 td.key-row-actions > * {
   vertical-align: middle;
+}
+td.actions.key-row-actions .icon-button + .icon-button {
+  margin-left: 3px;
+}
+td.actions.key-row-actions .key-row-action-danger {
+  color: var(--danger);
 }
 tr[tabindex="0"]:focus-visible {
   outline: 2px solid var(--primary-active);
@@ -8164,6 +8170,10 @@ label.check input[type="checkbox"]:not(.switch) {
 .cockpit-dual-grid.is-single {
   grid-template-columns: minmax(0, 1fr);
 }
+.cockpit-usage-panel,
+.cockpit-logs-panel {
+  min-height: 260px;
+}
 /* .panel + .panel stacks vertical panels with an 18px top margin; inside this
    side-by-side grid the gap already spaces the columns, so the same rule
    would shove the right panel down. */
@@ -8646,6 +8656,13 @@ label.check input[type="checkbox"]:not(.switch) {
   display: grid;
   gap: 10px;
   margin-bottom: 18px;
+}
+.dashboard-page > .cockpit-stack > .telemetry-stack {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }
 /* 语义色左缘：读数为仪表、而非盒子 */
 .telemetry-secondary {

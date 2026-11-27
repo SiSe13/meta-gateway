@@ -5,6 +5,7 @@ import { ApiError } from "../../api/client";
 import { Button, Dialog, ErrorState, Field } from "../../components/ui";
 import { useSession } from "../../session";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import {
   nativeAmount,
   quotePublisher,
@@ -141,7 +142,9 @@ export function QuoteActions({
           numbers below it keep the weight. */}
       <p className="quote-entry-meta">
         {quote.source}
-        {quote.upstream_group ? ` · ${t("billing.group", { group: quote.upstream_group })}` : ""}
+        {quote.upstream_group
+          ? ` · ${t("billing.group", { group: formatGroupName(quote.upstream_group, t) })}`
+          : ""}
         {` · ${t("billing.observed", { time: new Date(quote.observed_at).toLocaleString() })}`}
         {quote.unit.display_currency
           ? ` · ${t("billing.displayOnly", { currency: quote.unit.display_currency })}`

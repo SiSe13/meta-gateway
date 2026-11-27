@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button as HeroButton } from "@heroui/react";
 import { ChevronDown, ChevronUp, GripVertical, RotateCcw } from "lucide-react";
-import { Button, Dialog, Loading } from "../components/ui";
+import { Button, Dialog, Loading, TextInput, CheckboxControl } from "../components/ui";
 import { accountRequest } from "../team/transport";
 import { teamError, teamText } from "../team/text";
 import type { RouteOrder, RouteUpstream } from "../team/types";
@@ -200,7 +200,7 @@ export function RouteOrderDialog({
               </span>
               <label className="route-order-weight">
                 <span className="workspace-caption">{t("upstreamWeight")}</span>
-                <input
+                <TextInput
                   type="number"
                   min={1}
                   max={1000}
@@ -214,8 +214,7 @@ export function RouteOrderDialog({
                 </small>
               </label>
               <label className="route-order-toggle">
-                <input
-                  type="checkbox"
+                <CheckboxControl
                   disabled={busy}
                   checked={!row.disabled}
                   onChange={(event) => patch(row.id, { disabled: !event.target.checked })}

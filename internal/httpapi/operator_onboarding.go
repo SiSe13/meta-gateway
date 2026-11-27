@@ -323,7 +323,7 @@ func (h *sessionHandler) claimOwner(w http.ResponseWriter, r *http.Request) {
 		// A team session's account version moved, so re-issue its cookie: the
 		// operator must not be signed out by setting their own password.
 		if principal := teamActor(r); principal != nil && principal.User != nil {
-			if _, sessionErr := h.team.startSession(w, r, account); sessionErr != nil {
+			if _, sessionErr := h.team.startSession(w, r, account, "operator_password"); sessionErr != nil {
 				// The credentials are stored either way; the console will ask
 				// for a sign-in again rather than reporting a failed claim.
 				writeJSON(w, http.StatusOK, map[string]any{"reauthenticate": true, "onboarding": h.onboardingState()})

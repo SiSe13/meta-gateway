@@ -22,6 +22,7 @@ import {
 } from "../../components/ui";
 import { useAdminMutation } from "../../hooks/useAdminMutation";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import { useSession } from "../../session";
 import "./modelChanges.css";
 
@@ -419,7 +420,7 @@ export function ModelChangesPanel({
                               <span className="muted">
                                 {t("modelChanges.member", {
                                   id: member.member_id,
-                                  group: member.group_name || "default",
+                                  group: formatGroupName(member.group_name, t),
                                 })}
                               </span>
                             </li>
@@ -770,7 +771,7 @@ function ReplacementDialog({
                       {member.route_name} ·{" "}
                       {t("modelChanges.member", {
                         id: member.member_id,
-                        group: member.group_name || "default",
+                        group: formatGroupName(member.group_name, t),
                       })}
                     </small>
                   </span>
@@ -883,7 +884,7 @@ function DiscardDialog({
               <div key={item.member_id}>
                 <strong className="mono">{item.model_pattern}</strong>
                 <span className="muted">
-                  {item.route_name} · #{item.member_id} · {item.group_name || "default"}
+                  {item.route_name} · #{item.member_id} · {formatGroupName(item.group_name, t)}
                 </span>
                 {/* One value and what deleting it costs — not the "from → to"
                     pair the replacement preview draws. Sharing that three-column
@@ -960,7 +961,7 @@ function DiscardDialog({
                       {member.route_name} ·{" "}
                       {t("modelChanges.member", {
                         id: member.member_id,
-                        group: member.group_name || "default",
+                        group: formatGroupName(member.group_name, t),
                       })}
                     </small>
                     {member.deletable ? null : (

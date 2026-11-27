@@ -6,7 +6,7 @@
 引擎是 SQLite（WAL 模式），迁移脚本是 `internal/store/NNN_*.sql`，按文件名的数字序执行。
 本页由生成器**实际迁移一个临时数据库再读回 schema**得出，所以它反映的是代码最终产生的结构，而不是对 SQL 文本的解析结果。
 
-当前：`internal/store/` 下 **146** 个 `.sql` 文件，其中 **146** 个已应用。两者不等是正常的——迁移历史上存在编号重复与退休：`026` / `027` / `028` 各有两个文件（按后缀安全排序），`060` 被 `067` 退休。
+当前：`internal/store/` 下 **157** 个 `.sql` 文件，其中 **157** 个已应用。两者不等是正常的——迁移历史上存在编号重复与退休：`026` / `027` / `028` 各有两个文件（按后缀安全排序），`060` 被 `067` 退休。
 
 ## 迁移铁律
 
@@ -26,7 +26,7 @@
 
 ## 表
 
-共 **67** 个表。
+共 **70** 个表。
 
 ### admin_totp · 4 列
 
@@ -983,7 +983,7 @@
 | `keepalive_daily_cap` | INTEGER | 是 | 0 | — |
 | `keepalive_quiet_hours` | TEXT | 是 | '' | — |
 
-### team_code_redemptions · 6 列
+### team_code_redemptions · 9 列
 
 | 列 | 类型 | NOT NULL | 默认值 | 主键 |
 | --- | --- | --- | --- | --- |
@@ -993,6 +993,20 @@
 | `quota_tokens` | INTEGER | 是 | 0 | — |
 | `created_at` | TEXT | 是 | datetime('now') | — |
 | `quota_cost` | REAL | 是 | 0 | — |
+| `quota_concurrent` | INTEGER | 是 | 0 | — |
+| `grant_expires_at` | INTEGER | 是 | 0 | — |
+| `grant_expired` | INTEGER | 是 | 0 | — |
+
+### team_concurrency_grants · 6 列
+
+| 列 | 类型 | NOT NULL | 默认值 | 主键 |
+| --- | --- | --- | --- | --- |
+| `id` | INTEGER | — | — | 是 |
+| `user_id` | INTEGER | 是 | — | — |
+| `quota_concurrent` | INTEGER | 是 | — | — |
+| `grant_expires_at` | INTEGER | 是 | 0 | — |
+| `grant_expired` | INTEGER | 是 | 0 | — |
+| `created_at` | TEXT | 是 | datetime('now') | — |
 
 ### team_identities · 9 列
 
@@ -1008,7 +1022,15 @@
 | `created_at` | TEXT | 是 | datetime('now') | — |
 | `last_login_at` | TEXT | 是 | datetime('now') | — |
 
-### team_invites · 16 列
+### team_invite_policies · 3 列
+
+| 列 | 类型 | NOT NULL | 默认值 | 主键 |
+| --- | --- | --- | --- | --- |
+| `invite_id` | INTEGER | 是 | — | 是 |
+| `policy_id` | INTEGER | 是 | — | 是 |
+| `position` | INTEGER | 是 | 0 | — |
+
+### team_invites · 19 列
 
 | 列 | 类型 | NOT NULL | 默认值 | 主键 |
 | --- | --- | --- | --- | --- |
@@ -1028,8 +1050,11 @@
 | `quota_tokens` | INTEGER | 是 | 0 | — |
 | `note` | TEXT | 是 | '' | — |
 | `quota_cost` | REAL | 是 | 0 | — |
+| `quota_concurrent` | INTEGER | 是 | 0 | — |
+| `grant_validity_days` | INTEGER | 是 | 0 | — |
+| `token_enc` | TEXT | 是 | '' | — |
 
-### team_policies · 9 列
+### team_policies · 5 列
 
 | 列 | 类型 | NOT NULL | 默认值 | 主键 |
 | --- | --- | --- | --- | --- |
@@ -1038,10 +1063,6 @@
 | `models_json` | TEXT | 是 | '[]' | — |
 | `members_json` | TEXT | 是 | '[]' | — |
 | `all_models` | INTEGER | 是 | 0 | — |
-| `max_keys` | INTEGER | 是 | 5 | — |
-| `rpm` | INTEGER | 是 | 60 | — |
-| `allow_routing` | INTEGER | 是 | 0 | — |
-| `allow_request_preferences` | INTEGER | 是 | 0 | — |
 
 ### team_requests · 7 列
 
@@ -1065,7 +1086,7 @@
 | `members_json` | TEXT | 是 | '[]' | — |
 | `is_default` | INTEGER | 是 | 0 | — |
 
-### team_sessions · 5 列
+### team_sessions · 10 列
 
 | 列 | 类型 | NOT NULL | 默认值 | 主键 |
 | --- | --- | --- | --- | --- |
@@ -1074,6 +1095,11 @@
 | `version` | INTEGER | 是 | — | — |
 | `created_at` | INTEGER | 是 | — | — |
 | `expires_at` | INTEGER | 是 | — | — |
+| `device` | TEXT | 是 | '' | — |
+| `ip_address` | TEXT | 是 | '' | — |
+| `login_method` | TEXT | 是 | '' | — |
+| `last_active_at` | INTEGER | 是 | 0 | — |
+| `device_key` | TEXT | 是 | '' | — |
 
 ### team_settings · 4 列
 
@@ -1084,7 +1110,15 @@
 | `branding_json` | TEXT | 是 | '{}' | — |
 | `oauth_json` | TEXT | 是 | '' | — |
 
-### team_users · 14 列
+### team_user_policies · 3 列
+
+| 列 | 类型 | NOT NULL | 默认值 | 主键 |
+| --- | --- | --- | --- | --- |
+| `user_id` | INTEGER | 是 | — | 是 |
+| `policy_id` | INTEGER | 是 | — | 是 |
+| `created_at` | TEXT | 是 | datetime('now') | — |
+
+### team_users · 20 列
 
 | 列 | 类型 | NOT NULL | 默认值 | 主键 |
 | --- | --- | --- | --- | --- |
@@ -1102,6 +1136,12 @@
 | `quota_used_tokens` | INTEGER | 是 | 0 | — |
 | `quota_total_cost` | REAL | 是 | 0 | — |
 | `quota_used_cost` | REAL | 是 | 0 | — |
+| `max_keys` | INTEGER | 是 | 5 | — |
+| `rpm` | INTEGER | 是 | 60 | — |
+| `allow_routing` | INTEGER | 是 | 0 | — |
+| `allow_request_preferences` | INTEGER | 是 | 0 | — |
+| `last_login_at` | TEXT | 是 | '' | — |
+| `max_concurrent` | INTEGER | 是 | 5 | — |
 
 ### usage_records · 18 列
 
@@ -1149,7 +1189,7 @@
 
 ## 索引
 
-共 **87** 个索引。
+共 **91** 个索引。
 
 | 索引 | 表 | 唯一 |
 | --- | --- | --- |
@@ -1228,14 +1268,18 @@
 | `idx_site_probe_samples_run` | `site_probe_samples` | — |
 | `idx_site_probe_samples_time` | `site_probe_samples` | — |
 | `idx_sites_base_url` | `sites` | — |
+| `team_code_redemptions_expiry_idx` | `team_code_redemptions` | — |
 | `team_code_redemptions_once` | `team_code_redemptions` | 是 |
+| `team_concurrency_grants_expiry_idx` | `team_concurrency_grants` | — |
 | `team_identities_subject` | `team_identities` | 是 |
 | `team_identities_user` | `team_identities` | — |
+| `team_invite_policies_policy` | `team_invite_policies` | — |
 | `team_invites_kind_idx` | `team_invites` | — |
 | `team_requests_user_time` | `team_requests` | — |
 | `team_route_plans_default` | `team_route_plans` | 是 |
 | `team_route_plans_user` | `team_route_plans` | — |
 | `team_sessions_user` | `team_sessions` | — |
+| `team_user_policies_policy` | `team_user_policies` | — |
 | `idx_usage_records_created` | `usage_records` | — |
 | `idx_usage_records_key_created` | `usage_records` | — |
 | `idx_usage_records_request` | `usage_records` | — |

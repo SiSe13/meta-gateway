@@ -157,8 +157,9 @@ type Service struct {
 	// grayscale relay attempts before the channel graduates; 0 disables).
 	grayPromoteRequests atomic.Int64
 	// inflight counts in-flight relays per channel for the burst guard.
-	inflightMu sync.Mutex
-	inflight   map[int64]int
+	inflightMu  sync.Mutex
+	inflight    map[int64]int
+	keyInFlight map[int64]int
 	// concurrencyAware enables the burst guard (selector-side scoring);
 	// concurrencyLimit is the per-channel ceiling.
 	concurrencyAware atomic.Bool
@@ -170,6 +171,8 @@ type Service struct {
 	credentialRefresher CredentialRefresher
 	// gate is the hard per-channel concurrency limiter (FIFO wait queue).
 	gate *ChannelGate
+	// userGate limits all in-flight requests for one team account across channels.
+	userGate *ChannelGate
 	// nonStreamTimeout caps a non-streaming upstream attempt (request + body
 	// read); 0 uses the package default nonStreamRequestTimeout. Streaming
 	// requests are exempt. Injectable for tests.
@@ -401,6 +404,7 @@ func New(selector Selector, upstream Relay, db *store.DB, enc *crypto.Encrypter,
 	service.faultProtectionEnabled.Store(true)
 	service.cooldownNs.Store(int64(cooldown))
 	service.gate = NewChannelGate()
+	service.userGate = NewChannelGate()
 	return service
 }
 
@@ -449,6 +453,37 @@ func (s *Service) Inflight(channelID int64) int {
 	s.inflightMu.Lock()
 	defer s.inflightMu.Unlock()
 	return s.inflight[channelID]
+}
+
+// KeyInFlight 返回指定下游令牌当前正在处理的请求数。
+func (s *Service) KeyInFlight(keyID int64) int {
+	s.inflightMu.Lock()
+	defer s.inflightMu.Unlock()
+	return s.keyInFlight[keyID]
+}
+
+// acquireKey 在令牌请求进入转发流程时增加计数。
+func (s *Service) acquireKey(keyID int64) {
+	if keyID <= 0 {
+		return
+	}
+	s.inflightMu.Lock()
+	if s.keyInFlight == nil {
+		s.keyInFlight = make(map[int64]int)
+	}
+	s.keyInFlight[keyID]++
+	s.inflightMu.Unlock()
+}
+
+// releaseKey 在令牌请求完成或响应体关闭后减少计数。
+func (s *Service) releaseKey(keyID int64) {
+	s.inflightMu.Lock()
+	if count := s.keyInFlight[keyID]; count > 1 {
+		s.keyInFlight[keyID] = count - 1
+	} else {
+		delete(s.keyInFlight, keyID)
+	}
+	s.inflightMu.Unlock()
 }
 
 // acquireChannel reserves one in-flight slot for the channel; releaseChannel

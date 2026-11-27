@@ -31,6 +31,8 @@ type AdminHandler struct {
 	// modelsCache is invalidated on route/channel writes so /v1/models never
 	// serves stale ids after admin changes.
 	modelsCache *modelsCache
+	// keyInFlight 提供转发服务统计的令牌实时请求数。
+	keyInFlight func(int64) int
 	// gcService drives scheduled + manual database maintenance (may be nil).
 	gcService *maintenance.GCService
 	// validateProxyURL validates a per-channel proxy URL against the outbound
@@ -73,6 +75,11 @@ func NewAdminHandler(db *store.DB, enc *crypto.Encrypter, selector *routing.Sele
 // disables per-channel proxy validation).
 func (h *AdminHandler) SetProxyValidator(fn func(raw string) error) {
 	h.validateProxyURL = fn
+}
+
+// SetKeyInFlightProvider 设置令牌当前请求数的数据源。
+func (h *AdminHandler) SetKeyInFlightProvider(provider func(int64) int) {
+	h.keyInFlight = provider
 }
 
 // SetGCService wires the database-maintenance service (may be nil).
@@ -190,6 +197,7 @@ func (h *AdminHandler) Register(r chi.Router) {
 
 	// Downstream keys
 	r.Get("/downstream-keys", h.listDownstreamKeys)
+	r.Get("/downstream-keys/activity", h.listDownstreamKeyActivity)
 	r.Post("/downstream-keys", h.createDownstreamKey)
 	r.Put("/downstream-keys/{id}", h.updateDownstreamKey)
 	r.Delete("/downstream-keys/{id}", h.deleteDownstreamKey)

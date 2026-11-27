@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Button, Dialog, Field, Loading } from "../components/ui";
+import { Button, Dialog, Field, Loading, TextInput } from "../components/ui";
 import { useI18n } from "../i18n";
 import { useSession } from "../session";
 
@@ -72,7 +72,7 @@ export function OperatorClaimPanel({
   const claiming = state.data?.required ?? false;
   return (
     <section className="operator-profile-panel">
-      <p className="field-hint">{claiming ? t("operator.claimHint") : t("operator.changeHint")}</p>
+      {claiming ? <p className="field-hint">{t("operator.claimHint")}</p> : null}
       {state.isError ? (
         <p role="alert">{t("operator.loadFailed")}</p>
       ) : (
@@ -84,7 +84,7 @@ export function OperatorClaimPanel({
         >
           <fieldset disabled={save.isPending} className="overlay-fields">
             <Field label={t("app.connect.username")}>
-              <input
+              <TextInput
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setName(e.target.value)}
@@ -94,8 +94,29 @@ export function OperatorClaimPanel({
                 pattern="[A-Za-z0-9_.-]+"
               />
             </Field>
+            {state.data?.token_login ? (
+              <Field label={t("operator.confirmToken")}>
+                <TextInput
+                  type="password"
+                  autoComplete="current-password"
+                  value={token}
+                  onChange={(e) => setToken(e.target.value)}
+                  required
+                />
+              </Field>
+            ) : (
+              <Field label={t("operator.currentPassword")}>
+                <TextInput
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                />
+              </Field>
+            )}
             <Field label={t("operator.newPassword")}>
-              <input
+              <TextInput
                 type="password"
                 autoComplete="new-password"
                 value={password}
@@ -104,7 +125,7 @@ export function OperatorClaimPanel({
               />
             </Field>
             <Field label={t("operator.confirmNewPassword")}>
-              <input
+              <TextInput
                 type="password"
                 autoComplete="new-password"
                 value={confirm}
@@ -120,30 +141,9 @@ export function OperatorClaimPanel({
                 {t("operator.passwordMismatch")}
               </p>
             ) : null}
-            {state.data?.token_login ? (
-              <Field label={t("operator.confirmToken")}>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                  required
-                />
-              </Field>
-            ) : (
-              <Field label={t("operator.currentPassword")}>
-                <input
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  required
-                />
-              </Field>
-            )}
             {state.data?.totp_login ? (
               <Field label={t("app.connect.totp")}>
-                <input
+                <TextInput
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   pattern="[0-9]{6}"

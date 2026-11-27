@@ -37,7 +37,6 @@ const CHANGE_EVENT = "meta-gateway:topbar-changed";
 export const MODE_GATED_NAV = [
   "/users/members",
   "/users/policies",
-  "/users/quotas",
   "/users/codes",
   "/users/pricing",
   "/users/oauth",

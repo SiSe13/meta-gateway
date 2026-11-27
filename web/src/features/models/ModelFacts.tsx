@@ -25,7 +25,7 @@ export function ModelFacts({
       <dl className="model-facts model-facts-compact">
         {hasContext ? (
           <div>
-            <dt>{t("modelsPage.metaCtx")}</dt>
+            <dt>{t("modelsPage.metaCtxCompact")}</dt>
             <dd>{formatTokens(contextWindow!)}</dd>
           </div>
         ) : null}

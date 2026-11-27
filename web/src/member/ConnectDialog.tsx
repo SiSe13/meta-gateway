@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button as HeroButton } from "@heroui/react";
-import { Button, Dialog, Field, Loading } from "../components/ui";
+import { Button, Dialog, Field, Loading, SelectControl } from "../components/ui";
+import { useConfirm } from "../components/ConfirmProvider";
 import { accountRequest } from "../team/transport";
 import { teamError, type TeamText } from "../team/text";
 import type { UserKey } from "../team/types";
@@ -46,6 +47,7 @@ export function ConnectDialog({
   onCopy: (value: string, label?: string) => void;
 }) {
   const { locale } = useI18n();
+  const confirm = useConfirm();
   const [client, setClient] = useState<Client>("curl");
   const [model, setModel] = useState(initialModel ?? models[0] ?? "");
   const reveal = useQuery({
@@ -67,9 +69,16 @@ export function ConnectDialog({
         ? JSON.stringify({ name: brandName, endpoint: base, apiKey: secret, model }, null, 2)
         : `curl ${JSON.stringify(base + "/models")} \\\n  -H ${JSON.stringify("Authorization: Bearer " + secret)}`;
 
-  function importIntoClient() {
+  async function importIntoClient() {
     if (!model) return;
-    if (!confirm(t("importWarning"))) return;
+    if (
+      !(await confirm({
+        title: t("importConfirmTitle"),
+        message: t("importWarning"),
+        confirmLabel: t("importClient"),
+      }))
+    )
+      return;
     const params = new URLSearchParams({
       resource: "provider",
       app: "codex",
@@ -144,11 +153,11 @@ export function ConnectDialog({
           </div>
           {client === "ccswitch" && (
             <Field label={t("model")} className="form-grid-single">
-              <select value={model} onChange={(e) => setModel(e.target.value)}>
+              <SelectControl value={model} onChange={(e) => setModel(e.target.value)}>
                 {models.map((name) => (
                   <option key={name}>{name}</option>
                 ))}
-              </select>
+              </SelectControl>
             </Field>
           )}
           <pre className="user-code">{configuration}</pre>

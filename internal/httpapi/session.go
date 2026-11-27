@@ -125,7 +125,7 @@ func (h *sessionHandler) login(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				if h.team.enabled() {
-					h.team.issueSession(w, r, u)
+					h.team.issueSession(w, r, u, "password")
 					return
 				}
 				if u.Role != "owner" {

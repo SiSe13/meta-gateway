@@ -237,6 +237,8 @@ export interface PriceWindow {
 }
 export interface DownstreamKey {
   user_id?: number;
+  owner_name?: string;
+  owner_username?: string;
   id: number;
   name: string;
   enabled: boolean;
@@ -255,6 +257,12 @@ export interface DownstreamKey {
   allowed_ips?: string;
   group_name?: string;
   route_group_name?: string;
+  today_tokens?: number;
+  today_cost?: number;
+  last_30_days_tokens?: number;
+  last_30_days_cost?: number;
+  current_concurrent?: number;
+  authorization_groups?: string[];
   /** Persisted billing total for this key (sum of usage_records.cost). */
   cost?: number;
   has_token?: boolean;
@@ -270,6 +278,11 @@ export interface DownstreamKey {
 }
 export interface CreatedDownstreamKey extends DownstreamKey {
   token: string;
+}
+
+export interface DownstreamKeyActivity {
+  id: number;
+  current_concurrent: number;
 }
 /** Writable key fields shared by the editor, data source and API client. */
 export type KeyUpdateInput = {

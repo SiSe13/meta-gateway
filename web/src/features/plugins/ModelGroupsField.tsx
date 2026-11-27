@@ -1,7 +1,7 @@
 import { Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
 import { useI18n } from "../../i18n";
-import { Button } from "../../components/ui";
+import { Button, TextInput, SelectControl } from "../../components/ui";
 
 /** One named shortlist: a scenario, and the models that may answer inside it. */
 export interface ModelGroup {
@@ -153,13 +153,13 @@ export function ModelGroupsField({
         return (
           <div className="model-group" key={`group-${index}`}>
             <div className="model-group-head">
-              <input
+              <TextInput
                 className="model-group-name"
                 placeholder={t("plugins.modelGroups.namePlaceholder")}
                 value={group.name}
                 onChange={(event) => replace(index, { name: event.target.value })}
               />
-              <input
+              <TextInput
                 className="model-group-hint"
                 placeholder={t("plugins.modelGroups.hintPlaceholder")}
                 value={group.hint}
@@ -195,7 +195,7 @@ export function ModelGroupsField({
                   </HeroButton>
                 </span>
               ))}
-              <select
+              <SelectControl
                 className="model-group-add"
                 aria-label={t("plugins.modelGroups.pickModel")}
                 value=""
@@ -216,7 +216,7 @@ export function ModelGroupsField({
                     {model}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
             </div>
           </div>
         );

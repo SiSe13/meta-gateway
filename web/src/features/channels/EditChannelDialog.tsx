@@ -8,8 +8,18 @@ import type { Channel, RouteOverview, Site } from "../../api/types";
 import { parseCredentialMeta } from "../credentialMeta";
 import { Drawer } from "../../components/Drawer";
 import { SearchableSelect } from "../../components/SearchableSelect";
-import { Button, ErrorState, Field, InfoTip } from "../../components/ui";
+import {
+  Button,
+  ErrorState,
+  Field,
+  InfoTip,
+  TextInput,
+  TextAreaControl,
+  SelectControl,
+  CheckboxControl,
+} from "../../components/ui";
 import { useI18n } from "../../i18n";
+import { formatGroupName } from "../../lib/format";
 import { formatCost, formatTokens } from "../../lib/format";
 import {
   UA_PRESETS,
@@ -357,13 +367,17 @@ export function EditChannelDialog({
           </div>
           <div className="form-grid form-grid-single">
             <Field label={t("common.name")}>
-              <input value={name} onChange={(e) => setName(e.target.value)} disabled={pending} />
+              <TextInput
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={pending}
+              />
             </Field>
             <Field
               label={t("common.baseUrl")}
               hint={inheritedBase ? t("channels.editBaseUrlInherited") : t("channels.baseUrlHint")}
             >
-              <input
+              <TextInput
                 type="url"
                 required
                 value={baseUrl}
@@ -387,7 +401,11 @@ export function EditChannelDialog({
               <SearchableSelect
                 options={Array.from(new Set(["default", ...existingGroups]))
                   .sort((a, b) => a.localeCompare(b))
-                  .map((group) => ({ value: group, label: group, group: "existing" }))}
+                  .map((group) => ({
+                    value: group,
+                    label: formatGroupName(group, t),
+                    group: "existing",
+                  }))}
                 groups={["existing"]}
                 value={groupName}
                 onChange={(next) => setGroupName(next ?? "default")}
@@ -560,7 +578,7 @@ export function EditChannelDialog({
             <div className="advanced-fields">
               <div className="form-grid">
                 <Field label={t("common.priority")} hint={t("channels.priorityHint")}>
-                  <input
+                  <TextInput
                     type="number"
                     value={priority}
                     onChange={(e) => setPriority(Number(e.target.value) || 0)}
@@ -568,7 +586,7 @@ export function EditChannelDialog({
                   />
                 </Field>
                 <Field label={t("common.weight")} hint={t("channels.weightHint")}>
-                  <input
+                  <TextInput
                     type="number"
                     value={weight}
                     onChange={(e) => setWeight(Number(e.target.value) || 0)}
@@ -579,7 +597,7 @@ export function EditChannelDialog({
                   label={t("channels.maxReasoningEffort")}
                   hint={t("channels.maxReasoningEffortHint")}
                 >
-                  <select
+                  <SelectControl
                     value={maxReasoningEffort}
                     onChange={(e) => setMaxReasoningEffort(e.target.value)}
                     disabled={pending}
@@ -590,10 +608,10 @@ export function EditChannelDialog({
                         {level}
                       </option>
                     ))}
-                  </select>
+                  </SelectControl>
                 </Field>
                 <Field label={t("channels.maxConcurrent")} hint={t("channels.maxConcurrentHint")}>
-                  <input
+                  <TextInput
                     type="number"
                     min={0}
                     max={10000}
@@ -606,7 +624,7 @@ export function EditChannelDialog({
                   label={t("channels.nonStreamTimeout")}
                   hint={t("channels.nonStreamTimeoutHint")}
                 >
-                  <input
+                  <TextInput
                     type="number"
                     min={0}
                     max={86400}
@@ -629,7 +647,7 @@ export function EditChannelDialog({
                         })
                   }
                 >
-                  <input
+                  <TextInput
                     type="number"
                     min={0}
                     step="0.01"
@@ -650,7 +668,7 @@ export function EditChannelDialog({
                         })
                   }
                 >
-                  <input
+                  <TextInput
                     type="number"
                     min={0}
                     value={usageLimitTokens}
@@ -661,7 +679,7 @@ export function EditChannelDialog({
                   />
                 </Field>
                 <Field label={t("channels.streamPolicy")} hint={t("channels.streamPolicyHint")}>
-                  <select
+                  <SelectControl
                     value={streamPolicy}
                     onChange={(e) => setStreamPolicy(e.target.value as typeof streamPolicy)}
                     disabled={pending}
@@ -671,11 +689,11 @@ export function EditChannelDialog({
                     <option value="force_non_stream">
                       {t("channels.streamPolicyForceNonStream")}
                     </option>
-                  </select>
+                  </SelectControl>
                 </Field>
                 {/* 此策略控制保活等自动请求的表现，与签到账号凭据分开配置。 */}
                 <Field label={t("channels.callPolicy")} hint={t("channels.callPolicyHint")}>
-                  <select
+                  <SelectControl
                     value={callPolicy}
                     onChange={(e) => setCallPolicy(e.target.value as typeof callPolicy)}
                     disabled={pending}
@@ -693,10 +711,10 @@ export function EditChannelDialog({
                     <option value="real_calls_only">
                       {t("channels.keepalive.policyRealCallsOnly")}
                     </option>
-                  </select>
+                  </SelectControl>
                 </Field>
                 <Field label={t("channels.proxyUrl")} hint={t("channels.proxyUrlHint")}>
-                  <input
+                  <TextInput
                     type="url"
                     value={proxyUrl}
                     placeholder="http://127.0.0.1:7897"
@@ -712,7 +730,7 @@ export function EditChannelDialog({
                 </div>
                 <Field label={t("channels.uaPreset")} hint={t("channels.uaPresetHint")}>
                   <div className="ua-preset-row">
-                    <select
+                    <SelectControl
                       aria-label={t("channels.uaPreset")}
                       value={uaDraft && UA_PRESETS.includes(uaDraft) ? uaDraft : "custom"}
                       onChange={(e) => {
@@ -727,8 +745,8 @@ export function EditChannelDialog({
                           {preset}
                         </option>
                       ))}
-                    </select>
-                    <input
+                    </SelectControl>
+                    <TextInput
                       value={uaDraft}
                       onChange={(e) => applyUA(e.target.value)}
                       placeholder={t("channels.uaPlaceholder")}
@@ -740,7 +758,7 @@ export function EditChannelDialog({
                   ) : null}
                 </Field>
                 <Field label={t("channels.headerOverride")} hint={t("channels.headerOverrideHint")}>
-                  <textarea
+                  <TextAreaControl
                     className="mono textarea-sm"
                     value={headerOverride}
                     onChange={(e) => {
@@ -753,7 +771,7 @@ export function EditChannelDialog({
                   />
                 </Field>
                 <Field label={t("channels.systemPrompt")} hint={t("channels.systemPromptHint")}>
-                  <textarea
+                  <TextAreaControl
                     value={systemPrompt}
                     onChange={(e) => setSystemPrompt(e.target.value)}
                     disabled={pending}
@@ -762,7 +780,7 @@ export function EditChannelDialog({
                   />
                 </Field>
                 <Field label={t("channels.retryConfig")} hint={t("channels.retryConfigHint")}>
-                  <textarea
+                  <TextAreaControl
                     value={retryConfig}
                     onChange={(e) => setRetryConfig(e.target.value)}
                     disabled={pending}
@@ -771,8 +789,7 @@ export function EditChannelDialog({
                   />
                 </Field>
                 <label className="check is-spaced">
-                  <input
-                    type="checkbox"
+                  <CheckboxControl
                     checked={stableFirst}
                     onChange={(e) => setStableFirst(e.target.checked)}
                     disabled={pending}
@@ -780,7 +797,7 @@ export function EditChannelDialog({
                   <span>{t("channels.stableFirst")}</span>
                 </label>
                 <Field label={t("channels.payloadRules")} hint={t("channels.payloadRulesHint")}>
-                  <textarea
+                  <TextAreaControl
                     className="mono textarea-lg"
                     value={payloadRules}
                     onChange={(e) => setPayloadRules(e.target.value)}

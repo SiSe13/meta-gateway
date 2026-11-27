@@ -1,3 +1,4 @@
+import { TextInput } from "./ui";
 import {
   ArrowDown,
   ArrowUp,
@@ -245,7 +246,7 @@ export function CommandPalette({
       >
         <div className="command-search-box">
           <Search size={16} className="command-search-icon" />
-          <input
+          <TextInput
             ref={inputRef}
             value={query}
             placeholder={t("command.placeholder")}

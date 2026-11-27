@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button as HeroButton } from "@heroui/react";
-import { ErrorState, Field, Panel } from "../components/ui";
+import {
+  ErrorState,
+  Field,
+  Panel,
+  TextInput,
+  SelectControl,
+  CheckboxControl,
+} from "../components/ui";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 import { teamError, type TeamText } from "./text";
 import type { OAuthSettings, Policy, TeamRequest } from "./types";
@@ -37,10 +44,8 @@ function oauthPayload(settings: OAuthSettings, secrets: Record<string, string>) 
  * client id + secret — the console says so explicitly, because a half-filled
  * card is the most likely reason a button does not appear.
  *
- * The board is a Panel whose header carries the save action, so the operator does
- * not have to scroll back to the top to commit a change made in the last card;
- * the provider cards stay fieldsets, because that is what they are (a named group
- * of settings), but every control inside them is the shared one.
+ * The three settings cards save together after a short pause in editing, while
+ * retaining a clean baseline so in-flight requests cannot overwrite newer input.
  */
 export function OAuthPanel({
   request,
@@ -61,6 +66,8 @@ export function OAuthPanel({
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState("");
   const [copied, setCopied] = useState("");
+  const draftRef = useRef(draft);
+  const secretsRef = useRef(secrets);
   // A document that lands while the operator is mid-edit must not overwrite
   // their input; only the first payload — or one arriving while nothing is
   // unsaved — is adopted.
@@ -87,90 +94,100 @@ export function OAuthPanel({
     baseline !== null &&
     JSON.stringify(oauthPayload(draft, secrets)) !== JSON.stringify(oauthPayload(baseline, {}));
   editedRef.current = dirty;
+  draftRef.current = draft;
+  secretsRef.current = secrets;
   // Leaving this board — through the sidebar, the command palette or any other
-  // in-app move — must not throw the half-filled form away without a word.
+  // in-app move — must not discard a change before its automatic save completes.
   useUnsavedChanges(dirty);
+
+  useEffect(() => {
+    if (!draft || !baseline || !dirty || busy || error) return;
+
+    const payload = oauthPayload(draft, secrets);
+    const signature = JSON.stringify(payload);
+    const timer = window.setTimeout(() => {
+      setBusy(true);
+      setError(null);
+      setNotice("");
+      void request<OAuthSettings>("/admin/team/oauth", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      })
+        .then((result) => {
+          const latestSignature = JSON.stringify(
+            oauthPayload(draftRef.current!, secretsRef.current),
+          );
+          setBaseline(result);
+          if (latestSignature === signature) {
+            setDraft(result);
+            setSecrets({});
+            setNotice(t("oauthAutoSaved"));
+          }
+        })
+        .catch((saveError) => {
+          const latestSignature = JSON.stringify(
+            oauthPayload(draftRef.current!, secretsRef.current),
+          );
+          if (latestSignature === signature) setError(saveError);
+        })
+        .finally(() => setBusy(false));
+    }, 650);
+
+    return () => window.clearTimeout(timer);
+  }, [baseline, busy, dirty, draft, error, request, secrets, t]);
 
   if (error && !draft) {
     return <ErrorState error={error} />;
   }
   if (!draft) return <p className="panel-hint">{t("load")}</p>;
 
-  const patch = (providerId: string, values: Partial<OAuthSettings["providers"][number]>) =>
+  const patch = (providerId: string, values: Partial<OAuthSettings["providers"][number]>) => {
+    setError(null);
+    setNotice("");
     setDraft({
       ...draft,
       providers: draft.providers.map((item) =>
         item.id === providerId ? { ...item, ...values } : item,
       ),
     });
+  };
 
-  async function save() {
-    if (!draft) return;
-    setBusy(true);
+  const updateRegistration = (values: Partial<OAuthSettings>) => {
     setError(null);
     setNotice("");
-    try {
-      const result = await request<OAuthSettings>("/admin/team/oauth", {
-        method: "PUT",
-        body: JSON.stringify(oauthPayload(draft, secrets)),
-      });
-      setDraft(result);
-      setBaseline(result);
-      setSecrets({});
-      setNotice(t("success"));
-    } catch (e) {
-      setError(e);
-    } finally {
-      setBusy(false);
-    }
-  }
+    setDraft({ ...draft, ...values });
+  };
 
   return (
     <div className="team-board">
-      <Panel
-        title={t("oauth")}
-        titleHelp={t("oauthHint")}
-        actions={
-          <HeroButton
-            type="button"
-            variant="primary"
-            className="button button-primary"
-            isDisabled={busy}
-            isPending={busy}
-            onPress={() => void save()}
-          >
-            {busy ? <LoaderCircle size={14} className="spin" aria-hidden="true" /> : null}
-            {t("save")}
-          </HeroButton>
-        }
-      >
-        {error ? (
-          <p className="inline-error" role="alert">
-            {teamError(error, locale)}
-          </p>
-        ) : null}
-        {notice ? (
-          <p className="notice" role="status">
-            {notice}
-          </p>
-        ) : null}
-
-        <fieldset className="team-section">
-          <legend>{t("oauthRegistration")}</legend>
+      {busy || notice ? (
+        <p className="team-oauth-autosave" role="status" aria-live="polite">
+          {busy ? <LoaderCircle size={13} className="spin" aria-hidden="true" /> : null}
+          {busy ? t("oauthAutoSaving") : notice}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="inline-error" role="alert">
+          {teamError(error, locale)}
+        </p>
+      ) : null}
+      <div className="team-oauth-grid">
+        <Panel
+          title={t("oauthRegistration")}
+          className="team-oauth-card team-oauth-card-registration"
+        >
           <label className="check marginless">
-            <input
-              type="checkbox"
+            <CheckboxControl
               checked={draft.auto_register}
-              onChange={(e) => setDraft({ ...draft, auto_register: e.target.checked })}
+              onChange={(e) => updateRegistration({ auto_register: e.target.checked })}
             />
             <span>{t("oauthAutoRegister")}</span>
           </label>
           <p className="panel-hint">{t("oauthAutoRegisterHint")}</p>
           <Field label={t("oauthDefaultPolicy")}>
-            <select
+            <SelectControl
               value={draft.default_policy_id}
-              disabled={!draft.auto_register}
-              onChange={(e) => setDraft({ ...draft, default_policy_id: Number(e.target.value) })}
+              onChange={(e) => updateRegistration({ default_policy_id: Number(e.target.value) })}
             >
               <option value={0}>{t("oauthFirstPolicy")}</option>
               {policies.map((policy) => (
@@ -178,18 +195,20 @@ export function OAuthPanel({
                   {policy.name}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </Field>
-        </fieldset>
+        </Panel>
 
         {draft.providers.map((provider) => {
           const ready = provider.enabled && provider.client_id && provider.has_secret;
           return (
-            <fieldset className="team-section team-oauth-card" key={provider.id}>
-              <legend>{provider.label}</legend>
+            <Panel
+              title={provider.label}
+              className={`team-oauth-card team-oauth-card-${provider.id}`}
+              key={provider.id}
+            >
               <label className="check marginless">
-                <input
-                  type="checkbox"
+                <CheckboxControl
                   checked={provider.enabled}
                   onChange={(e) => patch(provider.id, { enabled: e.target.checked })}
                 />
@@ -219,7 +238,7 @@ export function OAuthPanel({
 
               <div className="meta-form">
                 <Field label={t("oauthClientID")}>
-                  <input
+                  <TextInput
                     value={provider.client_id}
                     maxLength={200}
                     autoComplete="off"
@@ -233,16 +252,20 @@ export function OAuthPanel({
                       : t("oauthClientSecret")
                   }
                 >
-                  <input
+                  <TextInput
                     type="password"
                     autoComplete="new-password"
                     placeholder={provider.has_secret ? t("oauthSecretKeep") : ""}
                     value={secrets[provider.id] ?? ""}
-                    onChange={(e) => setSecrets({ ...secrets, [provider.id]: e.target.value })}
+                    onChange={(e) => {
+                      setError(null);
+                      setNotice("");
+                      setSecrets({ ...secrets, [provider.id]: e.target.value });
+                    }}
                   />
                 </Field>
                 <Field label={t("oauthScopes")}>
-                  <input
+                  <TextInput
                     value={provider.scopes}
                     placeholder={provider.default_scopes}
                     onChange={(e) => patch(provider.id, { scopes: e.target.value })}
@@ -255,21 +278,21 @@ export function OAuthPanel({
                 <p className="panel-hint">{t("oauthAdvancedHint")}</p>
                 <div className="meta-form">
                   <Field label={t("oauthAuthorizeURL")}>
-                    <input
+                    <TextInput
                       value={provider.authorize_url}
                       placeholder={provider.default_authorize_url}
                       onChange={(e) => patch(provider.id, { authorize_url: e.target.value })}
                     />
                   </Field>
                   <Field label={t("oauthTokenURL")}>
-                    <input
+                    <TextInput
                       value={provider.token_url}
                       placeholder={provider.default_token_url}
                       onChange={(e) => patch(provider.id, { token_url: e.target.value })}
                     />
                   </Field>
                   <Field label={t("oauthUserInfoURL")}>
-                    <input
+                    <TextInput
                       value={provider.userinfo_url}
                       placeholder={provider.default_userinfo_url}
                       onChange={(e) => patch(provider.id, { userinfo_url: e.target.value })}
@@ -278,11 +301,43 @@ export function OAuthPanel({
                 </div>
               </details>
 
+              <details className="team-oauth-guide">
+                <summary>
+                  {t(provider.id === "github" ? "oauthGitHubGuide" : "oauthLinuxDoGuide")}
+                </summary>
+                <ol>
+                  {provider.id === "github" ? (
+                    <>
+                      <li>{t("oauthGitHubGuideStep1")}</li>
+                      <li>{t("oauthGitHubGuideStep2")}</li>
+                      <li>{t("oauthGitHubGuideStep3")}</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>{t("oauthLinuxDoGuideStep1")}</li>
+                      <li>{t("oauthLinuxDoGuideStep2")}</li>
+                      <li>{t("oauthLinuxDoGuideStep3")}</li>
+                    </>
+                  )}
+                </ol>
+                <a
+                  href={
+                    provider.id === "github"
+                      ? "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app"
+                      : "https://connect.linux.do"
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t(provider.id === "github" ? "oauthGitHubGuideLink" : "oauthLinuxDoGuideLink")}
+                </a>
+              </details>
+
               <p className="panel-hint">{ready ? t("oauthReady") : t("oauthNotReady")}</p>
-            </fieldset>
+            </Panel>
           );
         })}
-      </Panel>
+      </div>
     </div>
   );
 }

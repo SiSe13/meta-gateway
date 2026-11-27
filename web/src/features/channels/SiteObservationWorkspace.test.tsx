@@ -184,6 +184,10 @@ it("lists every collected record independently of local route rows", async () =>
   const actions = backend();
   mount();
   await screen.findByText("model-32");
+  const siteNavigation = screen.getByRole("navigation", { name: "Observed sites" });
+  expect(
+    within(siteNavigation).getByText("Sample site", { selector: ".observation-site-name" }),
+  ).toBeInTheDocument();
   expect(document.querySelectorAll(".observation-model:not(.is-header)")).toHaveLength(32);
   expect(screen.queryByText("route-only")).toBeNull();
   expect(actions.collect).not.toHaveBeenCalled();

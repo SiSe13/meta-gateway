@@ -2,31 +2,36 @@ package httpapi
 
 import (
 	"crypto/rand"
+	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// Team codes are one table with three jobs, distinguished by kind:
+// Team codes are one table with four jobs, distinguished by kind:
 //
 //	invite   — sign up (single-use by default, multi-use when max_uses > 1)
 //	credit   — top up the signed-in member's own credit pool
+//	concurrency — add in-flight request slots to the signed-in member's account
 //	recovery — reset a password (bound to one account)
 //
-// The plaintext leaves the server exactly once, in the creation response: the
-// table only stores a hash, so a list view can show what a code does but never
-// the code itself. That is deliberate — a code is a bearer credential.
+// The hash remains the redemption verifier; newly minted codes also keep an
+// encrypted copy so an authenticated operator can explicitly reveal them later.
 
 const (
-	teamCodeKinds    = "invite,credit"
+	teamCodeKinds    = "invite,credit,concurrency"
 	teamCodeMaxBatch = 500
 	teamCodeMaxQuota = 1_000_000_000_000
 	// A voucher's money face value, in the ledger's unit.
-	teamCodeMaxCost     = 1_000_000.0
-	teamCodeMaxUses     = 100000
-	teamCodeMaxNote     = 200
-	teamCodeMaxValidity = 365 * 24 * time.Hour
+	teamCodeMaxCost       = 1_000_000.0
+	teamCodeMaxUses       = 100000
+	teamCodeMaxNote       = 200
+	teamCodeMaxConcurrent = 10000
+	teamCodeMaxValidity   = 365 * 24 * time.Hour
+	// 兑换后的额度与并发最长有效一年；0 表示永久。
+	teamCodeMaxGrantValidityDays = 365
 )
 
 // teamCodeAlphabet omits the characters that get misread out loud (I, L, O, U)
@@ -112,31 +117,40 @@ func teamCodeCandidates(raw string) []string {
 }
 
 type teamCodeView struct {
-	ID         int64   `json:"id"`
-	Kind       string  `json:"kind"`
-	Label      string  `json:"label"`
-	Note       string  `json:"note"`
-	PolicyID   int64   `json:"policy_id"`
-	Role       string  `json:"role"`
-	ExpiresAt  int64   `json:"expires_at"`
-	MaxUses    int     `json:"max_uses"`
-	UsedCount  int     `json:"used_count"`
-	QuotaToken int64   `json:"quota_tokens"`
-	QuotaCost  float64 `json:"quota_cost"`
-	Revoked    bool    `json:"revoked"`
-	CreatedAt  string  `json:"created_at"`
+	ID                int64   `json:"id"`
+	Kind              string  `json:"kind"`
+	Label             string  `json:"label"`
+	Note              string  `json:"note"`
+	PolicyID          int64   `json:"policy_id"`
+	Role              string  `json:"role"`
+	ExpiresAt         int64   `json:"expires_at"`
+	MaxUses           int     `json:"max_uses"`
+	UsedCount         int     `json:"used_count"`
+	QuotaToken        int64   `json:"quota_tokens"`
+	QuotaCost         float64 `json:"quota_cost"`
+	QuotaConcurrent   int     `json:"quota_concurrent"`
+	GrantValidityDays int     `json:"grant_validity_days"`
+	Revoked           bool    `json:"revoked"`
+	CreatedAt         string  `json:"created_at"`
 	// Prefix is a display hint only (first group), so an operator can tell two
 	// vouchers apart without the table storing anything recoverable.
 	Prefix string `json:"prefix"`
+	// Revealable 只表示存在受保护的密文，不包含密文或明文。
+	Revealable bool `json:"revealable"`
 }
 
 func (h *TeamHandler) listCodes(w http.ResponseWriter, r *http.Request) {
 	kind := strings.TrimSpace(r.URL.Query().Get("kind"))
-	query := `SELECT id,kind,label,note,policy_id,role,expires_at,max_uses,used_count,quota_tokens,quota_cost,revoked,created_at FROM team_invites WHERE kind IN ('invite','credit')`
+	query := `SELECT id,kind,label,note,policy_id,role,expires_at,max_uses,used_count,quota_tokens,quota_cost,quota_concurrent,grant_validity_days,revoked,created_at,(token_enc <> '') FROM team_invites WHERE kind IN ('invite','credit')`
 	args := []any{}
 	if kind == "invite" || kind == "credit" {
 		query += ` AND kind=?`
 		args = append(args, kind)
+		if kind == "credit" {
+			query += ` AND quota_concurrent=0`
+		}
+	} else if kind == "concurrency" {
+		query += ` AND kind='credit' AND quota_concurrent>0`
 	}
 	// Recovery links are bound to one account and belong to that account's
 	// detail view, not to the code board.
@@ -150,11 +164,14 @@ func (h *TeamHandler) listCodes(w http.ResponseWriter, r *http.Request) {
 	items := []teamCodeView{}
 	for rows.Next() {
 		var v teamCodeView
-		if rows.Scan(&v.ID, &v.Kind, &v.Label, &v.Note, &v.PolicyID, &v.Role, &v.ExpiresAt, &v.MaxUses, &v.UsedCount, &v.QuotaToken, &v.QuotaCost, &v.Revoked, &v.CreatedAt) != nil {
+		if rows.Scan(&v.ID, &v.Kind, &v.Label, &v.Note, &v.PolicyID, &v.Role, &v.ExpiresAt, &v.MaxUses, &v.UsedCount, &v.QuotaToken, &v.QuotaCost, &v.QuotaConcurrent, &v.GrantValidityDays, &v.Revoked, &v.CreatedAt, &v.Revealable) != nil {
 			teamFail(w, 500, "load_failed")
 			return
 		}
 		items = append(items, v)
+		if v.QuotaConcurrent > 0 {
+			items[len(items)-1].Kind = "concurrency"
+		}
 	}
 	if p := teamActor(r); p != nil && p.User != nil && p.User.Role == "admin" {
 		// A restricted admin manages members, so only member-facing codes are
@@ -171,16 +188,19 @@ func (h *TeamHandler) listCodes(w http.ResponseWriter, r *http.Request) {
 }
 
 type teamCodeCreate struct {
-	Kind       string  `json:"kind"`
-	Count      int     `json:"count"`
-	Label      string  `json:"label"`
-	Note       string  `json:"note"`
-	PolicyID   int64   `json:"policy_id"`
-	Role       string  `json:"role"`
-	MaxUses    int     `json:"max_uses"`
-	QuotaToken int64   `json:"quota_tokens"`
-	QuotaCost  float64 `json:"quota_cost"`
-	ExpiresIn  int64   `json:"expires_in_hours"`
+	Kind              string  `json:"kind"`
+	Count             int     `json:"count"`
+	Label             string  `json:"label"`
+	Note              string  `json:"note"`
+	PolicyID          int64   `json:"policy_id"`
+	PolicyIDs         []int64 `json:"policy_ids"`
+	Role              string  `json:"role"`
+	MaxUses           int     `json:"max_uses"`
+	QuotaToken        int64   `json:"quota_tokens"`
+	QuotaCost         float64 `json:"quota_cost"`
+	QuotaConcurrent   int     `json:"quota_concurrent"`
+	ExpiresIn         *int64  `json:"expires_in_hours"`
+	GrantValidityDays int     `json:"grant_validity_days"`
 }
 
 // createCodes mints 1..N codes in one request. Batch generation is the whole
@@ -194,7 +214,7 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 	if !teamRead(w, r, &req) {
 		return
 	}
-	if req.Kind != "invite" && req.Kind != "credit" {
+	if req.Kind != "invite" && req.Kind != "credit" && req.Kind != "concurrency" {
 		teamFail(w, 400, "invalid_kind")
 		return
 	}
@@ -234,10 +254,23 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "invalid_request")
 		return
 	}
-	if req.ExpiresIn <= 0 {
-		req.ExpiresIn = 7 * 24
+	if req.QuotaConcurrent < 0 || req.QuotaConcurrent > teamCodeMaxConcurrent {
+		teamFail(w, 400, "invalid_request")
+		return
 	}
-	if time.Duration(req.ExpiresIn)*time.Hour > teamCodeMaxValidity {
+	if req.GrantValidityDays < 0 || req.GrantValidityDays > teamCodeMaxGrantValidityDays || (req.Kind == "invite" && req.GrantValidityDays != 0) {
+		teamFail(w, 400, "invalid_request")
+		return
+	}
+	if req.Kind != "concurrency" && req.QuotaConcurrent != 0 {
+		teamFail(w, 400, "invalid_request")
+		return
+	}
+	expiresIn := int64(7 * 24)
+	if req.ExpiresIn != nil {
+		expiresIn = *req.ExpiresIn
+	}
+	if expiresIn < 0 || time.Duration(expiresIn)*time.Hour > teamCodeMaxValidity {
 		teamFail(w, 400, "invalid_request")
 		return
 	}
@@ -247,12 +280,23 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "invalid_quota")
 		return
 	}
+	if req.Kind == "concurrency" && req.QuotaConcurrent <= 0 {
+		teamFail(w, 400, "invalid_quota")
+		return
+	}
 	if req.Kind == "invite" {
-		if _, err := h.policy(req.PolicyID); err != nil {
+		if len(req.PolicyIDs) == 0 && req.PolicyID > 0 {
+			req.PolicyIDs = []int64{req.PolicyID}
+		}
+		var err error
+		req.PolicyIDs, err = h.validatePolicyIDs(req.PolicyIDs)
+		if err != nil {
 			teamFail(w, 400, "invalid_policy")
 			return
 		}
+		req.PolicyID = req.PolicyIDs[0]
 	} else {
+		req.PolicyIDs = nil
 		// policy_id is NOT NULL with a foreign key, and a credit voucher has no
 		// policy at all — it tops up an account that already exists. Store the
 		// site's first policy as an inert placeholder rather than refusing to
@@ -262,7 +306,10 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	expiry := time.Now().Add(time.Duration(req.ExpiresIn) * time.Hour).Unix()
+	var expiry int64 // 0 means that the code has no redemption deadline.
+	if expiresIn > 0 {
+		expiry = time.Now().Add(time.Duration(expiresIn) * time.Hour).Unix()
+	}
 	type minted struct {
 		ID    int64  `json:"id"`
 		Code  string `json:"code"`
@@ -282,14 +329,30 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 			teamFail(w, 500, "save_failed")
 			return
 		}
-		res, err := tx.Exec(`INSERT INTO team_invites(token_hash,label,note,policy_id,role,kind,expires_at,max_uses,quota_tokens,quota_cost) VALUES(?,?,?,?,?,?,?,?,?,?)`,
-			teamHash(stripTeamCode(raw)), req.Label, req.Note, req.PolicyID, req.Role, req.Kind, expiry, req.MaxUses, req.QuotaToken, req.QuotaCost)
+		tokenEnc, err := h.enc.Encrypt([]byte(raw))
+		if err != nil {
+			teamFail(w, 500, "save_failed")
+			return
+		}
+		dbKind := req.Kind
+		if dbKind == "concurrency" {
+			dbKind = "credit"
+		}
+		res, err := tx.Exec(`INSERT INTO team_invites(token_hash,token_enc,label,note,policy_id,role,kind,expires_at,max_uses,quota_tokens,quota_cost,quota_concurrent,grant_validity_days) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			teamHash(stripTeamCode(raw)), tokenEnc, req.Label, req.Note, req.PolicyID, req.Role, dbKind, expiry, req.MaxUses, req.QuotaToken, req.QuotaCost, req.QuotaConcurrent, req.GrantValidityDays)
 		if err != nil {
 			log.Printf("team: create codes insert kind=%s policy=%d: %v", req.Kind, req.PolicyID, err)
 			teamFail(w, 500, "save_failed")
 			return
 		}
 		id, _ := res.LastInsertId()
+		for position, policyID := range req.PolicyIDs {
+			if _, err := tx.Exec(`INSERT INTO team_invite_policies(invite_id,policy_id,position) VALUES(?,?,?)`, id, policyID, position); err != nil {
+				log.Printf("team: create code authorization groups code=%d: %v", id, err)
+				teamFail(w, 500, "save_failed")
+				return
+			}
+		}
 		out = append(out, minted{ID: id, Code: raw, Path: "/app/accept#invite=" + raw, Label: req.Label})
 	}
 	if err := tx.Commit(); err != nil {
@@ -302,12 +365,54 @@ func (h *TeamHandler) createCodes(w http.ResponseWriter, r *http.Request) {
 	teamJSON(w, 201, map[string]any{"codes": out, "expires_at": expiry, "kind": req.Kind})
 }
 
+// revealCode 仅在明确请求且兑换码仍有效时返回明文。
+func (h *TeamHandler) revealCode(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	query := `SELECT token_enc,expires_at,max_uses,used_count,revoked FROM team_invites WHERE id=? AND kind IN ('invite','credit')`
+	if p := teamActor(r); p != nil && p.User != nil && p.User.Role == "admin" {
+		query += ` AND role='member'`
+	}
+	var tokenEnc string
+	var expiresAt int64
+	var maxUses, usedCount int
+	var revoked bool
+	err := h.db.QueryRow(query, id).Scan(&tokenEnc, &expiresAt, &maxUses, &usedCount, &revoked)
+	if errors.Is(err, sql.ErrNoRows) {
+		teamFail(w, 404, "not_found")
+		return
+	}
+	if err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	if revoked || (expiresAt > 0 && expiresAt <= time.Now().Unix()) || usedCount >= maxUses {
+		teamFail(w, 409, "code_not_revealable")
+		return
+	}
+	if tokenEnc == "" {
+		teamFail(w, 409, "code_unavailable")
+		return
+	}
+	plain, err := h.enc.Decrypt(tokenEnc)
+	if err != nil {
+		log.Printf("team: decrypt code id=%d: %v", id, err)
+		teamFail(w, 500, "code_unavailable")
+		return
+	}
+	h.audit(r, "team.code.reveal", id)
+	teamJSON(w, 200, map[string]string{"code": string(plain)})
+}
+
+// revokeCode 撤销注册码或额度码，使其不能再次兑换。
 func (h *TeamHandler) revokeCode(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
-	query := `UPDATE team_invites SET revoked=1 WHERE id=? AND kind IN ('invite','credit')`
+	query := `UPDATE team_invites SET revoked=1,token_enc='' WHERE id=? AND kind IN ('invite','credit')`
 	args := []any{id}
 	if p := teamActor(r); p != nil && p.User != nil && p.User.Role == "admin" {
 		query += ` AND role='member'`
@@ -355,13 +460,16 @@ func (h *TeamHandler) redeemCredit(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback()
 	var codeID, quota int64
 	var quotaCost float64
+	var quotaConcurrent, grantValidityDays int
+	now := time.Now()
 	// Both caps are enforced by this single statement: the row must still have
 	// uses left (used_count < max_uses), and the unique redemption index turns
 	// a second attempt by the same account into a constraint error below.
 	consume := func(hash string) error {
-		return tx.QueryRow(`UPDATE team_invites SET used_count = used_count + 1, consumed_at = COALESCE(consumed_at, ?)
-			WHERE token_hash=? AND kind='credit' AND revoked=0 AND expires_at>? AND used_count < max_uses
-			RETURNING id, quota_tokens, quota_cost`, time.Now().Unix(), hash, time.Now().Unix()).Scan(&codeID, &quota, &quotaCost)
+		return tx.QueryRow(`UPDATE team_invites SET used_count = used_count + 1, consumed_at = COALESCE(consumed_at, ?),
+			token_enc=CASE WHEN used_count + 1 >= max_uses THEN '' ELSE token_enc END
+			WHERE token_hash=? AND kind='credit' AND revoked=0 AND (expires_at=0 OR expires_at>?) AND used_count < max_uses
+			RETURNING id, quota_tokens, quota_cost, quota_concurrent, grant_validity_days`, now.Unix(), hash, now.Unix()).Scan(&codeID, &quota, &quotaCost, &quotaConcurrent, &grantValidityDays)
 	}
 	var consumeErr error
 	for _, candidate := range teamCodeCandidates(req.Code) {
@@ -373,16 +481,24 @@ func (h *TeamHandler) redeemCredit(w http.ResponseWriter, r *http.Request) {
 		teamFail(w, 400, "code_invalid")
 		return
 	}
-	if _, err := tx.Exec(`INSERT INTO team_code_redemptions(code_id,user_id,quota_tokens,quota_cost) VALUES(?,?,?,?)`, codeID, p.User.ID, quota, quotaCost); err != nil {
+	var grantExpiresAt int64
+	if grantValidityDays > 0 {
+		grantExpiresAt = now.Add(time.Duration(grantValidityDays) * 24 * time.Hour).Unix()
+	}
+	if _, err := tx.Exec(`INSERT INTO team_code_redemptions(code_id,user_id,quota_tokens,quota_cost,quota_concurrent,grant_expires_at) VALUES(?,?,?,?,?,?)`, codeID, p.User.ID, quota, quotaCost, quotaConcurrent, grantExpiresAt); err != nil {
 		// The unique (code_id, user_id) index: this account already redeemed it.
 		teamFail(w, 409, "code_already_redeemed")
 		return
 	}
 	// A voucher may carry tokens, money, or both; the pool holds two budgets and
 	// the code simply adds to whichever it names.
-	if _, err := tx.Exec(`UPDATE team_users SET quota_total_tokens = quota_total_tokens + ?, quota_total_cost = quota_total_cost + ? WHERE id=?`, quota, quotaCost, p.User.ID); err != nil {
-		teamFail(w, 500, "save_failed")
+	var maxConcurrent int
+	if err := tx.QueryRow(`UPDATE team_users SET quota_total_tokens = quota_total_tokens + ?, quota_total_cost = quota_total_cost + ?, max_concurrent = max_concurrent + ? WHERE id=? AND max_concurrent <= ? RETURNING max_concurrent`, quota, quotaCost, quotaConcurrent, p.User.ID, 10000-quotaConcurrent).Scan(&maxConcurrent); err != nil {
+		teamFail(w, 400, "concurrency_limit_exceeded")
 		return
+	}
+	if quotaConcurrent == 0 {
+		_ = tx.QueryRow(`SELECT max_concurrent FROM team_users WHERE id=?`, p.User.ID).Scan(&maxConcurrent)
 	}
 	if err := tx.Commit(); err != nil {
 		teamFail(w, 500, "save_failed")
@@ -393,15 +509,65 @@ func (h *TeamHandler) redeemCredit(w http.ResponseWriter, r *http.Request) {
 	var costTotal, costUsed float64
 	_ = h.db.QueryRow(`SELECT quota_total_tokens, quota_used_tokens, quota_total_cost, quota_used_cost FROM team_users WHERE id=?`, p.User.ID).Scan(&total, &used, &costTotal, &costUsed)
 	teamJSON(w, 200, map[string]any{
-		"granted":          quota,
-		"quota_total":      total,
-		"quota_used":       used,
-		"quota_available":  maxInt64(total-used, 0),
-		"cost_granted":     quotaCost,
-		"cost_total":       costTotal,
-		"cost_used":        costUsed,
-		"account_redeemed": true,
+		"granted":             quota,
+		"quota_total":         total,
+		"quota_used":          used,
+		"quota_available":     maxInt64(total-used, 0),
+		"cost_granted":        quotaCost,
+		"cost_total":          costTotal,
+		"cost_used":           costUsed,
+		"concurrency_granted": quotaConcurrent,
+		"max_concurrent":      maxConcurrent,
+		"account_redeemed":    true,
 	})
+}
+
+// myRedemptions returns the signed-in member's account and key-based grant history.
+// The original voucher codes are intentionally never exposed.
+func (h *TeamHandler) myRedemptions(w http.ResponseWriter, r *http.Request) {
+	user := teamActor(r).User
+	rows, err := h.db.Query(`SELECT id, created_at, quota_tokens, quota_cost, quota_concurrent, grant_expires_at, grant_expired, target
+		FROM (
+			SELECT id, CAST(strftime('%s', created_at) AS INTEGER) AS created_at, quota_tokens,
+				quota_cost, quota_concurrent, grant_expires_at, grant_expired, 'account' AS target
+			FROM team_code_redemptions WHERE user_id=?
+			UNION ALL
+			SELECT -rc.id, CAST(strftime('%s', rc.redeemed_at) AS INTEGER), rc.quota_tokens,
+				0, 0, 0, 0, 'api_key'
+			FROM redemption_codes rc
+			JOIN downstream_keys k ON k.id=rc.redeemed_by_key_id
+			WHERE k.user_id=? AND rc.redeemed_by_key_id<>0 AND rc.redeemed_at IS NOT NULL
+		) ORDER BY created_at DESC, id DESC LIMIT 100`, user.ID, user.ID)
+	if err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	defer rows.Close()
+	type redemption struct {
+		ID              int64   `json:"id"`
+		CreatedAt       int64   `json:"created_at"`
+		QuotaTokens     int64   `json:"quota_tokens"`
+		QuotaCost       float64 `json:"quota_cost"`
+		QuotaConcurrent int     `json:"quota_concurrent"`
+		GrantExpiresAt  int64   `json:"grant_expires_at"`
+		GrantExpired    bool    `json:"grant_expired"`
+		Target          string  `json:"target"`
+	}
+	items := []redemption{}
+	for rows.Next() {
+		var item redemption
+		if err := rows.Scan(&item.ID, &item.CreatedAt, &item.QuotaTokens, &item.QuotaCost,
+			&item.QuotaConcurrent, &item.GrantExpiresAt, &item.GrantExpired, &item.Target); err != nil {
+			teamFail(w, 500, "load_failed")
+			return
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		teamFail(w, 500, "load_failed")
+		return
+	}
+	teamJSON(w, 200, items)
 }
 
 // teamCreditView is what a member may see about their own pool. The pool holds

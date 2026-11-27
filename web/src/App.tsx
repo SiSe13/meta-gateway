@@ -1,6 +1,6 @@
+import { TextInput, CheckboxControl } from "./components/ui";
 import { OperatorUpgradePrompt } from "./features/OperatorProfilePanel";
 import { DeploymentStepPrompt } from "./features/DeploymentStepPrompt";
-import { OperatorClaimPanel } from "./features/OperatorProfilePanel";
 import {
   ArrowLeft,
   ArrowRight,
@@ -53,6 +53,7 @@ import { isStaff, type ConsoleRole } from "./session";
 import { accountRequest, COOKIE_SESSION, refreshAnonymousCSRF } from "./team/transport";
 import { teamText } from "./team/text";
 import { AcceptFlow } from "./features/AcceptFlow";
+import { PasswordChangeDialog } from "./features/PasswordChangeDialog";
 const AccountPage = lazy(() =>
   import("./features/AccountPage").then((module) => ({ default: module.AccountPage })),
 );
@@ -127,7 +128,7 @@ export function App() {
 
 function GatewayApp() {
   useCurrency();
-  const { client, connect, connectMember, disconnect, role } = useSession();
+  const { client, connect, connectMember, disconnect, role, sessionReady } = useSession();
   // The standalone admin screen renders the shared user-management module, so
   // it passes the transport in — the module deliberately does not know about
   // the console's session (see team/UsersLayout.tsx).
@@ -190,7 +191,9 @@ function GatewayApp() {
 
   return (
     <>
-      {client && role === "admin" ? (
+      {!sessionReady ? (
+        <Loading />
+      ) : client && role === "admin" ? (
         <Suspense fallback={<Loading />}>
           <StandaloneAdmin request={adminRequest} onDisconnect={handleDisconnect} />
         </Suspense>
@@ -553,7 +556,7 @@ function Connect({
                 <form onSubmit={submitSetup} aria-busy={pending}>
                   <p className="field-hint">{t("setup.firstRunHint")}</p>
                   <Field label={t("setup.code")}>
-                    <input
+                    <TextInput
                       value={setupCode}
                       onChange={(event) => setSetupCode(event.target.value)}
                       autoComplete="one-time-code"
@@ -562,7 +565,7 @@ function Connect({
                     />
                   </Field>
                   <Field label={t("app.connect.username")}>
-                    <input
+                    <TextInput
                       value={username}
                       onChange={(event) => setUsername(event.target.value)}
                       autoComplete="username"
@@ -574,7 +577,7 @@ function Connect({
                     />
                   </Field>
                   <Field label={t("operator.newPassword")}>
-                    <input
+                    <TextInput
                       type="password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
@@ -584,7 +587,7 @@ function Connect({
                     />
                   </Field>
                   <Field label={t("operator.confirmNewPassword")}>
-                    <input
+                    <TextInput
                       type="password"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
@@ -620,7 +623,7 @@ function Connect({
               ) : (
                 <form onSubmit={submit} aria-busy={pending}>
                   <Field label={t("app.connect.username")}>
-                    <input
+                    <TextInput
                       autoFocus
                       type="text"
                       value={username}
@@ -633,7 +636,7 @@ function Connect({
                     />
                   </Field>
                   <Field label={t("app.connect.password")}>
-                    <input
+                    <TextInput
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -646,7 +649,7 @@ function Connect({
                   </Field>
                   {needTOTP ? (
                     <Field label={t("app.connect.totp")}>
-                      <input
+                      <TextInput
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9]{6}"
@@ -663,8 +666,7 @@ function Connect({
                     </Field>
                   ) : null}
                   <label className="check">
-                    <input
-                      type="checkbox"
+                    <CheckboxControl
                       checked={remember}
                       onChange={(e) => setRemember(e.target.checked)}
                       disabled={pending}
@@ -730,7 +732,7 @@ function Connect({
           <p>{t("operator.legacyHint")}</p>
           <form onSubmit={(event) => void submit(event, true)}>
             <Field label={t("operator.confirmToken")}>
-              <input
+              <TextInput
                 type="password"
                 autoComplete="current-password"
                 value={password}
@@ -741,7 +743,7 @@ function Connect({
             </Field>
             {needTOTP ? (
               <Field label={t("app.connect.totp")}>
-                <input
+                <TextInput
                   inputMode="numeric"
                   pattern="[0-9]{6}"
                   autoComplete="one-time-code"
@@ -835,8 +837,7 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
   const hiddenPlugins = useHiddenPlugins();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [operatorPromptReady, setOperatorPromptReady] = useState(false);
-  const [operatorAccountOpen, setOperatorAccountOpen] = useState(false);
-  const [operatorAccountBusy, setOperatorAccountBusy] = useState(false);
+  const [passwordDialogMode, setPasswordDialogMode] = useState<"operator" | "member" | null>(null);
   const { client, role } = useSession();
   // A raw admin token (role === null) is the operator themselves, so it ranks
   // with an owner. Everything the console shows is then filtered by role:
@@ -1012,18 +1013,21 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
   const modeAvailableNav = sidebarNav.filter((item) => !modeHidesNav(item.to));
   const activeTopNavigation = chromeNavGroupForLocation(location.pathname, location.search);
   const activeGroup = CHROME_NAV_GROUPS.find((item) => item.id === activeTopNavigation)!;
-  const topNavigation = CHROME_NAV_GROUPS.flatMap((group) => {
-    const firstVisible = availableNav.find((item) => item.group === group.id);
-    const firstAvailable = modeAvailableNav.find((item) => item.group === group.id);
-    if (!firstAvailable) return [];
-    return [
-      {
-        id: group.id,
-        label: t(group.labelKey),
-        to: firstVisible?.to ?? firstAvailable.to,
-      },
-    ];
-  });
+  const topNavigation =
+    operatingMode.data?.mode === "team"
+      ? CHROME_NAV_GROUPS.flatMap((group) => {
+          const firstVisible = availableNav.find((item) => item.group === group.id);
+          const firstAvailable = modeAvailableNav.find((item) => item.group === group.id);
+          if (!firstAvailable) return [];
+          return [
+            {
+              id: group.id,
+              label: t(group.labelKey),
+              to: firstVisible?.to ?? firstAvailable.to,
+            },
+          ];
+        })
+      : [];
   const navSections =
     activeTopNavigation === "settings"
       ? RUNTIME_GROUPS.map((group) => ({
@@ -1060,18 +1064,12 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
       {/* Gated on the claim prompt so the two dialogs never stack: the account
           comes first, then the deployment file. */}
       <DeploymentStepPrompt enabled={operatorPromptReady} />
-      {operatorAccountOpen ? (
-        <Dialog
-          title={t("operator.title")}
-          onClose={() => setOperatorAccountOpen(false)}
-          busy={operatorAccountBusy}
-          className="operator-claim-dialog"
-        >
-          <OperatorClaimPanel
-            onBusyChange={setOperatorAccountBusy}
-            onSaved={() => setOperatorAccountOpen(false)}
-          />
-        </Dialog>
+      {passwordDialogMode ? (
+        <PasswordChangeDialog
+          mode={passwordDialogMode}
+          onClose={() => setPasswordDialogMode(null)}
+          onDisconnected={onUnauthorized}
+        />
       ) : null}
       <ConsoleShell
         appearance={appearance}
@@ -1081,7 +1079,8 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
         onSelectTopNavigation={(to) => navigate(to)}
         showAdminAccount={role === null || role === "owner"}
         showMemberAccount={role === "member" || role === "admin"}
-        onOpenAdminAccount={() => setOperatorAccountOpen(true)}
+        onOpenAdminAccount={() => setPasswordDialogMode("operator")}
+        onOpenPasswordDialog={() => setPasswordDialogMode("member")}
         appearanceHiddenNav={modeHiddenNav(operatingMode.data?.mode)}
         version={gatewayVersion}
         theme={theme}
@@ -1104,8 +1103,7 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
             <Route path="models/channel/:channelId" element={<ChannelModels />} />
             <Route path="models" element={<Models />} />
             <Route path="keys" element={<Keys />} />
-            {/* A member's own account: credit, request preferences, the
-						    member app's former settings page, at the member's own path. */}
+            {/* Personal information: account details, credit and login sessions. */}
             <Route
               path="account"
               element={role === null ? <Navigate to="/settings" replace /> : <AccountPage />}
@@ -1115,7 +1113,7 @@ function AuthenticatedShell({ onUnauthorized }: { onUnauthorized: () => void }) 
               <Route path="overview" element={<Navigate to="/users/members" replace />} />
               <Route path="members" element={<UsersBoards.MembersPanel />} />
               <Route path="policies" element={<UsersBoards.PoliciesPanel />} />
-              <Route path="quotas" element={<UsersBoards.QuotasPanel />} />
+              <Route path="quotas" element={<Navigate to="/users/members" replace />} />
               <Route path="pricing" element={<UsersBoards.PricingPanel />} />
               <Route path="codes" element={<UsersBoards.CodesPanel />} />
               <Route path="oauth" element={<UsersBoards.OAuthRoutePanel />} />

@@ -1,4 +1,14 @@
 import { useSyncExternalStore } from "react";
+
+/** 统一默认分组的显示名称，表单值、筛选条件和接口参数仍使用原始分组标识。 */
+export function formatGroupName(
+  name: string | null | undefined,
+  t: (key: string) => string,
+): string {
+  const normalized = name?.trim();
+  return !normalized || normalized === "default" ? t("routing.groupDefault") : normalized;
+}
+
 /** Compact token/request counts: 1.2M / 34.5k / 812. */
 export function formatTokens(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;

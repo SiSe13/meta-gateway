@@ -28,6 +28,7 @@ import type {
   WebDAVSyncResult,
 } from "../api/types";
 import { useI18n } from "../i18n";
+import { formatGroupName } from "../lib/format";
 import { useSession } from "../session";
 import { useUnsavedChanges } from "../lib/unsavedChanges";
 import {
@@ -1002,7 +1003,7 @@ export function Exchange({ embedded = false }: { embedded?: boolean } = {}) {
                 <strong>{c.name}</strong>
                 <small>
                   #{c.id}
-                  {c.group_name ? ` · ${c.group_name}` : ""}
+                  {c.group_name ? ` · ${formatGroupName(c.group_name, t)}` : ""}
                   {c.status !== "enabled" ? ` · ${c.status}` : ""}
                 </small>
               </span>
