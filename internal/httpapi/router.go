@@ -243,15 +243,16 @@ func NewWithDependencies(cfg *config.Config, db *store.DB, enc *crypto.Encrypter
 		http.Redirect(w, request, target, http.StatusPermanentRedirect)
 	}))
 	teamHandler := NewTeamHandler(db, enc)
-	// One front door. There is a single console now, so the root goes straight
-	// to it in either mode: a personal gateway's only user is the operator, and
-	// a team gateway's members sign in at the same door as everyone else. The
-	// old landing page is still served at /landing for anyone who wants a
-	// public brand surface.
-	r.Get("/", func(w http.ResponseWriter, request *http.Request) {
-		http.Redirect(w, request, "/console", http.StatusTemporaryRedirect)
+	// 公开首页供搜索收录，控制台自身通过 noindex 排除收录。
+	r.Get("/", handleLanding)
+	r.Head("/", handleLanding)
+	r.Get("/landing", func(w http.ResponseWriter, request *http.Request) {
+		http.Redirect(w, request, "/", http.StatusPermanentRedirect)
 	})
-	r.Get("/landing", handleLanding)
+	r.Get("/robots.txt", handleRobots)
+	r.Head("/robots.txt", handleRobots)
+	r.Get("/sitemap.xml", handleSitemap)
+	r.Head("/sitemap.xml", handleSitemap)
 
 	// Admin routes
 	adminGroup := chi.NewRouter()

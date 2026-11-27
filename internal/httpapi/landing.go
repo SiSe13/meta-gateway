@@ -4,18 +4,30 @@ import (
 	"net/http"
 )
 
-// Root landing page: a slim brand surface served at "/" so the root URL is
-// never a bare 404. Styled to match the admin connect screen (dark, squared,
-// mono accents), probes /readyz live to show gateway health, and runs a
-// canvas code-waterfall background (warm-white glyph rain, reduced-motion
-// aware). Kept in sync with tools/landing/index.html.
+// 公开首页直接输出产品介绍与 SEO 信息，和 tools/landing/index.html 保持同步。
 const landingPageHTML = `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="color-scheme" content="dark" />
-<title>Meta Gateway</title>
+<meta name="description" content="Balbo AI 提供便捷的 AI 模型服务与统一 API 入口。开通账户即可使用，轻松管理模型调用与用量。" />
+<meta name="keywords" content="Balbo AI, AI模型服务, AI API, 多模型平台, 模型调用, AI服务" />
+<meta name="robots" content="index, follow, max-image-preview:large" />
+<link rel="canonical" href="https://balbo.cn/" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="zh_CN" />
+<meta property="og:site_name" content="Balbo AI" />
+<meta property="og:title" content="Balbo AI — 多模型 AI 服务平台" />
+<meta property="og:description" content="开通账户即可使用 AI 模型服务，通过统一 API 入口管理模型调用与用量。" />
+<meta property="og:url" content="https://balbo.cn/" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="Balbo AI — 多模型 AI 服务平台" />
+<meta name="twitter:description" content="开通账户即可使用 AI 模型服务，通过统一 API 入口管理模型调用与用量。" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"Balbo AI","url":"https://balbo.cn/","inLanguage":"zh-CN","description":"面向个人与团队的 AI 模型服务平台，提供统一 API 入口、模型调用和用量管理。"}
+</script>
+<title>Balbo AI — 多模型 AI 服务平台</title>
 <style>
   :root {
     --bg: #141210;
@@ -161,15 +173,15 @@ const landingPageHTML = `<!doctype html>
   <canvas id="codefall" aria-hidden="true"></canvas>
   <main class="card">
     <header class="brand">
-      <div class="mark" aria-hidden="true">MG</div>
+      <div class="mark" aria-hidden="true">B</div>
       <div class="brand-copy">
-        <strong>Meta Gateway</strong>
-        <span>OpenAI-Compatible Relay</span>
+        <strong>Balbo AI</strong>
+        <span>AI MODEL PLATFORM</span>
       </div>
     </header>
     <div class="body">
-      <h1>多通道 API 中继网关</h1>
-      <p class="lead">统一接入多个上游渠道，模型路由、失败重试、密钥加密、用量审计与在线备份。</p>
+      <h1>多模型 AI 服务，开通即用</h1>
+      <p class="lead">Balbo AI 为个人与团队提供便捷的 AI 模型调用服务。通过统一 API 入口使用模型，在一个工作空间中查看可用模型、管理 API 密钥并跟踪用量。</p>
       <div class="status" role="status">
         <span class="dot" id="dot" aria-hidden="true"></span>
         <div class="status-copy">
@@ -178,19 +190,19 @@ const landingPageHTML = `<!doctype html>
         </div>
       </div>
       <div class="actions">
-        <a class="btn btn-primary" href="/console">进入管理控制台</a>
+        <a class="btn btn-primary" href="/console">进入控制台</a>
         <a class="btn btn-secondary" href="/healthz">健康检查</a>
       </div>
       <section class="endpoints">
-        <h2>Endpoints</h2>
-        <div class="endpoint"><code>/console</code><span>管理控制台</span></div>
-        <div class="endpoint"><code>/healthz · /readyz</code><span>健康检查</span></div>
-        <div class="endpoint"><code>/metrics</code><span>Prometheus 指标</span></div>
+        <h2>一站式 AI 模型服务</h2>
+        <div class="endpoint"><code>多模型调用</code><span>统一 API 入口，按需选择模型</span></div>
+        <div class="endpoint"><code>密钥管理</code><span>在控制台创建与管理 API 密钥</span></div>
+        <div class="endpoint"><code>用量明细</code><span>随时查看模型调用记录与消耗</span></div>
       </section>
     </div>
     <footer class="foot">
-      <span>META GATEWAY</span>
-      <em>MULTI-CHANNEL ROUTING · RETRY · AUDIT</em>
+      <span>BALBO AI</span>
+      <em>AI MODEL SERVICES · API · USAGE</em>
     </footer>
   </main>
   <script>
@@ -321,8 +333,29 @@ const landingPageHTML = `<!doctype html>
 </html>
 `
 
-func handleLanding(w http.ResponseWriter, _ *http.Request) {
+// handleLanding 提供无需执行 JavaScript 即可读取的公开产品页。
+func handleLanding(w http.ResponseWriter, request *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write([]byte(landingPageHTML))
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	if request.Method != http.MethodHead {
+		_, _ = w.Write([]byte(landingPageHTML))
+	}
+}
+
+// handleRobots 限制 API 抓取；控制台允许抓取以便读取其 noindex 标记。
+func handleRobots(w http.ResponseWriter, request *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if request.Method != http.MethodHead {
+		_, _ = w.Write([]byte("User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /auth\nDisallow: /me\nDisallow: /v1\nSitemap: https://balbo.cn/sitemap.xml\n"))
+	}
+}
+
+// handleSitemap 仅列出允许收录的公开页面，并使用正式域名。
+func handleSitemap(w http.ResponseWriter, request *http.Request) {
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if request.Method != http.MethodHead {
+		_, _ = w.Write([]byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"><url><loc>https://balbo.cn/</loc></url></urlset>\n"))
+	}
 }
