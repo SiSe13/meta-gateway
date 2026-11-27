@@ -126,7 +126,7 @@ func (h *AdminHandler) createCredential(w http.ResponseWriter, r *http.Request) 
 			}
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"id": candidate.ID, "site_id": candidate.SiteID, "kind": candidate.Kind,
-				"auth_mode": normalizeCredentialAuthMode(candidate.AuthMode),
+				"auth_mode":  normalizeCredentialAuthMode(candidate.AuthMode),
 				"has_secret": true, "has_cookie": len(candidate.CookieEnc) > 0,
 				"meta_json": candidate.MetaJSON, "status": candidate.Status,
 				"checkin_enabled": candidate.CheckinEnabled, "models_csv": candidate.ModelsCSV,

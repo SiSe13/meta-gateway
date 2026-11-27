@@ -24,10 +24,15 @@ fail() {
 # its environment is fixed, so a later change to the fake's behaviour has to come
 # through the filesystem.
 echo 0 >"$WORK/up_exit"
+echo 'sise13/meta-gateway:latest' >"$WORK/running_image"
+echo 'sise13/meta-gateway:latest' >"$WORK/config_image"
 cat >"$BIN/docker" <<EOF
 #!/bin/sh
 echo "docker \$*" >>"$CALLS"
 case "\$*" in
+  *"ps -q meta-gateway"*) echo "gateway-container"; exit 0 ;;
+  *".Config.Image"*) cat "$WORK/running_image"; exit 0 ;;
+  *"config --images"*) cat "$WORK/config_image"; exit 0 ;;
   *"up -d"*) echo "recreating meta-gateway"; exit \$(cat "$WORK/up_exit") ;;
   *"pull"*) echo "pulled image"; exit 0 ;;
 esac
@@ -86,4 +91,20 @@ grep -q '"up":"failed"' "$STATE/result.json" || fail "the failing step is not na
 grep -q 'recreating meta-gateway' "$STATE/result.json" || fail "the log tail was not carried into the result"
 echo 0 >"$WORK/up_exit"
 
-echo "PASS: compose-updater contract (heartbeat, request/result, failure reporting)"
+# 镜像来源不匹配时必须拒绝更新，且不得开始拉取或重建容器。
+for mismatch in running_image config_image; do
+  rm -f "$STATE/result.json"
+  : >"$CALLS"
+  echo 'unrelated/meta-gateway:latest' >"$WORK/$mismatch"
+  printf '{"target":"v4.0.2","requested_at":%s}\n' "$(date +%s)" >"$STATE/request.json.tmp"
+  mv "$STATE/request.json.tmp" "$STATE/request.json"
+  wait_for "$STATE/result.json" 30 || fail "no result.json after image mismatch"
+  grep -q '"exit_code":1' "$STATE/result.json" || fail "image mismatch reported success"
+  grep -q 'update refused' "$STATE/result.json" || fail "image rejection was not explained"
+  if grep -Eq 'compose .* (pull|up) ' "$CALLS"; then
+    fail "image mismatch invoked pull or up: $(cat "$CALLS")"
+  fi
+  echo 'sise13/meta-gateway:latest' >"$WORK/$mismatch"
+done
+
+echo "PASS: compose-updater contract (heartbeat, request/result, failure reporting, image source)"

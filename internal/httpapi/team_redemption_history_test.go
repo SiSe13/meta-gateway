@@ -35,11 +35,18 @@ func TestMemberRedemptionHistoryIsScopedToAccount(t *testing.T) {
 			t.Fatalf("redeem personal code for member %d: status=%d", i, code)
 		}
 	}
-	// 兑换记录属于个人账号数据；关闭团队模式后仍可查询，但仍必须登录。
+	// 关闭团队模式会撤销成员会话，但不能删除账号的兑换记录。
 	e.setMode("personal")
 	if code, _, _ := e.call(http.DefaultClient, "GET", "/me/redemptions", nil, "", ""); code != http.StatusUnauthorized {
 		t.Fatalf("unauthenticated redemption history status = %d, want %d", code, http.StatusUnauthorized)
 	}
+	for _, member := range []*teamTestBrowser{alice, bob} {
+		member.request("GET", "/me/redemptions", nil, http.StatusUnauthorized)
+	}
+	// 重新启用成员登录后，记录仍只能由所属账号查询。
+	e.setMode("team")
+	alice.login("history-alice", "member-password-123")
+	bob.login("history-bob", "member-password-123")
 
 	type redemption struct {
 		CreatedAt       int64   `json:"created_at"`

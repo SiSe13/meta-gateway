@@ -456,7 +456,8 @@ func TestTeamRoutingGrantRevocationAndUsageOwnership(t *testing.T) {
 	e.admin("PUT", "/admin/team/policies/1", p, 200)
 	alice := e.member("alice", "member")
 	bob := e.member("bob", "member")
-	if _, err := e.db.Exec(`UPDATE team_users SET allow_routing=1 WHERE username='alice'`); err != nil {
+	// 两个账号都具有路由权限，才能验证方案的跨账号所有权检查。
+	if _, err := e.db.Exec(`UPDATE team_users SET allow_routing=1 WHERE username IN ('alice', 'bob')`); err != nil {
 		t.Fatal(err)
 	}
 	kid, token := alice.key("app")

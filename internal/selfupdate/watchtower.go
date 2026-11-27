@@ -5,10 +5,7 @@
 package selfupdate
 
 import (
-	"context"
-	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -48,26 +45,4 @@ func WatchtowerReachable() bool {
 	}
 	_ = conn.Close()
 	return true
-}
-
-// TriggerWatchtower asks the companion service to pull the new image and
-// recreate the meta-gateway container. Watchtower returns as soon as the
-// update is queued; the swap itself runs in the companion's cgroup, so this
-// process never dies mid-handoff.
-func TriggerWatchtower(ctx context.Context) error {
-	url, token := defaults()
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url+"/v1/update", nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("watchtower update: status %d", resp.StatusCode)
-	}
-	return nil
 }

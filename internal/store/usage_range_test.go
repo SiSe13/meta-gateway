@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -100,10 +101,10 @@ func TestUsageKeyWindowTotals(t *testing.T) {
 	if err != nil {
 		t.Fatalf("key usage windows: %v", err)
 	}
-	if got := totals[11]; got.TodayTokens != 100 || got.TodayCost != 0.2 || got.MonthTokens != 300 || got.MonthCost != 0.6 {
+	if got := totals[11]; got.TodayTokens != 100 || math.Abs(got.TodayCost-0.2) > 1e-9 || got.MonthTokens != 300 || math.Abs(got.MonthCost-0.6) > 1e-9 {
 		t.Fatalf("key 11 windows = %+v, want today 100/0.2 and 30-day 300/0.6", got)
 	}
-	if got := totals[12]; got.TodayTokens != 50 || got.MonthTokens != 50 || got.TodayCost != 0.1 || got.MonthCost != 0.1 {
+	if got := totals[12]; got.TodayTokens != 50 || got.MonthTokens != 50 || math.Abs(got.TodayCost-0.1) > 1e-9 || math.Abs(got.MonthCost-0.1) > 1e-9 {
 		t.Fatalf("key 12 windows = %+v, want 50/0.1 in both windows", got)
 	}
 }
