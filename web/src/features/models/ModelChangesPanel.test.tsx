@@ -6,6 +6,7 @@ import { I18nProvider } from "../../i18n";
 import { SessionProvider } from "../../session";
 import { ToastProvider } from "../../toast";
 import { ModelChangesPanel } from "./ModelChangesPanel";
+import { selectOption } from "../../test/selectOption";
 
 function LocationProbe() {
   const location = useLocation();
@@ -136,8 +137,7 @@ function setup(options: { applyError?: boolean; empty?: boolean } = {}) {
 async function openReplacement() {
   fireEvent.click(await screen.findByRole("button", { name: "View changes" }));
   fireEvent.click(screen.getAllByRole("button", { name: "Choose replacement" })[0]!);
-  await screen.findByRole("option", { name: "new-model — Added" });
-  fireEvent.change(screen.getByLabelText("Target model"), { target: { value: "new-model" } });
+  await selectOption(await screen.findByLabelText("Target model"), "new-model — Added");
 }
 beforeEach(() => {
   localStorage.clear();
@@ -186,10 +186,9 @@ describe("upstream model maintenance", () => {
     await openReplacement();
     expect(screen.getByLabelText("Target channel")).toBeDisabled();
     fireEvent.click(screen.getByLabelText("Choose a model from another channel"));
-    fireEvent.change(screen.getByLabelText("Target channel"), { target: { value: "2" } });
-    expect(screen.getByLabelText("Target model")).toHaveValue("");
-    await screen.findByRole("option", { name: "other-model" });
-    fireEvent.change(screen.getByLabelText("Target model"), { target: { value: "other-model" } });
+    await selectOption(screen.getByLabelText("Target channel"), "Channel B");
+    expect(screen.getByLabelText("Target model")).not.toHaveTextContent("new-model");
+    await selectOption(screen.getByLabelText("Target model"), "other-model");
     fireEvent.click(screen.getByRole("button", { name: "Preview replacement" }));
     await waitFor(() => expect(calls[0]?.body.target_channel_id).toBe(2));
   });

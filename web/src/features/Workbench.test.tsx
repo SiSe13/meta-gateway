@@ -426,11 +426,14 @@ describe("image workbench", () => {
     fireEvent.click(picker);
     expect(screen.queryByRole("listbox", { name: "Model" })).not.toBeInTheDocument();
     // Members of the selected model become the pinnable upstreams.
+    const connectionPicker = screen.getByRole("button", { name: "Upstream connection" });
+    fireEvent.click(connectionPicker);
     expect(
-      within(screen.getByRole("combobox", { name: "Upstream connection" }))
+      within(screen.getByRole("listbox", { name: "Upstream connection" }))
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["Auto (gateway routing)", "chat-up · p5/w2"]);
+    fireEvent.click(connectionPicker);
 
     const composer = screen.getByPlaceholderText("Type a message — ⌘/Ctrl + Enter to send…");
     fireEvent.change(composer, { target: { value: "ping" } });
@@ -492,9 +495,10 @@ describe("image workbench", () => {
     });
     renderWorkbench();
     fireEvent.click(await screen.findByText("Playground"));
-    const picker = await screen.findByRole("combobox", { name: "Upstream connection" });
+    const picker = await screen.findByRole("button", { name: "Upstream connection" });
+    fireEvent.click(picker);
     expect(
-      within(picker)
+      within(screen.getByRole("listbox", { name: "Upstream connection" }))
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual([
@@ -505,7 +509,9 @@ describe("image workbench", () => {
 
     // Choosing the second row pins the MEMBER: both rows share channel 7, so a
     // channel pin could only ever have reached the first of them.
-    fireEvent.change(picker, { target: { value: "42" } });
+    fireEvent.click(
+      screen.getByRole("option", { name: "sensenova · origin SenseNova-V6 · p0/w100" }),
+    );
     const composer = screen.getByPlaceholderText("Type a message — ⌘/Ctrl + Enter to send…");
     fireEvent.change(composer, { target: { value: "ping" } });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));

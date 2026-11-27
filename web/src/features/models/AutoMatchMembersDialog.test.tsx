@@ -106,8 +106,8 @@ describe("auto-match members dialog", () => {
     renderDialog({ onClose });
 
     // Opening is a read: nothing is written until the operator confirms.
-    expect(await screen.findByText("serving")).toBeInTheDocument();
-    expect(screen.getByText("also-serving")).toBeInTheDocument();
+    expect(await screen.findByRole("checkbox", { name: "serving" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "also-serving" })).toBeChecked();
     expect(screen.getByText("2 available, 2 selected")).toBeInTheDocument();
     expect(backend.attach).not.toHaveBeenCalled();
 
@@ -127,7 +127,7 @@ describe("auto-match members dialog", () => {
     const backend = mockBackend();
     renderDialog({ group: "blue" });
 
-    await screen.findByText("also-serving");
+    await screen.findByRole("checkbox", { name: "also-serving" });
     fireEvent.click(screen.getByRole("checkbox", { name: "also-serving" }));
     expect(screen.getByText("2 available, 1 selected")).toBeInTheDocument();
 
@@ -157,7 +157,7 @@ describe("auto-match members dialog", () => {
       ],
     });
     renderDialog();
-    await screen.findByText("serving");
+    await screen.findByRole("checkbox", { name: "serving" });
 
     // Narrowing is still available, and it is what the operator picks when the
     // wildcard would reach too far.
@@ -197,7 +197,7 @@ describe("auto-match members dialog", () => {
       ],
     });
     renderDialog();
-    await screen.findByText("namespaced");
+    await screen.findByRole("checkbox", { name: "namespaced" });
 
     // Asked for the widest scope without the operator touching anything, and
     // the scope reaches the server on the preview, not only on attach.

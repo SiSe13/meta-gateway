@@ -1,5 +1,14 @@
 import { Children, cloneElement, isValidElement, useId, type ReactNode } from "react";
-import { Description, Fieldset, Label, Modal, TextField, useOverlayState } from "@heroui/react";
+import {
+  Description,
+  Fieldset,
+  Input,
+  Label,
+  Modal,
+  TextArea,
+  useOverlayState,
+} from "@heroui/react";
+import { SelectControl, TextAreaControl, TextInput } from "../components/ui";
 
 export function TeamModal({
   title,
@@ -65,7 +74,7 @@ export function TeamField({
   const labelID = `${fieldID}-label`;
   const hintID = `${fieldID}-hint`;
 
-  // React Aria 标签对原生下拉框也通过 id 建立显式关联，并为提示补上描述关系。
+  // 标签只负责关联控件；不创建 TextField 状态，避免覆盖子输入框的类型和初始值。
   const controls = Children.map(children, (child) => {
     if (
       !isValidElement<{
@@ -75,13 +84,20 @@ export function TeamField({
         type?: string;
         name?: string;
       }>(child) ||
-      !["input", "select", "textarea"].includes(typeof child.type === "string" ? child.type : "") ||
       (child.type === "input" && child.props.type === "hidden")
     ) {
       return child;
     }
 
-    if (typeof child.type !== "string") return child;
+    if (child.type === SelectControl) {
+      return cloneElement(child, { "aria-label": label } as Record<string, string>);
+    }
+    if (
+      !["input", "select", "textarea", Input, TextArea, TextInput, TextAreaControl].includes(
+        child.type as string | typeof Input,
+      )
+    )
+      return child;
     return cloneElement(child, {
       id: fieldID,
       "aria-labelledby": labelID,
@@ -90,7 +106,7 @@ export function TeamField({
   });
 
   return (
-    <TextField className="team-field" fullWidth>
+    <div className="team-field">
       <Label className="team-field-label" id={labelID} htmlFor={fieldID}>
         {label}
       </Label>
@@ -100,6 +116,6 @@ export function TeamField({
           {hint}
         </Description>
       ) : null}
-    </TextField>
+    </div>
   );
 }

@@ -5,6 +5,7 @@ import type { Route } from "../../api/types";
 import { I18nProvider } from "../../i18n";
 import { SessionProvider } from "../../session";
 import { RouteDialog } from "./RouteDialog";
+import { selectOption } from "../../test/selectOption";
 
 function renderDialog(
   value: Partial<Route>,
@@ -43,18 +44,16 @@ function showModelLevelSettings() {
 
 // Several selects in this dialog offer an "Inherit" option, so the option text
 // alone cannot identify the affinity field — walk down from its own label.
-function stickySelect(): HTMLSelectElement {
+function stickySelect(): HTMLButtonElement {
   const label = screen.getByText("Sticky session").closest("label");
-  const select = label?.querySelector("select");
+  const select = label?.querySelector<HTMLButtonElement>(".searchable-select-trigger");
   if (!select) throw new Error("sticky session field not rendered");
-  return select as HTMLSelectElement;
+  return select;
 }
 
-// Read the ladder from the affinity select's own options: several other selects
-// in this dialog also offer an "Inherit" entry, so a document-wide query is
-// ambiguous.
+// 直接读取当前字段的选中标签，避免与其他字段的“继承”选项混淆。
 function inheritLabel(): string {
-  return stickySelect().options[0]?.textContent ?? "";
+  return stickySelect().textContent ?? "";
 }
 
 function save() {
@@ -78,25 +77,25 @@ describe("route-level session affinity", () => {
     const { saved } = renderDialog({ id: 1, model_pattern: "unified" });
     const select = stickySelect();
 
-    fireEvent.change(select, { target: { value: "on" } });
+    await selectOption(select, "Enabled");
     save();
     expect(saved[0]?.sticky_session).toBe(true);
 
-    fireEvent.change(select, { target: { value: "off" } });
+    await selectOption(select, "Disabled");
     save();
     expect(saved[1]?.sticky_session).toBe(false);
 
     // Back to inherit: null is what the backend reads as "follow the global
     // setting", and omitting the key would be a different statement on a
     // full-replacement PUT.
-    fireEvent.change(select, { target: { value: "inherit" } });
+    await selectOption(select, "Inherit");
     save();
     expect(saved[2]?.sticky_session).toBeNull();
   });
 
   it("starts on inherit when the route carries no override", async () => {
     renderDialog({ id: 1, model_pattern: "unified" });
-    expect(stickySelect().value).toBe("inherit");
+    expect(stickySelect()).toHaveTextContent("Inherit");
   });
 
   // "Inherit" is only useful if the operator can see what is being inherited;

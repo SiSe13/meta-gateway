@@ -460,9 +460,7 @@ export function DashboardView({
       description={caps.channels ? t("dashboard.description") : t("dashboard.descriptionMember")}
     >
       <div className="cockpit-stack">
-        {/* The member's own band answers "where do I connect, what is left, what
-            next" in one place; the endpoint strip below it is the operator's
-            version of the same line, so a host renders one or the other. */}
+        {/* 初始化向导和网关端点只对管理端显示，成员直接查看自己的用量。 */}
         {caps.setup ? <SetupGuide /> : null}
 
         {caps.memberHome ? null : <EndpointStrip />}

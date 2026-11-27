@@ -189,14 +189,7 @@ describe("dashboard time range", () => {
   });
 });
 
-/**
- * The member's own band, and what must NOT be on a member's page.
- *
- * The overview is shared by staff and members, and it used to open with the
- * operator's endpoint strip and channel-health matrix for both. This pins the
- * member side: their identity and budgets at the top, the four ways in, and none
- * of the gateway's own instrumentation or flourishes.
- */
+/** 个人总览只显示本人用量，不恢复已删除的接入信息区或管理端指标。 */
 describe("member overview", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -208,7 +201,7 @@ describe("member overview", () => {
     vi.unstubAllGlobals();
   });
 
-  it("opens with the member's own band instead of the operator's readouts", async () => {
+  it("shows the member's own usage without operator controls", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -285,18 +278,13 @@ describe("member overview", () => {
       </QueryClientProvider>,
     );
 
-    // The band reads /me: the base URL, the plan and its limits, and the two
-    // budgets with the remaining balance as the figure rather than five numbers
-    // to compare. (The greeting itself is the page heading, which this test
-    // mounts without a host — Dashboard supplies it from the same query.)
-    expect(await screen.findByText("https://gw.example/v1")).toBeInTheDocument();
-    expect(screen.getByText(/Standard/)).toBeInTheDocument();
-    expect(screen.getByText("3,000,000")).toBeInTheDocument();
-    expect(screen.getByText("$45.08")).toBeInTheDocument();
-    expect(screen.getByText(/2,000,000\s*\/\s*5,000,000/)).toBeInTheDocument();
-    // The four ways in point at the member's own pages.
-    expect(screen.getByRole("link", { name: /New token/ })).toHaveAttribute("href", "/keys");
-    expect(screen.getByRole("link", { name: /Browse models/ })).toHaveAttribute("href", "/models");
+    // 个人总览沿用用量卡片，数据来自成员接口，账户额度已移到个人资料页。
+    expect(await screen.findByText("$0.4000")).toBeInTheDocument();
+    expect(screen.getByText("92%")).toBeInTheDocument();
+    expect(screen.queryByText("https://gw.example/v1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /New token/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Browse models/ })).not.toBeInTheDocument();
+    expect(vi.mocked(fetch).mock.calls.every(([url]) => String(url).startsWith("/me/"))).toBe(true);
 
     // None of the operator's instrumentation, and none of the brand flourishes.
     expect(screen.queryByText("Channel health")).not.toBeInTheDocument();

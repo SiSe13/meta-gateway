@@ -562,9 +562,13 @@ function ReplacementDialog({
     request: ModelReplacementRequest;
   } | null>(null);
   const previewHeading = useRef<HTMLHeadingElement>(null);
+  const targetModelField = useRef<HTMLLabelElement>(null);
   const previousStep = useRef(false);
   useEffect(() => {
     if (preview) previewHeading.current?.focus();
+    // 返回选择步骤后，把键盘焦点交还给可搜索模型下拉框。
+    else if (previousStep.current)
+      targetModelField.current?.querySelector<HTMLButtonElement>("button")?.focus();
     previousStep.current = preview !== null;
   }, [preview]);
   const channels = useQuery({
@@ -726,7 +730,7 @@ function ReplacementDialog({
               {t("modelChanges.search")}
               <HeroInput value={modelQuery} onChange={(e) => setModelQuery(e.target.value)} />
             </label>
-            <label>
+            <label ref={targetModelField}>
               {t("modelChanges.targetModel")}
               <SelectControl
                 value={targetModel}

@@ -45,7 +45,7 @@ it("offers personal/team setup and does not advance after saving sync defaults f
       </I18nProvider>
     </QueryClientProvider>,
   );
-  expect(await screen.findByLabelText("Operating mode")).toHaveValue("personal");
+  expect(await screen.findByLabelText("Operating mode")).toHaveTextContent("Personal");
   expect(screen.queryByRole("heading", { name: "Create owner account" })).toBeNull();
   fireEvent.click(screen.getAllByRole("radio")[1]!);
   fireEvent.click(screen.getByRole("button", { name: "Next" }));

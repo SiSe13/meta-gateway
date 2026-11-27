@@ -103,9 +103,9 @@ describe("ModelGroupsField", () => {
 
   it("offers only the models the gateway routes", () => {
     renderField(`[{"name":"code","hint":"","models":[]}]`, ["gpt-5", "deepseek-chat"]);
-    const picker = screen.getByLabelText("Add model") as HTMLSelectElement;
-    const options = Array.from(picker.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toEqual(["", "gpt-5", "deepseek-chat"]);
+    fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
+    expect(options).toEqual(["+ Add a model", "gpt-5", "deepseek-chat"]);
   });
 
   it("adds the picked model to the scenario it was picked in", () => {
@@ -118,7 +118,8 @@ describe("ModelGroupsField", () => {
       },
     );
     const pickers = screen.getAllByLabelText("Add model");
-    fireEvent.change(pickers[1]!, { target: { value: "gpt-5" } });
+    fireEvent.click(pickers[1]!);
+    fireEvent.click(screen.getByRole("option", { name: "gpt-5" }));
     expect(JSON.parse(next)).toEqual([
       { name: "code", hint: "", models: ["gpt-6"] },
       { name: "simple", hint: "", models: ["gpt-5"] },
@@ -136,9 +137,9 @@ describe("ModelGroupsField", () => {
 
   it("never offers a model the scenario already has", () => {
     renderField(`[{"name":"code","hint":"","models":["gpt-5"]}]`, ["gpt-5", "gpt-6"]);
-    const picker = screen.getByLabelText("Add model") as HTMLSelectElement;
-    const options = Array.from(picker.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toEqual(["", "gpt-6"]);
+    fireEvent.click(screen.getByRole("button", { name: "Add model" }));
+    const options = screen.getAllByRole("option").map((option) => option.textContent);
+    expect(options).toEqual(["+ Add a model", "gpt-6"]);
   });
 
   it("removes a model chip", () => {

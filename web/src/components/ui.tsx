@@ -32,10 +32,13 @@ import { registerOverlay } from "./overlayStack";
 
 const PageActionHost = createContext<HTMLElement | null>(null);
 
-/** 保留 HeroUI 未写入 DOM 的原生标题提示，并合并调用方的按钮 ref。 */
-function useButtonTitleRef(
+/** 保留 HeroUI 规范化后丢失的标题、控件语义和外部表单关联。 */
+function useButtonAttributesRef(
   title: string | undefined,
   forwardedRef: React.Ref<HTMLButtonElement> | undefined,
+  role?: React.AriaRole,
+  form?: string,
+  ariaChecked?: React.AriaAttributes["aria-checked"],
 ) {
   return useCallback(
     (node: HTMLButtonElement | null) => {
@@ -44,8 +47,13 @@ function useButtonTitleRef(
       if (!node) return;
       if (title) node.title = title;
       else node.removeAttribute("title");
+      node.setAttribute("role", role ?? "button");
+      if (form) node.setAttribute("form", form);
+      else node.removeAttribute("form");
+      if (ariaChecked !== undefined) node.setAttribute("aria-checked", String(ariaChecked));
+      else node.removeAttribute("aria-checked");
     },
-    [forwardedRef, title],
+    [forwardedRef, title, role, form, ariaChecked],
   );
 }
 
@@ -71,8 +79,17 @@ export function Button({
   ref?: React.Ref<HTMLButtonElement>;
   value?: string;
 }) {
-  const { onClick, value, title, ref: forwardedRef, form, ...buttonProps } = props;
-  const buttonRef = useButtonTitleRef(title, forwardedRef);
+  const {
+    onClick,
+    value,
+    title,
+    ref: forwardedRef,
+    form,
+    role,
+    "aria-checked": ariaChecked,
+    ...buttonProps
+  } = props;
+  const buttonRef = useButtonAttributesRef(title, forwardedRef, role, form, ariaChecked);
   const heroVariant =
     variant === "secondary"
       ? "secondary"
@@ -93,7 +110,8 @@ export function Button({
       {...(buttonProps as React.ComponentProps<typeof HeroButton>)}
       onClick={(event) => {
         onClick?.(event as React.MouseEvent<HTMLButtonElement>);
-        if (type === "submit" && form) {
+        if (type === "submit" && form && !event.defaultPrevented) {
+          event.preventDefault();
           const ownerForm = document.getElementById(form);
           if (ownerForm instanceof HTMLFormElement) ownerForm.requestSubmit();
         }
@@ -120,7 +138,7 @@ export function IconButton({
   value?: string;
 }) {
   const { onClick, value, title, ref: forwardedRef, ...buttonProps } = props;
-  const buttonRef = useButtonTitleRef(title, forwardedRef);
+  const buttonRef = useButtonAttributesRef(title, forwardedRef);
   return (
     <HeroButton
       type={type}
@@ -177,7 +195,7 @@ export function SelectControl({
     .filter(isValidElement)
     .map((child) => {
       const props = child.props as { value?: string | number; children?: ReactNode };
-      return { value: String(props.value ?? ""), label: String(props.children ?? "") };
+      return { value: String(props.value ?? ""), label: Children.toArray(props.children).join("") };
     });
   return (
     <>

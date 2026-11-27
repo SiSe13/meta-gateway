@@ -314,7 +314,9 @@ describe("user management module", () => {
       ).toBe(true);
     });
 
-    fireEvent.click(within(row).getByRole("checkbox", { name: "Select Alice" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const refreshedRow = await screen.findByRole("row", { name: /Alice/ });
+    fireEvent.click(within(refreshedRow).getByRole("checkbox", { name: "Select Alice" }));
     const bulkBar = screen.getByRole("region", { name: "Bulk actions" });
     fireEvent.click(within(bulkBar).getByRole("button", { name: "Adjust concurrency" }));
     expect(await screen.findByRole("dialog", { name: "Adjust concurrency · 1" })).toHaveTextContent(

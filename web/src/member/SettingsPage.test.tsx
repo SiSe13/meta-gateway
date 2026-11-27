@@ -222,7 +222,9 @@ it("revokes a selected session and reloads the session list", async () => {
 
 it("signs out other sessions after confirmation", async () => {
   const { fetcher } = mount();
-  fireEvent.click(await screen.findByRole("button", { name: "Sign out other sessions" }));
+  const action = await screen.findByRole("button", { name: "Sign out other sessions" });
+  await waitFor(() => expect(action).toBeEnabled());
+  fireEvent.click(action);
   const dialog = await screen.findByRole("dialog", { name: "Sign out other sessions" });
   expect(
     within(dialog).getByText(

@@ -749,14 +749,7 @@ function MemberDetail({
             <Button variant="secondary" disabled={busy} onClick={onBack}>
               {t("cancel")}
             </Button>
-            <Button
-              type="button"
-              loading={busy}
-              onClick={() => {
-                const form = document.getElementById(formID);
-                if (form instanceof HTMLFormElement) form.requestSubmit();
-              }}
-            >
+            <Button type="submit" form={formID} loading={busy}>
               {t("save")}
             </Button>
           </div>

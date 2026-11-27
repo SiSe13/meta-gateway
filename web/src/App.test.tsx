@@ -253,7 +253,7 @@ describe("channel-first shell", () => {
     expect(screen.getByRole("dialog", { name: "Getting started" })).toBeInTheDocument();
     expect(document.querySelector(".dialog-backdrop")).toBeInTheDocument();
     expect(document.querySelector(".console-shell")).toBeInTheDocument();
-    expect(await screen.findByLabelText("Operating mode")).toHaveValue("personal");
+    expect(await screen.findByLabelText("Operating mode")).toHaveTextContent("Personal");
   });
 
   it("uses one account form and immediately adopts a member session", async () => {
@@ -319,7 +319,7 @@ describe("channel-first shell", () => {
     const card = moreWays.closest(".login-card");
 
     expect(card).not.toBeNull();
-    expect(card?.querySelector(".login-card-mark img")).toHaveAttribute("alt", "Meta Gateway");
+    expect(card?.querySelector(".login-card-mark img")).toHaveAttribute("alt", "Balbo AI");
   });
 
   it("keeps the language switcher and ignores a saved custom login background", () => {
@@ -327,10 +327,10 @@ describe("channel-first shell", () => {
     vi.stubGlobal("fetch", stubAdminFetch());
     renderApp();
 
-    expect(screen.getByRole("combobox", { name: "Language" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Language" })).toBeInTheDocument();
     expect(document.querySelector(".login-atmosphere")?.getAttribute("style")).toBeNull();
     expect(document.querySelector(".login-tools input[type=file]")).toBeNull();
-    expect(document.querySelectorAll(".login-tools button")).toHaveLength(1);
+    expect(document.querySelectorAll(".login-tools button")).toHaveLength(2);
     expect(localStorage.getItem("mg.login.bg")).toBeNull();
   });
 
@@ -342,7 +342,7 @@ describe("channel-first shell", () => {
     const otherOptions = await screen.findByRole("heading", { name: "Other sign-in options" });
     expect(
       otherOptions.closest(".login-card")?.querySelector(".login-card-mark img"),
-    ).toHaveAttribute("alt", "Meta Gateway");
+    ).toHaveAttribute("alt", "Balbo AI");
     // The backend has always exposed the configured providers; nothing used to
     // render them, so a member had no button to sign in with one.
     expect(await screen.findByRole("link", { name: /Continue with Linux\.do/ })).toHaveAttribute(
@@ -379,7 +379,7 @@ describe("channel-first shell", () => {
       }),
     );
     renderApp(["/users/members"]);
-    expect(await screen.findByRole("heading", { name: "User management" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search members" })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent("/users/members"));
     expect(document.querySelector(".console-shell")).toBeInTheDocument();
     expect(document.querySelector('a[href="/console/users/policies"]')).toBeNull();
@@ -438,7 +438,7 @@ describe("channel-first shell", () => {
     expect(localStorage.getItem("meta-gateway.admin-token")).toBe("mg-sess.test");
     expect(document.querySelector(".gateway-transition")).toBeNull();
     expect(await screen.findByRole("heading", { name: "Overview" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
+    expect(document.querySelector(".console-navigation")).toBeInTheDocument();
     expect(document.querySelector(".authenticated-stage.is-revealing")).toBeNull();
     expect(document.querySelector(".gateway-transition")).toBeNull();
     expect(fetcher.mock.calls.filter(([input]) => String(input) === "/admin/session")).toHaveLength(
@@ -520,7 +520,7 @@ describe("channel-first shell", () => {
       ].map((element) => element.textContent?.trim());
 
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
     expect(navLabels()).toContain("Check-in");
     expect(navLabels()).not.toContain("Workbench");
 
@@ -530,7 +530,7 @@ describe("channel-first shell", () => {
       JSON.stringify({ controls: {}, hiddenNav: ["/checkins"] }),
     );
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
     expect(navLabels()).not.toContain("Check-in");
     expect(navLabels()).not.toContain("Workbench");
 
@@ -538,7 +538,7 @@ describe("channel-first shell", () => {
     // the command palette still offers it.
     cleanup();
     renderApp(["/checkins"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Check-in" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Run enabled" })).toBeInTheDocument();
     // Three full app mounts in one case: 1s on an idle machine, but the 5s default
     // is not enough when the whole suite runs in parallel (measured 4059ms and
     // 5016ms on 2026-10-08, the latter a timeout). The assertions are about
@@ -554,11 +554,14 @@ describe("channel-first shell", () => {
         hiddenNav: ["/", "/channels", "/models", "/keys", "/logs", "/checkins"],
       }),
     );
-    vi.stubGlobal("fetch", stubAdminFetch());
+    vi.stubGlobal(
+      "fetch",
+      stubAdminFetch({ mode: { mode: "team", has_owner: true, role: "owner" } }),
+    );
 
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Console" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Console" })).toBeInTheDocument();
   });
 
   // The top bar used to carry a check-in shortcut next to the navigation entry
@@ -579,13 +582,13 @@ describe("channel-first shell", () => {
       stubAdminFetch({ mode: { mode: "team", has_owner: true, role: "owner" } }),
     );
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
     await waitFor(() => expect(topNavLabels()).toContain("User management"));
 
     cleanup();
     vi.stubGlobal("fetch", stubAdminFetch());
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
     await waitFor(() => expect(topNavLabels()).not.toContain("User management"));
     expect(topNavLabels()).toEqual([]);
   });
@@ -594,7 +597,7 @@ describe("channel-first shell", () => {
     localStorage.setItem("meta-gateway.admin-token", "nav-token");
     vi.stubGlobal("fetch", stubAdminFetch());
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
     expect(document.querySelector(".console-checkin, .deck-checkin-btn")).toBeNull();
   });
 
@@ -603,7 +606,7 @@ describe("channel-first shell", () => {
     vi.stubGlobal("fetch", stubAdminFetch());
 
     renderApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
 
     cleanup();
     renderApp(["/logs"]);
@@ -612,9 +615,13 @@ describe("channel-first shell", () => {
     cleanup();
     renderApp(["/settings"]);
     expect(screen.queryByRole("heading", { level: 1, name: "Settings" })).not.toBeInTheDocument();
-    expect(
-      document.querySelector('.console-navigation a[href="/console/settings?tab=runtime"]'),
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        document.querySelector(
+          '.console-navigation a[href^="/console/settings?tab=runtime&section="]',
+        ),
+      ).toBeInTheDocument(),
+    );
 
     cleanup();
     renderApp(["/backups"]);
@@ -626,7 +633,7 @@ describe("channel-first shell", () => {
     vi.stubGlobal("fetch", stubAdminFetch());
 
     renderDataRouterApp(["/models"]);
-    expect(await screen.findByRole("heading", { level: 1, name: "Models" })).toBeInTheDocument();
+    expect(await screen.findByRole("searchbox", { name: "Search models" })).toBeInTheDocument();
 
     // A push through the shell's own nav.
     fireEvent.click(screen.getByRole("link", { name: "Request history" }));
@@ -751,7 +758,7 @@ describe("channel-first shell", () => {
     );
 
     renderApp(["/models"]);
-    await screen.findByRole("heading", { level: 1, name: "Models" });
+    await screen.findByRole("searchbox", { name: "Search models" });
 
     // The plugin's model is a row of its own, owned by the plugin — and only the
     // literal name: a wildcard is a matcher, not something a client can call.

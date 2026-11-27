@@ -136,12 +136,14 @@ describe("member workbench", () => {
     const picker = await screen.findByRole("button", { name: "Model" });
     expect(picker).toHaveTextContent("gpt-5.1");
     // The connection picker is the member's token, labelled as such.
-    const connections = screen.getByRole("combobox", { name: "Which token" });
+    const connections = screen.getByRole("button", { name: "Which token" });
+    fireEvent.click(connections);
     expect(
-      within(connections)
+      within(screen.getByRole("listbox", { name: "Which token" }))
         .getAllByRole("option")
         .map((option) => option.textContent),
     ).toEqual(["Auto (first usable token)", "default-key"]);
+    fireEvent.click(connections);
 
     const composer = screen.getByPlaceholderText("Type a message — ⌘/Ctrl + Enter to send…");
     fireEvent.change(composer, { target: { value: "ping" } });

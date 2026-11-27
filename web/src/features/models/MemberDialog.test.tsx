@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { I18nProvider } from "../../i18n";
 import { MemberDialog } from "./MemberDialog";
+import { selectOption } from "../../test/selectOption";
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -62,7 +63,7 @@ function upstreamOptionLabels() {
   );
 }
 const blankTarget = "Blank (forward the route name)";
-it("offers the selected channel's own models as upstream name suggestions", () => {
+it("offers the selected channel's own models as upstream name suggestions", async () => {
   localStorage.setItem("meta-gateway.locale", "en");
   const save = vi.fn();
   render(
@@ -78,7 +79,7 @@ it("offers the selected channel's own models as upstream name suggestions", () =
       />
     </I18nProvider>,
   );
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "5" } });
+  await selectOption(screen.getByLabelText(/Channel/), "WONG");
   fireEvent.click(screen.getByRole("button", { name: /Upstream model name/ }));
   // The wildcard is a route matcher, never a callable upstream model name.
   expect(upstreamOptionLabels()).toEqual([
@@ -116,7 +117,7 @@ it("suggests models from the member's own channel while editing", () => {
   fireEvent.click(screen.getByRole("button", { name: /Upstream model name/ }));
   expect(upstreamOptionLabels()).toEqual([blankTarget, "gpt-4o", "Custom model name"]);
 });
-it("resets the upstream target when the channel changes", () => {
+it("resets the upstream target when the channel changes", async () => {
   localStorage.setItem("meta-gateway.locale", "en");
   const save = vi.fn();
   render(
@@ -135,12 +136,12 @@ it("resets the upstream target when the channel changes", () => {
       />
     </I18nProvider>,
   );
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "5" } });
+  await selectOption(screen.getByLabelText(/Channel/), "WONG");
   fireEvent.click(screen.getByRole("button", { name: /Upstream model name/ }));
   fireEvent.click(screen.getByRole("option", { name: "gpt-4o" }));
   expect(screen.getByRole("button", { name: /Upstream model name/ })).toHaveTextContent("gpt-4o");
 
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "6" } });
+  await selectOption(screen.getByLabelText(/Channel/), "OTHER");
   // The previous channel's target is gone, and the options are the new one's.
   expect(screen.getByRole("button", { name: /Upstream model name/ })).not.toHaveTextContent(
     "gpt-4o",
@@ -152,7 +153,7 @@ it("resets the upstream target when the channel changes", () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(save).toHaveBeenCalledWith({ channel_id: 6, mapping_json: "" });
 });
-it("abandons a custom upstream name when the channel changes", () => {
+it("abandons a custom upstream name when the channel changes", async () => {
   localStorage.setItem("meta-gateway.locale", "en");
   const save = vi.fn();
   render(
@@ -171,14 +172,14 @@ it("abandons a custom upstream name when the channel changes", () => {
       />
     </I18nProvider>,
   );
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "5" } });
+  await selectOption(screen.getByLabelText(/Channel/), "WONG");
   fireEvent.click(screen.getByRole("button", { name: /Upstream model name/ }));
   fireEvent.click(screen.getByRole("option", { name: "Custom model name" }));
   const customField = () => screen.queryByPlaceholderText(/Blank forwards the route name/);
   fireEvent.change(customField()!, { target: { value: "hand-typed-name" } });
   expect(customField()).toBeInTheDocument();
 
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "6" } });
+  await selectOption(screen.getByLabelText(/Channel/), "OTHER");
   // Back to an empty dropdown: no leftover free-text box, no stale name.
   expect(customField()).toBeNull();
   const trigger = screen.getByRole("button", { name: /Upstream model name/ });
@@ -206,7 +207,7 @@ it("keeps the picked upstream name when the custom row is clicked by mistake", a
       />
     </I18nProvider>,
   );
-  fireEvent.change(screen.getByLabelText(/Channel/), { target: { value: "5" } });
+  await selectOption(screen.getByLabelText(/Channel/), "WONG");
   fireEvent.click(screen.getByRole("button", { name: /Upstream model name/ }));
   fireEvent.click(screen.getByRole("option", { name: "gpt-4o" }));
   // The trigger ignores clicks for ~300ms after a commit (double-Enter guard).
